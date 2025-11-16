@@ -17,13 +17,14 @@ use crate::{
     config::{
         keys::{
             GlobalAction,
-            actions::{AddKind, DeleteKind, Position, RateKind, SaveKind},
+            actions::{AddKind, AutoplayKind, DeleteKind, Position, RateKind, SaveKind},
         },
         tabs::PaneType,
     },
     core::command::{create_env, run_external},
     ctx::{Ctx, LIKE_STICKER, RATING_STICKER},
     mpd::{
+        client::Client,
         commands::Song,
         mpd_client::{Filter, MpdClient, MpdCommand},
         proto_client::ProtoClient,
@@ -33,7 +34,7 @@ use crate::{
         key_event::KeyEvent,
         macros::{modal, status_error, status_info, status_warn},
         mouse_event::{MouseEvent, MouseEventKind, calculate_scrollbar_position},
-        mpd_client_ext::{Autoplay, Enqueue, MpdClientExt},
+        mpd_client_ext::{Enqueue, MpdClientExt},
     },
     ui::{
         UiEvent,
@@ -397,15 +398,15 @@ impl SearchPane {
                 CommonAction::AddOptions { kind: AddKind::Action(opts) } if opts.all => {
                     let (_, enqueue) = self.enqueue(opts.all);
                     if !enqueue.is_empty() {
-                        let queue_len = ctx.queue.len();
                         let current_song_idx = ctx.find_current_song_in_queue().map(|(i, _)| i);
-
-                        ctx.command(move |client| {
-                            let autoplay = opts.autoplay(queue_len, current_song_idx, None);
-                            client.enqueue_multiple(enqueue, opts.position, autoplay)?;
-
-                            Ok(())
-                        });
+                        Client::resolve_and_enqueue(
+                            ctx,
+                            enqueue,
+                            opts.position,
+                            opts.autoplay,
+                            current_song_idx,
+                            None,
+                        );
                     }
                 }
                 // This action only makes sense when opts.all is true while we are on the
@@ -586,7 +587,7 @@ impl SearchPane {
                     });
                     if !items.is_empty() {
                         ctx.command(move |client| {
-                            client.enqueue_multiple(items, Position::EndOfQueue, Autoplay::None)?;
+                            client.enqueue_multiple(items, None, None, false)?;
                             Ok(())
                         });
                     }
@@ -649,18 +650,17 @@ impl SearchPane {
                 CommonAction::Close => {}
                 CommonAction::Confirm if self.songs_dir.marked().is_empty() => {
                     let (hovered_song_idx, items) = self.enqueue(true);
-                    let queue_len = ctx.queue.len();
                     let current_song_idx = ctx.find_current_song_in_queue().map(|(i, _)| i);
 
                     if !items.is_empty() {
-                        ctx.command(move |client| {
-                            client.enqueue_multiple(
-                                items,
-                                Position::Replace,
-                                Autoplay::Hovered { queue_len, current_song_idx, hovered_song_idx },
-                            )?;
-                            Ok(())
-                        });
+                        Client::resolve_and_enqueue(
+                            ctx,
+                            items,
+                            Position::Replace,
+                            AutoplayKind::Hovered,
+                            current_song_idx,
+                            hovered_song_idx,
+                        );
                     }
 
                     ctx.render()?;
@@ -671,17 +671,16 @@ impl SearchPane {
                     let (hovered_song_idx, enqueue) = self.enqueue(opts.all);
 
                     if !enqueue.is_empty() {
-                        let queue_len = ctx.queue.len();
                         let current_song_idx = ctx.find_current_song_in_queue().map(|(i, _)| i);
 
-                        ctx.command(move |client| {
-                            let autoplay =
-                                opts.autoplay(queue_len, current_song_idx, hovered_song_idx);
-
-                            client.enqueue_multiple(enqueue, opts.position, autoplay)?;
-
-                            Ok(())
-                        });
+                        Client::resolve_and_enqueue(
+                            ctx,
+                            enqueue,
+                            opts.position,
+                            opts.autoplay,
+                            current_song_idx,
+                            hovered_song_idx,
+                        );
                     }
                 }
                 CommonAction::AddOptions { kind: AddKind::Modal(opts) } => {
@@ -829,22 +828,14 @@ impl SearchPane {
                         let enqueue_clone = enqueue.clone();
                         section.add_item("Add all to queue", move |ctx| {
                             ctx.command(move |client| {
-                                client.enqueue_multiple(
-                                    enqueue_clone,
-                                    Position::EndOfQueue,
-                                    Autoplay::None,
-                                )?;
+                                client.enqueue_multiple(enqueue_clone, None, None, false)?;
                                 Ok(())
                             });
                             Ok(())
                         });
                         section.add_item("Replace queue with all", move |ctx| {
                             ctx.command(move |client| {
-                                client.enqueue_multiple(
-                                    enqueue,
-                                    Position::Replace,
-                                    Autoplay::None,
-                                )?;
+                                client.enqueue_multiple(enqueue, None, None, true)?;
                                 Ok(())
                             });
                             Ok(())
@@ -1151,11 +1142,7 @@ impl Pane for SearchPane {
                         let (_, items) = self.enqueue(false);
                         if !items.is_empty() {
                             ctx.command(move |client| {
-                                client.enqueue_multiple(
-                                    items,
-                                    Position::EndOfQueue,
-                                    Autoplay::None,
-                                )?;
+                                client.enqueue_multiple(items, None, None, false)?;
                                 Ok(())
                             });
                         }
@@ -1210,7 +1197,7 @@ impl Pane for SearchPane {
                     let (_, items) = self.enqueue(false);
                     if !items.is_empty() {
                         ctx.command(move |client| {
-                            client.enqueue_multiple(items, Position::EndOfQueue, Autoplay::None)?;
+                            client.enqueue_multiple(items, None, None, false)?;
                             Ok(())
                         });
                     }

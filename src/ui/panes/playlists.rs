@@ -8,7 +8,7 @@ use ratatui::{Frame, prelude::Rect, widgets::ListState};
 use super::Pane;
 use crate::{
     MpdQueryResult,
-    config::{keys::actions::Position, tabs::PaneType},
+    config::tabs::PaneType,
     ctx::Ctx,
     mpd::{
         client::Client,
@@ -21,7 +21,7 @@ use crate::{
         key_event::KeyEvent,
         macros::{modal, status_info},
         mouse_event::MouseEvent,
-        mpd_client_ext::{Autoplay, MpdClientExt, MpdDelete},
+        mpd_client_ext::MpdDelete,
     },
     status_warn,
     ui::{
@@ -58,41 +58,6 @@ impl PlaylistsPane {
             browser: Browser::new(),
             initialized: false,
         }
-    }
-
-    fn open_or_play(&mut self, autoplay: bool, ctx: &Ctx) -> Result<()> {
-        let Some(selected) = self.stack().current().selected() else {
-            log::error!("Failed to move deeper inside dir. Current value is None");
-            return Ok(());
-        };
-
-        match selected {
-            DirOrSong::Dir { .. } => {
-                self.stack_mut().enter();
-                ctx.render()?;
-            }
-            DirOrSong::Song(_song) => {
-                let (items, hovered_song_idx) = self.enqueue(self.stack().current().items.iter());
-                if !items.is_empty() {
-                    let queue_len = ctx.queue.len();
-                    let (position, autoplay) = if autoplay {
-                        (Position::Replace, Autoplay::Hovered {
-                            queue_len,
-                            current_song_idx: None,
-                            hovered_song_idx,
-                        })
-                    } else {
-                        (Position::EndOfQueue, Autoplay::None)
-                    };
-                    ctx.command(move |client| {
-                        client.enqueue_multiple(items, position, autoplay)?;
-                        Ok(())
-                    });
-                }
-            }
-        }
-
-        Ok(())
     }
 }
 
@@ -351,10 +316,6 @@ impl BrowserPane<DirOrSong> for PlaylistsPane {
         self.filter_input_mode
     }
 
-    fn next(&mut self, ctx: &Ctx) -> Result<()> {
-        self.open_or_play(false, ctx)
-    }
-
     fn list_songs_in_item(
         &self,
         item: DirOrSong,
@@ -393,10 +354,6 @@ impl BrowserPane<DirOrSong> for PlaylistsPane {
         }
 
         Ok(())
-    }
-
-    fn open(&mut self, ctx: &Ctx) -> Result<()> {
-        self.open_or_play(true, ctx)
     }
 
     fn show_info(&self, item: &DirOrSong, ctx: &Ctx) -> Result<()> {

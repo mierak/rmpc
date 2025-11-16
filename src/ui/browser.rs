@@ -11,7 +11,7 @@ use crate::{
     config::keys::{
         CommonAction,
         GlobalAction,
-        actions::{AddKind, DeleteKind, Position, RateKind, SaveKind},
+        actions::{AddKind, AutoplayKind, DeleteKind, Position, RateKind, SaveKind},
     },
     ctx::{Ctx, LIKE_STICKER, RATING_STICKER},
     mpd::{client::Client, commands::Song, mpd_client::MpdClient},
@@ -19,7 +19,7 @@ use crate::{
         key_event::KeyEvent,
         macros::{modal, status_warn},
         mouse_event::{MouseEvent, MouseEventKind, calculate_scrollbar_position},
-        mpd_client_ext::{Autoplay, Enqueue, MpdClientExt, MpdDelete},
+        mpd_client_ext::{Enqueue, MpdClientExt, MpdDelete},
         mpd_query::EXTERNAL_COMMAND,
     },
     ui::{
@@ -63,7 +63,39 @@ where
     }
     fn set_filter_input_mode_active(&mut self, active: bool);
     fn is_filter_input_mode_active(&self) -> bool;
-    fn next(&mut self, ctx: &Ctx) -> Result<()>;
+    fn open(&mut self, autoplay: bool, ctx: &Ctx) -> Result<()> {
+        let Some(selected) = self.stack().current().selected() else {
+            log::error!("Failed to move deeper inside dir. Current value is None");
+            return Ok(());
+        };
+
+        if selected.is_file() {
+            let (items, hovered_song_idx) = self.enqueue(
+                self.stack()
+                    .current()
+                    .items
+                    .iter()
+                    // Only add songs here in case the directory contains combination of
+                    // directories, playlists and songs to be able to use autoplay from the
+                    // hovered song properly.
+                    .filter(|item| item.is_file()),
+            );
+            if !items.is_empty() {
+                let (position, autoplay) = if autoplay {
+                    (Position::Replace, AutoplayKind::Hovered)
+                } else {
+                    (Position::EndOfQueue, AutoplayKind::None)
+                };
+
+                Client::resolve_and_enqueue(ctx, items, position, autoplay, None, hovered_song_idx);
+            }
+        } else {
+            self.stack_mut().enter();
+            ctx.render()?;
+        }
+
+        Ok(())
+    }
     fn list_songs_in_item(
         &self,
         item: T,
@@ -119,7 +151,6 @@ where
 
         (items, idx)
     }
-    fn open(&mut self, ctx: &Ctx) -> Result<()>;
     fn show_info(&self, item: &T, ctx: &Ctx) -> Result<()> {
         Ok(())
     }
@@ -292,7 +323,7 @@ where
                 if let Some(idx_to_select) =
                     self.stack().current().state.get_at_rendered_row(clicked_row)
                 {
-                    self.next(ctx)?;
+                    self.open(false, ctx)?;
                     self.fetch_data_internal(ctx);
                 }
             }
@@ -307,11 +338,7 @@ where
                         let (items, _) = self.enqueue(std::iter::once(item));
                         if !items.is_empty() {
                             ctx.command(move |client| {
-                                client.enqueue_multiple(
-                                    items,
-                                    Position::EndOfQueue,
-                                    Autoplay::None,
-                                )?;
+                                client.enqueue_multiple(items, None, None, false)?;
                                 Ok(())
                             });
                         }
@@ -341,7 +368,7 @@ where
                     if clicked_row < preview.len() { Some(clicked_row) } else { None }
                 });
 
-                self.next(ctx)?;
+                self.open(false, ctx)?;
                 self.stack_mut().current_mut().select_idx(idx_to_select.unwrap_or_default(), 0);
 
                 self.fetch_data_internal(ctx);
@@ -429,7 +456,7 @@ where
                 ctx.render()?;
             }
             CommonAction::Right => {
-                self.next(ctx)?;
+                self.open(false, ctx)?;
                 self.fetch_data_internal(ctx);
                 ctx.render()?;
             }
@@ -497,7 +524,8 @@ where
             CommonAction::FocusInput => {}
             CommonAction::Close => {}
             CommonAction::Confirm if self.stack().current().marked().is_empty() => {
-                self.open(ctx)?;
+                self.open(true, ctx)?;
+                self.fetch_data_internal(ctx)?;
                 ctx.render()?;
             }
             CommonAction::ShowInfo => {
@@ -516,12 +544,14 @@ where
                     let queue_len = ctx.queue.len();
                     let current_song_idx = ctx.find_current_song_in_queue().map(|(i, _)| i);
 
-                    ctx.command(move |client| {
-                        let autoplay = options.autoplay(queue_len, current_song_idx, hovered_idx);
-                        client.enqueue_multiple(enqueue, options.position, autoplay)?;
-
-                        Ok(())
-                    });
+                    Client::resolve_and_enqueue(
+                        ctx,
+                        enqueue,
+                        options.position,
+                        options.autoplay,
+                        current_song_idx,
+                        hovered_idx,
+                    );
                 }
             }
             CommonAction::AddOptions { kind: AddKind::Modal(items) } => {
@@ -704,11 +734,7 @@ where
                     let cloned_items = current_items.clone();
                     section.add_item("Add to queue", move |ctx| {
                         ctx.command(move |client| {
-                            client.enqueue_multiple(
-                                cloned_items,
-                                Position::EndOfQueue,
-                                Autoplay::None,
-                            )?;
+                            client.enqueue_multiple(cloned_items, None, None, false)?;
                             Ok(())
                         });
                         Ok(())
@@ -716,11 +742,7 @@ where
                     let cloned_items = current_items.clone();
                     section.add_item("Replace queue", move |ctx| {
                         ctx.command(move |client| {
-                            client.enqueue_multiple(
-                                cloned_items,
-                                Position::Replace,
-                                Autoplay::None,
-                            )?;
+                            client.enqueue_multiple(cloned_items, None, None, true)?;
                             Ok(())
                         });
                         Ok(())

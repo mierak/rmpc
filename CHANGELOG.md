@@ -6,6 +6,8 @@ All notable changes to this project will be documented in this file.
 
 ### Added
 
+- `AfterCurrentAlbum` and `BeforeCurrentAlbum` to `AddOptions` keybind
+
 ### Changed
 
 - Moved docs to a new [repository](https://github.com/rmpc-org/rmpc-org.github.io) and [domain](https://rmpc.mierak.dev/)
@@ -13,6 +15,7 @@ All notable changes to this project will be documented in this file.
 ### Fixed
 
 - Ignore rare phantom inputs from querying terminal for protocol support on startup
+- Fix directories pane not fetching data after using the `Confirm` action to enter a directory
 
 ## [0.10.0] - 2025-11-11
 
