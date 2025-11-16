@@ -1,4 +1,5 @@
 use std::{
+    collections::VecDeque,
     io::Write,
     ops::AddAssign,
     sync::{Arc, atomic::Ordering},
@@ -26,6 +27,7 @@ use crate::{
         image::resize_image,
         macros::{status_error, try_cont},
         terminal::TERMINAL,
+        tmux::tmux_write_bytes,
     },
     tmux,
     try_skip,
@@ -116,7 +118,7 @@ impl Sixel {
                         clear_area(&mut w, config.colors, area),
                         "Failed to clear sixel image area"
                     );
-                    try_skip!(display(&mut w, &buf, resized_area), "Failed to display sixel image");
+                    try_skip!(display(&mut w, buf, resized_area), "Failed to display sixel image");
                 }
             })
             .expect("sixel thread to be spawned");
@@ -125,11 +127,29 @@ impl Sixel {
     }
 }
 
-fn display(w: &mut impl Write, data: &[u8], area: Rect) -> Result<()> {
+fn display(w: &mut impl Write, mut data: VecDeque<u8>, area: Rect) -> Result<()> {
     log::debug!(bytes = data.len(); "transmitting data");
     queue!(w, SavePosition)?;
     queue!(w, MoveTo(area.x, area.y))?;
-    w.write_all(data)?;
+
+    let (x, y) = if tmux::is_inside_tmux() {
+        let pane_position = tmux::pane_position()?;
+        (area.x + 1 + pane_position.0, area.y + 1 + pane_position.1)
+    } else {
+        (area.x + 1, area.y + 1)
+    };
+
+    for b in format!("\x1b7\x1b[{y};{x}H").as_bytes().iter().rev() {
+        data.push_front(*b);
+    }
+
+    for b in "\x1b8".as_bytes() {
+        data.push_back(*b);
+    }
+
+    let mut data = data.make_contiguous().to_vec();
+    tmux_write_bytes!(w, data)?;
+
     w.flush()?;
     queue!(w, RestorePosition)?;
 
@@ -142,7 +162,7 @@ fn encode(
     max_size: Size,
     halign: HorizontalAlign,
     valign: VerticalAlign,
-) -> Result<(Vec<u8>, Rect)> {
+) -> Result<(VecDeque<u8>, Rect)> {
     let start = Instant::now();
 
     let (image, resized_area) = match resize_image(data, area, max_size, halign, valign) {
@@ -210,7 +230,7 @@ fn encode(
     }
 
     log::debug!(bytes = buf.len(), image_bytes = image.len(), elapsed:? = start.elapsed(); "encoded data");
-    Ok((buf, resized_area.area))
+    Ok((buf.into(), resized_area.area))
 }
 
 fn put_color<W: Write>(
