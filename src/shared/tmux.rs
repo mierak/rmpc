@@ -48,7 +48,12 @@ impl TmuxHooks {
         let current_exe = std::env::current_exe()?;
         let current_exe = current_exe.to_string_lossy();
 
-        for hook in ["session-window-changed", "client-attached", "client-session-changed"] {
+        for hook in [
+            "session-window-changed",
+            "client-attached",
+            "client-detached",
+            "client-session-changed",
+        ] {
             let mut cmd = std::process::Command::new("tmux");
             let cmd = cmd.args([
                 "set-hook",
