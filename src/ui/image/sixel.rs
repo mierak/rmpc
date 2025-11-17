@@ -9,11 +9,7 @@ use std::{
 use anyhow::{Result, bail};
 use color_quant::NeuQuant;
 use crossbeam::channel::{Sender, unbounded};
-use crossterm::{
-    cursor::{MoveTo, RestorePosition, SavePosition},
-    queue,
-    style::Colors,
-};
+use crossterm::style::Colors;
 use image::Rgba;
 use ratatui::layout::Rect;
 
@@ -129,12 +125,18 @@ impl Sixel {
 
 fn display(w: &mut impl Write, mut data: VecDeque<u8>, area: Rect) -> Result<()> {
     log::debug!(bytes = data.len(); "transmitting data");
-    queue!(w, SavePosition)?;
-    queue!(w, MoveTo(area.x, area.y))?;
 
+    // Adjust for tmux pane position if inside tmux
     let (x, y) = if tmux::is_inside_tmux() {
-        let pane_position = tmux::pane_position()?;
-        (area.x + 1 + pane_position.0, area.y + 1 + pane_position.1)
+        match tmux::pane_position() {
+            Ok(pane_position) => (area.x + 1 + pane_position.0, area.y + 1 + pane_position.1),
+            Err(err) => {
+                log::error!(
+                    "Failed to get tmux pane position, falling back to unadjusted position, err: {err}"
+                );
+                (area.x + 1, area.y + 1)
+            }
+        }
     } else {
         (area.x + 1, area.y + 1)
     };
@@ -147,11 +149,8 @@ fn display(w: &mut impl Write, mut data: VecDeque<u8>, area: Rect) -> Result<()>
         data.push_back(*b);
     }
 
-    let mut data = data.make_contiguous().to_vec();
-    tmux_write_bytes!(w, data)?;
-
+    tmux_write_bytes!(w, data.make_contiguous());
     w.flush()?;
-    queue!(w, RestorePosition)?;
 
     Ok(())
 }

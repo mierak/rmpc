@@ -132,8 +132,17 @@ fn display(w: &mut impl Write, data: EncodedData) -> Result<()> {
 
     // Adjust for tmux pane position if inside tmux
     let (x, y) = if tmux::is_inside_tmux() {
-        let pane_position = tmux::pane_position()?;
-        (aligned_area.x + 1 + pane_position.0, aligned_area.y + 1 + pane_position.1)
+        match tmux::pane_position() {
+            Ok(pane_position) => {
+                (aligned_area.x + 1 + pane_position.0, aligned_area.y + 1 + pane_position.1)
+            }
+            Err(err) => {
+                log::error!(
+                    "Failed to get tmux pane position, falling back to unadjusted position, err: {err}"
+                );
+                (aligned_area.x + 1, aligned_area.y + 1)
+            }
+        }
     } else {
         (aligned_area.x + 1, aligned_area.y + 1)
     };

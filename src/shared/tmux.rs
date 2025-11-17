@@ -283,17 +283,22 @@ macro_rules! tmux_write {
     }}
 }
 macro_rules! tmux_write_bytes {
-    ( $w:ident, $data:ident ) => {{
+    ( $w:ident, $data:expr ) => {{
         if *crate::tmux::IS_TMUX {
-            for i in (0..$data.len()).rev() {
-                if $data[i] == b"\x1b"[0] {
-                    $data.insert(i, b"\x1b"[0]);
+            $w.write_all("\x1bPtmux;".as_bytes())?;
+
+            for b in $data {
+                let b = *b;
+                if b == b"\x1b"[0] {
+                    $w.write_all(b"\x1b\x1b")?;
+                } else {
+                    $w.write_all(&[b])?;
                 }
             }
-            $w.write("\x1bPtmux;".as_bytes())
-                .and_then(|_| $w.write(&$data).and_then(|_| $w.write("\x1b\\".as_bytes())))
+
+            $w.write_all("\x1b\\".as_bytes())?
         } else {
-            $w.write(&$data)
+            $w.write_all(&$data)?
         }
     }};
 }
