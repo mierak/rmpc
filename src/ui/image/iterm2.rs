@@ -6,11 +6,7 @@ use std::{
 use anyhow::{Result, bail};
 use base64::Engine;
 use crossbeam::channel::{Sender, unbounded};
-use crossterm::{
-    cursor::{MoveTo, RestorePosition, SavePosition},
-    queue,
-    style::Colors,
-};
+use crossterm::style::Colors;
 use ratatui::layout::Rect;
 
 use super::{AlbumArtConfig, Backend, EncodeRequest, ImageBackendRequest};
@@ -23,7 +19,7 @@ use crate::{
         image::{create_aligned_area, get_gif_frames, jpg_encode, resize_image},
         macros::try_cont,
         terminal::TERMINAL,
-        tmux::tmux_write,
+        tmux::{self, tmux_write},
     },
     try_skip,
     ui::image::{clear_area, facade::IS_SHOWING, recv_data},
@@ -134,8 +130,22 @@ impl Iterm2 {
 fn display(w: &mut impl Write, data: EncodedData) -> Result<()> {
     let EncodedData { content, size, aligned_area, img_width_px, img_height_px } = data;
 
-    queue!(w, SavePosition)?;
-    queue!(w, MoveTo(aligned_area.x, aligned_area.y))?;
+    // Adjust for tmux pane position if inside tmux
+    let (x, y) = if tmux::is_inside_tmux() {
+        match tmux::pane_position() {
+            Ok(pane_position) => {
+                (aligned_area.x + 1 + pane_position.0, aligned_area.y + 1 + pane_position.1)
+            }
+            Err(err) => {
+                log::error!(
+                    "Failed to get tmux pane position, falling back to unadjusted position, err: {err}"
+                );
+                (aligned_area.x + 1, aligned_area.y + 1)
+            }
+        }
+    } else {
+        (aligned_area.x + 1, aligned_area.y + 1)
+    };
 
     // TODO: https://iterm2.com/documentation-images.html
     // A new way of sending files was introduced in iTerm2 version 3.5 which
@@ -150,9 +160,9 @@ fn display(w: &mut impl Write, data: EncodedData) -> Result<()> {
     // bytes. Finally, send: ESC ] 1337 ; FileEnd ^G
     tmux_write!(
         w,
-        "\x1b]1337;File=inline=1;size={size};width={img_width_px}px;height={img_height_px}px;preserveAspectRatio=1;doNotMoveCursor=1:{content}\x08\x1b\n"
+        "\x1B7\x1b[{y};{x}H\x1b]1337;File=inline=1;size={size};width={img_width_px}px;height={img_height_px}px;preserveAspectRatio=1;doNotMoveCursor=1:{content}\x08\x1b\n\x1B8",
     )?;
-    queue!(w, RestorePosition)?;
+
     w.flush()?;
 
     Ok(())

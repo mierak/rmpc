@@ -176,6 +176,63 @@ fn is_in_visible_pane() -> Result<bool> {
     Ok(stdout.starts_with('*'))
 }
 
+#[derive(Debug)]
+pub enum StatusBarPosition {
+    Top,
+    Bottom,
+}
+
+/// Returns the (x, y) position of the top-left corner of the current tmux pane,
+/// adjusted for the status bar if it's enabled.
+pub fn pane_position() -> Result<(u16, u16)> {
+    let mut cmd = std::process::Command::new("tmux");
+    let cmd = cmd.args([
+        "display-message",
+        "-p",
+        "-t",
+        &TMUX_PANE,
+        "-F",
+        "#{pane_left}|#{pane_top}|#{status}|#{status-position}",
+    ]);
+    let stdout = cmd.output()?.stdout;
+    let stdout = String::from_utf8(stdout)?;
+    let stdout = stdout.trim();
+    log::trace!(stdout; "got tmux pane geometry");
+
+    let mut parts = stdout.split('|');
+    let x = parts
+        .next()
+        .ok_or_else(|| anyhow::anyhow!("Failed to get pane x from tmux"))?
+        .parse::<u16>()?;
+    let y = parts
+        .next()
+        .ok_or_else(|| anyhow::anyhow!("Failed to get pane top from tmux"))?
+        .parse::<u16>()?;
+    let enabled = parts
+        .next()
+        .ok_or_else(|| anyhow::anyhow!("Failed to get pane top from tmux"))
+        .and_then(|enabled| match enabled {
+        "on" => Ok(true),
+        "off" => Ok(false),
+        _ => Err(anyhow::anyhow!("Unknown enabled state '{enabled}' for tmux bar info.")),
+    })?;
+    let position = parts
+        .next()
+        .ok_or_else(|| anyhow::anyhow!("Failed to get pane top from tmux"))
+        .and_then(|position| match position {
+            "top" => Ok(StatusBarPosition::Top),
+            "bottom" => Ok(StatusBarPosition::Bottom),
+            _ => Err(anyhow::anyhow!("Unknown position '{position}' for tmux bar info.")),
+        })?;
+
+    let result =
+        if enabled && matches!(position, StatusBarPosition::Top) { (x, y + 1) } else { (x, y) };
+
+    log::debug!(x, y, stdout:?; "calculated tmux pane position");
+
+    Ok(result)
+}
+
 fn session_has_attached_client() -> Result<bool> {
     let mut cmd = std::process::Command::new("tmux");
     let cmd = cmd.args(["list-panes", "-F", "#{session_attached}", "-t", &TMUX_PANE]);
@@ -225,6 +282,28 @@ macro_rules! tmux_write {
         }
     }}
 }
+macro_rules! tmux_write_bytes {
+    ( $w:ident, $data:expr ) => {{
+        if *crate::tmux::IS_TMUX {
+            $w.write_all("\x1bPtmux;".as_bytes())?;
+
+            for b in $data {
+                let b = *b;
+                if b == b"\x1b"[0] {
+                    $w.write_all(b"\x1b\x1b")?;
+                } else {
+                    $w.write_all(&[b])?;
+                }
+            }
+
+            $w.write_all("\x1b\\".as_bytes())?
+        } else {
+            $w.write_all(&$data)?
+        }
+    }};
+}
+
 pub(crate) use tmux_write;
+pub(crate) use tmux_write_bytes;
 
 use crate::try_skip;
