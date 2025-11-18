@@ -1,4 +1,5 @@
 use anyhow::Result;
+use notify_debouncer_full::{Debouncer, RecommendedCache, notify::RecommendedWatcher};
 use ratatui::{
     Frame,
     layout::{Constraint, Layout, Rect},
@@ -22,13 +23,14 @@ use crate::{
 #[derive(Debug)]
 pub struct LyricsPane {
     current_lyrics: Option<Lrc>,
+    watcher: Option<Debouncer<RecommendedWatcher, RecommendedCache>>,
     initialized: bool,
     last_requested_line_idx: usize,
 }
 
 impl LyricsPane {
     pub fn new(_ctx: &Ctx) -> Self {
-        Self { current_lyrics: None, initialized: false, last_requested_line_idx: 0 }
+        Self { current_lyrics: None, watcher: None, initialized: false, last_requested_line_idx: 0 }
     }
 }
 
@@ -163,9 +165,29 @@ impl Pane for LyricsPane {
 
     fn on_event(&mut self, event: &mut UiEvent, _is_visible: bool, ctx: &Ctx) -> Result<()> {
         match event {
-            UiEvent::SongChanged | UiEvent::Reconnected => {
+            UiEvent::SongChanged | UiEvent::Reconnected | UiEvent::LyricsChanged => {
                 match ctx.find_lrc() {
                     Ok(lrc) => {
+                        let watcher = lrc.as_ref().and_then(|_| {
+                            let Some((_, song)) = ctx.find_current_song_in_queue() else {
+                                return None;
+                            };
+
+                            let Some(lyrics_dir) = &ctx.config.lyrics_dir else {
+                                return None;
+                            };
+
+                            let path = crate::shared::lrc::get_lrc_path(lyrics_dir, &song.file)
+                                .ok()
+                                .filter(|p| p.exists())
+                                .or_else(|| {
+                                    ctx.lrc_index.find_entry(song).map(|e| e.path.to_path_buf())
+                                });
+
+                            let event_tx = ctx.app_event_sender.clone();
+                            path.map(|path| crate::core::lyrics_watcher::init(path, event_tx))
+                        });
+                        self.watcher = watcher.transpose()?;
                         self.current_lyrics = lrc;
                         ctx.render()?;
                     }

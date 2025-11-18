@@ -101,6 +101,7 @@ pub(crate) enum AppEvent {
     ThemeChanged {
         theme: Box<UiConfig>,
     },
+    LyricsChanged,
     RemoteSwitchTab {
         tab_name: String,
     },

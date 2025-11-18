@@ -189,6 +189,12 @@ fn main_task<B: Backend + std::io::Write>(
                     }
                     render_wanted = true;
                 }
+                AppEvent::LyricsChanged => {
+                    if let Err(err) = ui.on_event(UiEvent::LyricsChanged, &mut ctx) {
+                        log::error!(error:? = err; "UI failed to handle lyrics changed event");
+                        continue;
+                    }
+                }
                 AppEvent::UserKeyInput(key) => match ui.handle_key(&mut key.into(), &mut ctx) {
                     Ok(KeyHandleResult::None) => continue,
                     Ok(KeyHandleResult::Quit) => {

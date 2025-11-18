@@ -918,6 +918,7 @@ pub enum UiEvent {
     Displayed,
     Hidden,
     ConfigChanged,
+    LyricsChanged,
     PlaybackStateChanged,
     ImageEncoded { data: EncodeData },
     ImageEncodeFailed { err: anyhow::Error },

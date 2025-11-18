@@ -106,7 +106,7 @@ impl LrcIndex {
         }
     }
 
-    fn find_entry(&self, song: &Song) -> Option<&LrcIndexEntry> {
+    pub(crate) fn find_entry(&self, song: &Song) -> Option<&LrcIndexEntry> {
         // TODO xxx.last() is called here to not change existing behavior. Consider
         // supporting all the tag entries
         let artist = song.metadata.get("artist").map(|v| v.last())?;
