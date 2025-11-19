@@ -1,4 +1,4 @@
-use std::{path::PathBuf, time::Duration};
+use std::{path::Path, time::Duration};
 
 use anyhow::{Context, Result, bail};
 use crossbeam::channel::Sender;
@@ -19,7 +19,7 @@ use crate::{AppEvent, shared::macros::try_skip};
 
 #[must_use = "Returns a drop guard for the config directory watcher"]
 pub(crate) fn init(
-    lyrics_path: PathBuf,
+    lyrics_path: &Path,
     event_tx: Sender<AppEvent>,
 ) -> Result<Debouncer<RecommendedWatcher, RecommendedCache>> {
     if !lyrics_path.exists() {

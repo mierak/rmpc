@@ -2,6 +2,7 @@ use std::{
     cell::{Cell, RefCell},
     collections::{HashMap, HashSet},
     ops::AddAssign,
+    path::PathBuf,
     time::{Duration, Instant},
 };
 
@@ -29,7 +30,7 @@ use crate::{
     },
     shared::{
         events::ClientRequest,
-        lrc::{Lrc, LrcIndex, get_lrc_path},
+        lrc::{Lrc, LrcIndex},
         macros::{status_error, status_warn},
         mpd_client_ext::MpdClientExt,
         mpd_query::MpdQuerySync,
@@ -241,32 +242,29 @@ impl Ctx {
             .and_then(|id| self.queue.iter().enumerate().find(|(_, song)| song.id == id))
     }
 
-    pub(crate) fn find_lrc(&self) -> Result<Option<Lrc>> {
-        let Some((_, song)) = self.find_current_song_in_queue() else {
-            return Ok(None);
-        };
+    pub(crate) fn find_current_lyrics_path(&self) -> Option<PathBuf> {
+        let (_, song) = self.find_current_song_in_queue()?;
+        let lyrics_dir = self.config.lyrics_dir.as_ref()?;
+        let path = crate::shared::lrc::get_lrc_path(lyrics_dir, &song.file)
+            .ok()
+            .filter(|p| p.is_file())
+            .or_else(|| self.lrc_index.find_entry(song).map(|e| e.path.clone()));
 
-        let Some(lyrics_dir) = &self.config.lyrics_dir else {
-            return Ok(None);
-        };
-
-        let path = get_lrc_path(lyrics_dir, &song.file)?;
-        log::debug!(path:?; "getting lrc at path");
-        match std::fs::read_to_string(&path) {
-            Ok(lrc) => return Ok(Some(lrc.parse()?)),
-            Err(err) if matches!(err.kind(), std::io::ErrorKind::NotFound) => {
-                log::trace!(path:?; "Lyrics not found");
-            }
-            Err(err) => {
-                log::error!(err:?; "Encountered error when searching for sidecar lyrics");
-            }
+        let artist = song.metadata.get("artist").map(|v| v.last())?;
+        let title = song.metadata.get("title").map(|v| v.last())?;
+        let album = song.metadata.get("album").map(|v| v.last());
+        match &path {
+            Some(path) => log::debug!(artist, title, album; "Lyrics found at {}", path.display()),
+            None => log::debug!(artist, title, album; "No lyrics found"),
         }
 
-        if let Ok(Some(lrc)) = self.lrc_index.find_lrc_for_song(song) {
-            return Ok(Some(lrc));
-        }
+        path
+    }
 
-        Ok(None)
+    pub(crate) fn find_lrc(&self) -> Result<Option<(PathBuf, Lrc)>> {
+        let Some(path) = self.find_current_lyrics_path() else { return Ok(None) };
+        let lrc = std::fs::read_to_string(&path)?.parse()?;
+        Ok(Some((path, lrc)))
     }
 
     pub(crate) fn song_stickers(&self, uri: &str) -> Option<&HashMap<String, String>> {

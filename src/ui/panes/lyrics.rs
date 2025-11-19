@@ -32,6 +32,20 @@ impl LyricsPane {
     pub fn new(_ctx: &Ctx) -> Self {
         Self { current_lyrics: None, watcher: None, initialized: false, last_requested_line_idx: 0 }
     }
+
+    fn update_lyrics(&mut self, ctx: &Ctx) -> Result<()> {
+        self.current_lyrics = None;
+        self.watcher = None;
+
+        let lrc = ctx.find_lrc()?;
+        let Some((path, lrc)) = lrc else { return Ok(()) };
+        let event_tx = ctx.app_event_sender.clone();
+        let watcher = crate::core::lyrics_watcher::init(&path, event_tx)?;
+
+        self.watcher = Some(watcher);
+        self.current_lyrics = Some(lrc);
+        Ok(())
+    }
 }
 
 impl Pane for LyricsPane {
@@ -147,14 +161,8 @@ impl Pane for LyricsPane {
 
     fn before_show(&mut self, ctx: &Ctx) -> Result<()> {
         if !self.initialized {
-            match ctx.find_lrc() {
-                Ok(lrc) => {
-                    self.current_lyrics = lrc;
-                }
-                Err(err) => {
-                    status_error!("Failed to load lyrics file: '{err}'");
-                    self.current_lyrics = None;
-                }
+            if let Err(err) = self.update_lyrics(ctx) {
+                status_error!("Failed to load lyrics file: '{err}'");
             }
             self.last_requested_line_idx = 0;
             self.initialized = true;
@@ -166,49 +174,17 @@ impl Pane for LyricsPane {
     fn on_event(&mut self, event: &mut UiEvent, _is_visible: bool, ctx: &Ctx) -> Result<()> {
         match event {
             UiEvent::SongChanged | UiEvent::Reconnected | UiEvent::LyricsChanged => {
-                match ctx.find_lrc() {
-                    Ok(lrc) => {
-                        let watcher = lrc.as_ref().and_then(|_| {
-                            let Some((_, song)) = ctx.find_current_song_in_queue() else {
-                                return None;
-                            };
-
-                            let Some(lyrics_dir) = &ctx.config.lyrics_dir else {
-                                return None;
-                            };
-
-                            let path = crate::shared::lrc::get_lrc_path(lyrics_dir, &song.file)
-                                .ok()
-                                .filter(|p| p.exists())
-                                .or_else(|| {
-                                    ctx.lrc_index.find_entry(song).map(|e| e.path.to_path_buf())
-                                });
-
-                            let event_tx = ctx.app_event_sender.clone();
-                            path.map(|path| crate::core::lyrics_watcher::init(path, event_tx))
-                        });
-                        self.watcher = watcher.transpose()?;
-                        self.current_lyrics = lrc;
-                        ctx.render()?;
-                    }
-                    Err(err) => {
-                        self.current_lyrics = None;
-                        status_error!("Failed to load lyrics file: '{err}'");
-                    }
+                if let Err(err) = self.update_lyrics(ctx) {
+                    status_error!("Failed to load lyrics file: '{err}'");
                 }
+                ctx.render()?;
                 self.last_requested_line_idx = 0;
             }
             UiEvent::LyricsIndexed if self.current_lyrics.is_none() => {
-                match ctx.find_lrc() {
-                    Ok(lrc) => {
-                        self.current_lyrics = lrc;
-                        ctx.render()?;
-                    }
-                    Err(err) => {
-                        self.current_lyrics = None;
-                        status_error!("Failed to load lyrics file: '{err}'");
-                    }
+                if let Err(err) = self.update_lyrics(ctx) {
+                    status_error!("Failed to load lyrics file: '{err}'");
                 }
+                ctx.render()?;
                 self.last_requested_line_idx = 0;
             }
             _ => {}

@@ -10,7 +10,7 @@ use serde::Serialize;
 use unicase::UniCase;
 use walkdir::WalkDir;
 
-use super::{Lrc, parse_metadata_only};
+use super::parse_metadata_only;
 use crate::{mpd::commands::Song, shared::macros::try_cont};
 
 /// Index of LRC files for fast song-to-lyrics matching.
@@ -78,14 +78,6 @@ impl LrcIndex {
         log::trace!(file:?, entry:? = path; "Trying to index lyrics entry");
 
         LrcIndexEntry::read(BufReader::new(file), path).context("Failed to index an entry")
-    }
-
-    pub fn find_lrc_for_song(&self, song: &Song) -> Result<Option<Lrc>> {
-        if let Some(entry) = self.find_entry(song) {
-            Ok(Some(std::fs::read_to_string(&entry.path)?.parse()?))
-        } else {
-            Ok(None)
-        }
     }
 
     fn album_matches(entry: &LrcIndexEntry, song_album: Option<&str>) -> bool {
