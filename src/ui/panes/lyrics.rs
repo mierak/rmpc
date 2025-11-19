@@ -40,9 +40,12 @@ impl LyricsPane {
         let lrc = ctx.find_lrc()?;
         let Some((path, lrc)) = lrc else { return Ok(()) };
         let event_tx = ctx.app_event_sender.clone();
-        let watcher = crate::core::lyrics_watcher::init(&path, event_tx)?;
+        let watcher = ctx
+            .config
+            .enable_lyrics_hot_reload
+            .then(|| crate::core::lyrics_watcher::init(&path, event_tx));
 
-        self.watcher = Some(watcher);
+        self.watcher = watcher.transpose()?;
         self.current_lyrics = Some(lrc);
         Ok(())
     }
@@ -173,7 +176,10 @@ impl Pane for LyricsPane {
 
     fn on_event(&mut self, event: &mut UiEvent, _is_visible: bool, ctx: &Ctx) -> Result<()> {
         match event {
-            UiEvent::SongChanged | UiEvent::Reconnected | UiEvent::LyricsChanged => {
+            UiEvent::SongChanged
+            | UiEvent::Reconnected
+            | UiEvent::LyricsChanged
+            | UiEvent::ConfigChanged => {
                 if let Err(err) = self.update_lyrics(ctx) {
                     status_error!("Failed to load lyrics file: '{err}'");
                 }

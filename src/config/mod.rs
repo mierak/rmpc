@@ -63,6 +63,7 @@ pub struct Config {
     pub keybinds: KeyConfig,
     pub enable_mouse: bool,
     pub enable_config_hot_reload: bool,
+    pub enable_lyrics_hot_reload: bool,
     pub status_update_interval_ms: Option<u64>,
     pub select_current_song_on_change: bool,
     pub center_current_song_on_change: bool,
@@ -141,6 +142,8 @@ pub struct ConfigFile {
     enable_mouse: bool,
     #[serde(default = "defaults::bool::<true>")]
     pub enable_config_hot_reload: bool,
+    #[serde(default = "defaults::bool::<true>")]
+    pub enable_lyrics_hot_reload: bool,
     #[serde(default)]
     keybinds: KeyConfigFile,
     // Deprecated
@@ -223,6 +226,7 @@ impl Default for ConfigFile {
             tabs: TabsFile::default(),
             enable_mouse: true,
             enable_config_hot_reload: true,
+            enable_lyrics_hot_reload: true,
             wrap_navigation: false,
             password: None,
             artists: ArtistsFile::default(),
@@ -410,6 +414,7 @@ impl ConfigFile {
             mpd_idle_read_timeout_ms: self.mpd_idle_read_timeout_ms.map(Duration::from_millis),
             enable_mouse: self.enable_mouse,
             enable_config_hot_reload: self.enable_config_hot_reload,
+            enable_lyrics_hot_reload: self.enable_lyrics_hot_reload,
             keybinds: self.keybinds.try_into()?,
             select_current_song_on_change: self.select_current_song_on_change,
             center_current_song_on_change: self.center_current_song_on_change,
