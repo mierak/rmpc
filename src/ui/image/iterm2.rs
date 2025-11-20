@@ -1,32 +1,27 @@
-use std::{
-    io::Write,
-    sync::{Arc, atomic::Ordering},
-};
+use std::io::Write;
 
 use anyhow::{Result, bail};
 use base64::Engine;
-use crossbeam::channel::{Sender, unbounded};
-use crossterm::style::Colors;
 use ratatui::layout::Rect;
 
-use super::{AlbumArtConfig, Backend, EncodeRequest, ImageBackendRequest};
+use super::Backend;
 use crate::{
     config::{
         Size,
         album_art::{HorizontalAlign, VerticalAlign},
     },
+    ctx::Ctx,
     shared::{
         image::{create_aligned_area, get_gif_frames, jpg_encode, resize_image},
-        macros::try_cont,
-        terminal::TERMINAL,
         tmux::{self, tmux_write},
     },
     try_skip,
-    ui::image::{clear_area, facade::IS_SHOWING, recv_data},
+    ui::image::clear_area,
 };
 
-#[derive(Debug)]
-struct EncodedData {
+#[derive(derive_more::Debug)]
+pub struct EncodedData {
+    #[debug(skip)]
     content: String,
     aligned_area: Rect,
     size: usize,
@@ -35,95 +30,80 @@ struct EncodedData {
 }
 
 #[derive(Debug)]
-pub struct Iterm2 {
-    sender: Sender<ImageBackendRequest>,
-    colors: Colors,
-    handle: std::thread::JoinHandle<()>,
-}
+pub struct Iterm2;
 
 impl Backend for Iterm2 {
-    fn hide(&mut self, size: Rect) -> Result<()> {
-        let writer = TERMINAL.writer();
-        let mut writer = writer.lock();
-        clear_area(writer.by_ref(), self.colors, size)
+    type EncodedData = EncodedData;
+
+    fn hide(
+        &mut self,
+        w: &mut impl Write,
+        size: Rect,
+        bg_color: Option<crossterm::style::Color>,
+    ) -> Result<()> {
+        clear_area(w, bg_color, size)
     }
 
-    fn show(&mut self, data: Arc<Vec<u8>>, area: Rect) -> Result<()> {
-        Ok(self.sender.send(ImageBackendRequest::Encode(EncodeRequest { area, data }))?)
-    }
-
-    fn set_config(&self, config: AlbumArtConfig) -> Result<()> {
-        Ok(self.sender.send(ImageBackendRequest::SetConfig(config))?)
-    }
-
-    fn cleanup(self: Box<Self>, _area: Rect) -> Result<()> {
-        self.sender.send(ImageBackendRequest::Stop)?;
-        self.handle.join().expect("iterm2 thread to end gracefully");
+    fn display(&mut self, w: &mut impl Write, data: Self::EncodedData, _ctx: &Ctx) -> Result<()> {
+        try_skip!(display(w, data), "Failed to display iterm2 image");
         Ok(())
     }
-}
 
-impl Iterm2 {
-    pub(super) fn new(config: AlbumArtConfig) -> Self {
-        let (sender, receiver) = unbounded::<ImageBackendRequest>();
-        let colors = config.colors;
+    fn create_data(
+        image_data: &[u8],
+        area: Rect,
+        max_size: Size,
+        halign: HorizontalAlign,
+        valign: VerticalAlign,
+    ) -> Result<Self::EncodedData> {
+        let start = std::time::Instant::now();
 
-        let handle = std::thread::Builder::new()
-            .name("iterm2".to_string())
-            .spawn(move || {
-                let mut config = config;
-                let mut pending_req = None;
-                'outer: loop {
-                    let EncodeRequest { data, area } =
-                        match recv_data(&mut pending_req, &mut config, &receiver) {
-                            Ok(Some(msg)) => msg,
-                            Ok(None) => break,
-                            Err(err) => {
-                                log::error!("Error receiving ImageBackendRequest message: {err}");
-                                break;
-                            }
-                        };
+        let (len, width_px, height_px, data, aligned_area) = if let Some(gif_data) =
+            get_gif_frames(image_data)?
+        {
+            log::debug!("encoding animated gif");
 
-                    let encoded = try_cont!(
-                        encode(area, &data, config.max_size, config.halign, config.valign),
-                        "Failed to encode data"
-                    );
+            // Take smaller of the two dimensions to make the gif stretch over available
+            // area and not overflow
+            let (width, height) = gif_data.dimensions;
+            let aligned_area = create_aligned_area(area, (width, height), max_size, halign, valign);
+            log::debug!(aligned_area:?, dims:? = gif_data.dimensions; "encoded");
 
-                    // consume all pending messages, skipping older encode requests
-                    for msg in receiver.try_iter() {
-                        match msg {
-                            ImageBackendRequest::Stop => break 'outer,
-                            ImageBackendRequest::SetConfig(cfg) => config = cfg,
-                            ImageBackendRequest::Encode(req) => {
-                                pending_req = Some(req);
-                                log::debug!(
-                                    "Skipping image because another one is waiting in the queue"
-                                );
-                                continue 'outer;
-                            }
-                        }
+            let size = aligned_area.size_px.width.min(aligned_area.size_px.height).into();
+
+            (
+                image_data.len(),
+                size,
+                size,
+                base64::engine::general_purpose::STANDARD.encode(image_data),
+                aligned_area,
+            )
+        } else {
+            let (image, aligned_area) =
+                match resize_image(image_data, area, max_size, halign, valign) {
+                    Ok(v) => v,
+                    Err(err) => {
+                        bail!("Failed to resize image, err: {}", err);
                     }
+                };
+            let Ok(jpg) = jpg_encode(&image) else { bail!("Failed to encode image as jpg") };
+            (
+                jpg.len(),
+                image.width(),
+                image.height(),
+                base64::engine::general_purpose::STANDARD.encode(&jpg),
+                aligned_area,
+            )
+        };
 
-                    let writer = TERMINAL.writer();
-                    let mut writer = writer.lock();
-                    let mut w = writer.by_ref();
-                    if !IS_SHOWING.load(Ordering::Relaxed) {
-                        log::trace!(
-                            "Not showing image because its not supposed to be displayed anymore"
-                        );
-                        continue;
-                    }
-
-                    try_cont!(
-                        clear_area(&mut w, config.colors, area),
-                        "Failed to clear iterm2 image area"
-                    );
-                    try_skip!(display(&mut w, encoded), "Failed to display iterm2 image");
-                }
-            })
-            .expect("iterm2 thread to be spawned");
-
-        Self { sender, colors, handle }
+        log::debug!(compressed_bytes = data.len(), image_bytes = len, elapsed:? = start.elapsed(); "encoded data");
+        Ok(EncodedData {
+            content: data,
+            size: len,
+            img_width_px: width_px,
+            img_height_px: height_px,
+            aligned_area: aligned_area.area,
+        })
     }
 }
 
@@ -166,60 +146,4 @@ fn display(w: &mut impl Write, data: EncodedData) -> Result<()> {
     w.flush()?;
 
     Ok(())
-}
-
-fn encode(
-    area: Rect,
-    data: &[u8],
-    max_size_px: Size,
-    halign: HorizontalAlign,
-    valign: VerticalAlign,
-) -> Result<EncodedData> {
-    let start = std::time::Instant::now();
-
-    let (len, width_px, height_px, data, aligned_area) = if let Some(gif_data) =
-        get_gif_frames(data)?
-    {
-        log::debug!("encoding animated gif");
-
-        // Take smaller of the two dimensions to make the gif stretch over available
-        // area and not overflow
-        let (width, height) = gif_data.dimensions;
-        let aligned_area = create_aligned_area(area, (width, height), max_size_px, halign, valign);
-        log::debug!(aligned_area:?, dims:? = gif_data.dimensions; "encoded");
-
-        let size = aligned_area.size_px.width.min(aligned_area.size_px.height).into();
-
-        (
-            data.len(),
-            size,
-            size,
-            base64::engine::general_purpose::STANDARD.encode(data),
-            aligned_area,
-        )
-    } else {
-        let (image, aligned_area) = match resize_image(data, area, max_size_px, halign, valign) {
-            Ok(v) => v,
-            Err(err) => {
-                bail!("Failed to resize image, err: {}", err);
-            }
-        };
-        let Ok(jpg) = jpg_encode(&image) else { bail!("Failed to encode image as jpg") };
-        (
-            jpg.len(),
-            image.width(),
-            image.height(),
-            base64::engine::general_purpose::STANDARD.encode(&jpg),
-            aligned_area,
-        )
-    };
-
-    log::debug!(compressed_bytes = data.len(), image_bytes = len, elapsed:? = start.elapsed(); "encoded data");
-    Ok(EncodedData {
-        content: data,
-        size: len,
-        img_width_px: width_px,
-        img_height_px: height_px,
-        aligned_area: aligned_area.area,
-    })
 }

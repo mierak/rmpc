@@ -77,5 +77,6 @@ fn handle_work_request(
         WorkRequest::IndexSingleLrc { path } => {
             Ok(WorkDone::SingleLrcIndexed { lrc_entry: LrcIndex::index_single(path)? })
         }
+        WorkRequest::ResizeImage(fn_once) => Ok(WorkDone::ImageResized { data: fn_once() }),
     }
 }

@@ -10,7 +10,7 @@ use crossbeam::channel::{Receiver, RecvError, Sender, TryRecvError};
 use crossterm::{
     cursor::{MoveTo, RestorePosition, SavePosition},
     queue,
-    style::{Colors, PrintStyledContent, Stylize},
+    style::{PrintStyledContent, Stylize},
     terminal::{BeginSynchronizedUpdate, EndSynchronizedUpdate},
 };
 use ratatui::{Frame, layout::Rect, style::Style, widgets::Block};
@@ -343,8 +343,7 @@ impl CavaPane {
         let writer = TERMINAL.writer();
         let mut w = writer.lock();
 
-        let colors = Colors { background: Some(ctx.config.theme.cava.bg_color), foreground: None };
-        clear_area(w.by_ref(), colors, self.area)?;
+        clear_area(w.by_ref(), ctx.config.theme.cava.bg_color.into(), self.area)?;
 
         Ok(())
     }

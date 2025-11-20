@@ -3,29 +3,31 @@ use std::{
     io::{ErrorKind, Write},
     os::unix::net::UnixStream,
     process::{Child, Command, Stdio},
-    sync::Arc,
     time::Duration,
 };
 
 use anyhow::{Context, Result, anyhow};
-use crossbeam::channel::{Sender, unbounded};
 use ratatui::layout::Rect;
 use rustix::path::Arg;
 use serde::Serialize;
 use sysinfo::{ProcessRefreshKind, ProcessesToUpdate, System};
 
-use super::{AlbumArtConfig, Backend};
+use super::Backend;
 use crate::{
-    shared::macros::{try_cont, try_skip},
-    tmux,
+    config::{
+        Size,
+        album_art::{HorizontalAlign, VerticalAlign},
+    },
+    ctx::Ctx,
+    shared::{macros::try_skip, tmux},
 };
 
 #[derive(Debug)]
 pub struct Ueberzug {
-    sender: Sender<Action>,
-    handle: std::thread::JoinHandle<()>,
+    daemon: UeberzugDaemon,
 }
 
+#[derive(Debug)]
 struct UeberzugDaemon {
     pid: Option<Pid>,
     pid_file: String,
@@ -38,15 +40,15 @@ const PID_FILE_TIMEOUT: Duration = Duration::from_secs(5);
 const UEBERZUG_ALBUM_ART_PATH: &str = "/tmp/rmpc/albumart";
 const UEBERZUG_ALBUM_ART_DIR: &str = "/tmp/rmpc";
 
-enum Action {
-    Add(&'static str, u16, u16, u16, u16),
-    Remove,
-    Destroy,
-}
-
+#[derive(Debug)]
 pub enum Layer {
     Wayland,
     X11,
+}
+
+#[derive(derive_more::Debug)]
+pub struct Data {
+    area: Rect,
 }
 
 impl Layer {
@@ -59,15 +61,40 @@ impl Layer {
 }
 
 impl Backend for Ueberzug {
-    fn show(&mut self, data: Arc<Vec<u8>>, Rect { x, y, width, height }: Rect) -> Result<()> {
+    type EncodedData = Data;
+
+    fn hide(
+        &mut self,
+        _w: &mut impl Write,
+        _: Rect,
+        _bg_color: Option<crossterm::style::Color>,
+    ) -> Result<()> {
+        self.daemon.remove_image()?;
+        Ok(())
+    }
+
+    fn display(&mut self, _w: &mut impl Write, data: Self::EncodedData, _ctx: &Ctx) -> Result<()> {
         if tmux::is_in_tmux_and_hidden()? {
-            // We should not command ueberzugpp to rerender when rmpc is inside TMUX session
-            // without any attached clients or the pane which rmpc resides in is not visible
-            // because it might make ueberzugpp popup in windows/panes/sessions that do not
-            // belong to rmpc
+            // We should not command ueberzugpp to rerender when rmpc is inside
+            // TMUX session without any attached clients or the pane which rmpc
+            // resides in is not visible because it might make ueberzugpp popup
+            // in windows/panes/sessions that do not belong to rmpc
             return Ok(());
         }
+        let Rect { x, y, width, height } = data.area;
 
+        self.daemon.spawn_daemon_if_needed()?;
+        self.daemon.show_image(UEBERZUG_ALBUM_ART_PATH, x, y, width, height)?;
+        Ok(())
+    }
+
+    fn create_data(
+        image_data: &[u8],
+        area: Rect,
+        _max_size: Size,
+        _halign: HorizontalAlign,
+        _valign: VerticalAlign,
+    ) -> Result<Self::EncodedData> {
         std::fs::create_dir_all(UEBERZUG_ALBUM_ART_DIR)?;
         let mut file = std::fs::OpenOptions::new()
             .write(true)
@@ -75,30 +102,14 @@ impl Backend for Ueberzug {
             .truncate(true)
             .open(UEBERZUG_ALBUM_ART_PATH)?;
 
-        file.write_all(&data)?;
+        file.write_all(image_data)?;
 
-        Ok(self.sender.send(Action::Add(UEBERZUG_ALBUM_ART_PATH, x, y, width, height))?)
-    }
-
-    fn hide(&mut self, _: Rect) -> Result<()> {
-        Ok(self.sender.send(Action::Remove)?)
-    }
-
-    fn cleanup(self: Box<Self>, _: Rect) -> Result<()> {
-        self.sender.send(Action::Destroy)?;
-        self.handle.join().expect("Ueberzug thread to end gracefully");
-        Ok(())
-    }
-
-    fn set_config(&self, _config: AlbumArtConfig) -> Result<()> {
-        Ok(())
+        Ok(Data { area })
     }
 }
 
 impl Ueberzug {
     pub fn new(layer: Layer) -> Self {
-        let (tx, rx) = unbounded();
-
         let pid_file_path = std::env::temp_dir()
             .join("rmpc")
             .join(format!("ueberzug-{}.pid", std::process::id()))
@@ -111,62 +122,29 @@ impl Ueberzug {
             daemon.pid = Some(pid);
         }
 
-        let handle = std::thread::Builder::new()
-            .name("ueberzugpp".to_string())
-            .spawn(move || {
-                while let Ok(action) = rx.recv() {
-                    daemon.pid = Some(try_cont!(
-                        daemon.spawn_daemon_if_needed(),
-                        "Failed to spawn ueberzugpp daemon"
-                    ));
-                    match action {
-                        Action::Add(path, x, y, width, height) => {
-                            try_skip!(
-                                daemon.show_image(path, x, y, width, height),
-                                "Failed to send image to ueberzugpp"
-                            );
-                        }
-                        Action::Remove => {
-                            try_skip!(
-                                daemon.remove_image(),
-                                "Failed to send remove request to ueberzugpp"
-                            );
-                        }
-                        Action::Destroy => {
-                            try_skip!(
-                                daemon.remove_image(),
-                                "Failed to send remove request to ueberzugpp"
-                            );
+        Self { daemon }
+    }
+}
 
-                            if let Some(ref mut proc) = daemon.ueberzug_process {
-                                try_skip!(proc.kill(), "Failed to kill ueberzugpp process");
-                                try_skip!(proc.wait(), "Ueberzugpp process failed to die");
-                            }
+impl std::ops::Drop for UeberzugDaemon {
+    fn drop(&mut self) {
+        try_skip!(self.remove_image(), "Failed to send remove request to ueberzugpp");
 
-                            if let Some(pid) = daemon.pid
-                                && let Some(pid) = rustix::process::Pid::from_raw(pid.0)
-                            {
-                                try_skip!(
-                                    rustix::process::kill_process(
-                                        pid,
-                                        rustix::process::Signal::TERM
-                                    ),
-                                    "Failed to send SIGTERM to ueberzugpp pid file"
-                                );
-                            }
+        if let Some(ref mut proc) = self.ueberzug_process {
+            try_skip!(proc.kill(), "Failed to kill ueberzugpp process");
+            try_skip!(proc.wait(), "Ueberzugpp process failed to die");
+        }
 
-                            try_skip!(
-                                std::fs::remove_file(&daemon.pid_file),
-                                "Failed to remove ueberzugpp's pid file"
-                            );
-                            break;
-                        }
-                    }
-                }
-            })
-            .expect("ueberzugpp thread to be spawned");
+        if let Some(pid) = self.pid
+            && let Some(pid) = rustix::process::Pid::from_raw(pid.0)
+        {
+            try_skip!(
+                rustix::process::kill_process(pid, rustix::process::Signal::TERM),
+                "Failed to send SIGTERM to ueberzugpp pid file"
+            );
+        }
 
-        Self { sender: tx, handle }
+        try_skip!(std::fs::remove_file(&self.pid_file), "Failed to remove ueberzugpp's pid file");
     }
 }
 

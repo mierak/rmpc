@@ -20,7 +20,7 @@ use crate::{
         theme::UiConfig,
     },
     mpd::{QueuePosition, commands::IdleEvent},
-    ui::UiAppEvent,
+    ui::{UiAppEvent, image::facade::EncodeData},
 };
 
 #[derive(Debug)]
@@ -31,7 +31,6 @@ pub(crate) enum ClientRequest {
     Command(MpdCommand),
 }
 
-#[derive(Debug)]
 #[allow(unused)]
 pub(crate) enum WorkRequest {
     IndexLyrics {
@@ -49,6 +48,7 @@ pub(crate) enum WorkRequest {
         position: Option<QueuePosition>,
     },
     Command(Command),
+    ResizeImage(Box<dyn FnOnce() -> Result<EncodeData> + Send + Sync>),
 }
 
 #[derive(Debug)]
@@ -58,6 +58,7 @@ pub(crate) enum WorkDone {
     SingleLrcIndexed { lrc_entry: Option<LrcIndexEntry> },
     MpdCommandFinished { id: &'static str, target: Option<PaneType>, data: MpdQueryResult },
     SearchYtResults { items: Vec<SearchItem>, position: Option<QueuePosition> },
+    ImageResized { data: Result<EncodeData> },
     None,
 }
 

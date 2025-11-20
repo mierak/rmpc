@@ -1,6 +1,6 @@
 use crate::mpd::{FromMpd, LineHandled, errors::MpdError};
 
-#[derive(Debug, Clone, Copy, strum::Display)]
+#[derive(Debug, Clone, Copy, strum::Display, Eq, Hash, PartialEq)]
 #[strum(serialize_all = "snake_case")]
 pub enum IdleEvent {
     Player,   /* the player has been started, stopped or seeked or tags of
