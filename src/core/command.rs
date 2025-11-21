@@ -13,7 +13,7 @@ use crate::{
         QueuePosition,
         client::Client,
         commands::{IdleEvent, State, mpd_config::MpdConfig, volume::Bound},
-        mpd_client::{Filter, MpdClient, MpdCommand, Tag, ValueChange},
+        mpd_client::{AlbumArtOrder, Filter, MpdClient, MpdCommand, Tag, ValueChange},
         proto_client::ProtoClient,
         version::Version,
     },
@@ -378,7 +378,7 @@ impl Command {
                     std::process::exit(3);
                 };
 
-                let album_art = client.find_album_art(&song.file)?;
+                let album_art = client.find_album_art(&song.file, AlbumArtOrder::EmbeddedFirst)?;
 
                 let Some(album_art) = album_art else {
                     std::process::exit(2);

@@ -60,6 +60,15 @@ pub enum ValueChange {
     Set(u32),
 }
 
+#[derive(Debug, Default, Clone, Copy)]
+pub enum AlbumArtOrder {
+    #[default]
+    EmbeddedFirst,
+    FileFirst,
+    EmbeddedOnly,
+    FileOnly,
+}
+
 impl FromStr for ValueChange {
     type Err = anyhow::Error;
 
@@ -307,11 +316,7 @@ pub trait MpdClient: Sized {
         target_position: Option<usize>,
     ) -> MpdResult<()>;
     fn save_queue_as_playlist(&mut self, name: &str, mode: Option<SaveMode>) -> MpdResult<()>;
-    /// This function first invokes [`Self::albumart`].
-    /// If no album art is found it invokes [`Self::read_picture`].
-    /// If no art is still found, but no errors were encountered, None is
-    /// returned.
-    fn find_album_art(&mut self, path: &str) -> MpdResult<Option<Vec<u8>>>;
+    fn find_album_art(&mut self, path: &str, order: AlbumArtOrder) -> MpdResult<Option<Vec<u8>>>;
     // Outputs
     fn outputs(&mut self) -> MpdResult<Outputs>;
     fn toggle_output(&mut self, id: u32) -> MpdResult<()>;
@@ -727,12 +732,26 @@ impl MpdClient for Client<'_> {
         self.send_save_queue_as_playlist(name, mode).and_then(|()| self.read_ok())
     }
 
-    fn find_album_art(&mut self, path: &str) -> MpdResult<Option<Vec<u8>>> {
+    fn find_album_art(&mut self, path: &str, order: AlbumArtOrder) -> MpdResult<Option<Vec<u8>>> {
         // path is already escaped in albumart() and read_picture()
-        match self.albumart(path) {
+        let first_result = match order {
+            AlbumArtOrder::FileFirst | AlbumArtOrder::FileOnly => self.albumart(path),
+            AlbumArtOrder::EmbeddedFirst | AlbumArtOrder::EmbeddedOnly => self.read_picture(path),
+        };
+        match first_result {
             Ok(Some(v)) => Ok(Some(v)),
             Ok(None) | Err(MpdError::Mpd(MpdFailureResponse { code: ErrorCode::NoExist, .. })) => {
-                match self.read_picture(path) {
+                let second_result = match order {
+                    AlbumArtOrder::FileFirst => self.read_picture(path),
+                    AlbumArtOrder::EmbeddedFirst => self.albumart(path),
+                    AlbumArtOrder::EmbeddedOnly | AlbumArtOrder::FileOnly => {
+                        log::debug!(
+                            "No album art found and no secondary method configured, falling back to placeholder image"
+                        );
+                        Ok(None)
+                    }
+                };
+                match second_result {
                     Ok(Some(p)) => Ok(Some(p)),
                     Ok(None) => {
                         log::debug!("No album art found, falling back to placeholder image");
