@@ -7,10 +7,13 @@ All notable changes to this project will be documented in this file.
 ### Added
 
 - `AfterCurrentAlbum` and `BeforeCurrentAlbum` to `AddOptions` keybind
+- `order` option to `album_art`, sets whether to check embedded image or cover image file first
 
 ### Changed
 
 - Moved docs to a new [repository](https://github.com/rmpc-org/rmpc-org.github.io) and [domain](https://rmpc.mierak.dev/)
+- Rmpc now checks for embedded image first and cover image in a file second by default, this can be
+configured with the new `album_art.order` option
 
 ### Fixed
 

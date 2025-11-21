@@ -41,10 +41,11 @@ impl AlbumArtPane {
         }
 
         let song_uri = song_uri.to_owned();
+        let order = ctx.config.album_art.order;
         ctx.query().id(ALBUM_ART).replace_id(ALBUM_ART).target(PaneType::AlbumArt).query(move |client| {
             let start = std::time::Instant::now();
             log::debug!(file = song_uri.as_str(); "Searching for album art");
-            let result = client.find_album_art(&song_uri)?;
+            let result = client.find_album_art(&song_uri, order)?;
             log::debug!(elapsed:? = start.elapsed(), size = result.as_ref().map(|v|v.len()); "Found album art");
 
             Ok(MpdQueryResult::AlbumArt(result))

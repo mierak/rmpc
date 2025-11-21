@@ -30,6 +30,7 @@ use crate::mpd::{
     },
     errors::MpdError,
     mpd_client::{
+        AlbumArtOrder,
         Filter,
         MpdClient,
         SaveMode,
@@ -581,7 +582,7 @@ impl MpdClient for TestMpdClient {
         todo!("Not yet implemented")
     }
 
-    fn find_album_art(&mut self, _path: &str) -> MpdResult<Option<Vec<u8>>> {
+    fn find_album_art(&mut self, _path: &str, _order: AlbumArtOrder) -> MpdResult<Option<Vec<u8>>> {
         self.calls.entry("find_album_art".to_string()).or_default().add_assign(1);
         Ok(Some(Vec::new()))
     }
