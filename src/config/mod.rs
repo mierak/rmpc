@@ -142,7 +142,7 @@ pub struct ConfigFile {
     enable_mouse: bool,
     #[serde(default = "defaults::bool::<true>")]
     pub enable_config_hot_reload: bool,
-    #[serde(default = "defaults::bool::<true>")]
+    #[serde(default = "defaults::bool::<false>")]
     pub enable_lyrics_hot_reload: bool,
     #[serde(default)]
     keybinds: KeyConfigFile,
@@ -226,7 +226,7 @@ impl Default for ConfigFile {
             tabs: TabsFile::default(),
             enable_mouse: true,
             enable_config_hot_reload: true,
-            enable_lyrics_hot_reload: true,
+            enable_lyrics_hot_reload: false,
             wrap_navigation: false,
             password: None,
             artists: ArtistsFile::default(),
