@@ -166,6 +166,7 @@ impl AlbumArtFacade {
     pub fn display(&mut self, data: EncodeData, ctx: &Ctx) -> Result<()> {
         if !self.is_showing {
             log::trace!("Not showing image because its not supposed to be displayed anymore");
+            self.request_queue.clear();
             return Ok(());
         }
 

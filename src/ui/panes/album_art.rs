@@ -148,9 +148,7 @@ impl Pane for AlbumArtPane {
                 self.album_art.cleanup()?;
             }
             UiEvent::ImageEncoded { data } => {
-                if is_visible && !self.is_modal_open {
-                    self.album_art.display(std::mem::take(data), ctx)?;
-                }
+                self.album_art.display(std::mem::take(data), ctx)?;
             }
             UiEvent::ImageEncodeFailed { err } => {
                 self.album_art.image_processing_failed(err, ctx)?;
