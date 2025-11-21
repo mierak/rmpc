@@ -1,12 +1,7 @@
-use std::{
-    io::Write,
-    sync::{Arc, atomic::Ordering},
-    time::Instant,
-};
+use std::{io::Write, time::Instant};
 
 use anyhow::{Context, Result};
 use base64::Engine;
-use crossbeam::channel::{Sender, unbounded};
 use crossterm::{
     execute,
     style::{Colors, SetColors},
@@ -15,236 +10,134 @@ use flate2::Compression;
 use itertools::Itertools;
 use ratatui::prelude::Rect;
 
-use super::{
-    AlbumArtConfig,
-    Backend,
-    EncodeRequest,
-    ImageBackendRequest,
-    csi_move,
-    facade::IS_SHOWING,
-};
+use super::{Backend, csi_move};
 use crate::{
     config::{
         Size,
         album_art::{HorizontalAlign, VerticalAlign},
     },
+    ctx::Ctx,
     shared::{
         image::{create_aligned_area, get_gif_frames, resize_image},
-        macros::{status_error, try_cont},
-        terminal::TERMINAL,
         tmux::tmux_write,
     },
     try_skip,
-    ui::image::recv_data,
 };
 
 #[derive(Debug)]
-pub struct Kitty {
-    sender: Sender<ImageBackendRequest>,
-    colors: Colors,
-    handle: std::thread::JoinHandle<()>,
-}
+pub struct Kitty;
 
 impl Backend for Kitty {
-    fn hide(&mut self, area: Rect) -> Result<()> {
-        let writer = TERMINAL.writer();
-        let mut writer = writer.lock();
-        clear_area(writer.by_ref(), self.colors, area)
-    }
+    type EncodedData = Data;
 
-    fn show(&mut self, data: Arc<Vec<u8>>, area: Rect) -> Result<()> {
-        Ok(self.sender.send(ImageBackendRequest::Encode(EncodeRequest { area, data }))?)
-    }
+    fn hide(
+        &mut self,
+        w: &mut impl Write,
+        area: Rect,
+        bg_color: Option<crossterm::style::Color>,
+    ) -> Result<()> {
+        super::clear_area(w, bg_color, area)?;
+        tmux_write!(w, "\x1b_Ga=d,d=A,q=2\x1b\\")?;
 
-    fn cleanup(self: Box<Self>, area: Rect) -> Result<()> {
-        let writer = TERMINAL.writer();
-        let mut writer = writer.lock();
-        clear_area(writer.by_ref(), self.colors, area)?;
-        self.sender.send(ImageBackendRequest::Stop)?;
-        self.handle.join().expect("kitty thread to end gracefully");
         Ok(())
     }
 
-    fn set_config(&self, config: AlbumArtConfig) -> Result<()> {
-        Ok(self.sender.send(ImageBackendRequest::SetConfig(config))?)
+    fn display(&mut self, w: &mut impl Write, data: Self::EncodedData, ctx: &Ctx) -> Result<()> {
+        match data {
+            Data::ImageData(data) => {
+                try_skip!(
+                    transfer_image_data(w, &data.content, data.img_width, data.img_height),
+                    "Failed to transfer image data"
+                );
+
+                try_skip!(
+                    create_unicode_placeholder_grid(
+                        w,
+                        ctx.config.theme.background_color.map(Into::into),
+                        data.aligned_area
+                    ),
+                    "Failed to create unicode placeholders"
+                );
+            }
+            Data::AnimationData(data) => {
+                let aligned_area = data.aligned_area;
+                try_skip!(transfer_animation_data(w, data), "Failed to transfer animation data");
+                try_skip!(
+                    create_unicode_placeholder_grid(
+                        w,
+                        ctx.config.theme.background_color.map(Into::into),
+                        aligned_area
+                    ),
+                    "Failed to create unicode placeholders"
+                );
+            }
+        }
+        Ok(())
+    }
+
+    fn create_data(
+        image_data: &[u8],
+        area: Rect,
+        max_size: Size,
+        halign: HorizontalAlign,
+        valign: VerticalAlign,
+    ) -> Result<Self::EncodedData> {
+        let start_time = Instant::now();
+        log::debug!(bytes = image_data.len(); "Compressing image data");
+
+        if let Some(data) = get_gif_frames(image_data)? {
+            let frames = data.frames;
+            let (width, height) = data.dimensions;
+
+            let frames: Vec<AnimationFrame> = frames
+                .map_ok(|frame| {
+                    let delay = frame.delay().numer_denom_ms();
+
+                    AnimationFrame {
+                        delay: delay.0 / delay.1,
+                        content: base64::engine::general_purpose::STANDARD
+                            .encode(frame.buffer().as_raw()),
+                    }
+                })
+                .try_collect()?;
+            let aligned_area =
+                create_aligned_area(area, (width, height), max_size, halign, valign).area;
+
+            Ok(Data::AnimationData(AnimationData {
+                frames,
+                is_compressed: false,
+                img_width: width,
+                img_height: height,
+                aligned_area,
+            }))
+        } else {
+            let (image, aligned_area) = resize_image(image_data, area, max_size, halign, valign)?;
+
+            let mut e = flate2::write::ZlibEncoder::new(Vec::new(), Compression::new(6));
+            e.write_all(image.to_rgba8().as_raw())
+                .context("Error occurred when writing image bytes to zlib encoder")?;
+
+            let content = base64::engine::general_purpose::STANDARD.encode(
+                e.finish().context("Error occurred when flushing image bytes to zlib encoder")?,
+            );
+
+            log::debug!(input_bytes = image_data.len(), compressed_bytes = content.len(), duration:? = start_time.elapsed(); "Image data compression finished");
+            Ok(Data::ImageData(ImageData {
+                content,
+                aligned_area: aligned_area.area,
+                img_width: image.width(),
+                img_height: image.height(),
+            }))
+        }
     }
 }
 
-impl Kitty {
-    pub(super) fn new(config: AlbumArtConfig) -> Self {
-        let (sender, receiver) = unbounded::<ImageBackendRequest>();
-        let colors = config.colors;
-
-        let handle = std::thread::Builder::new()
-            .name("kitty".to_string())
-            .spawn(move || {
-                let mut config = config;
-                let mut pending_req: Option<EncodeRequest> = None;
-                'outer: loop {
-                    let EncodeRequest { data, area } =
-                        match recv_data(&mut pending_req, &mut config, &receiver) {
-                            Ok(Some(msg)) => msg,
-                            Ok(None) => break,
-                            Err(err) => {
-                                log::error!("Error receiving ImageBackendRequest message: {err}");
-                                break;
-                            }
-                        };
-
-                    let data = match create_data_to_transfer(
-                        &data,
-                        area,
-                        Compression::new(6),
-                        config.max_size,
-                        config.halign,
-                        config.valign,
-                    ) {
-                        Ok(data) => data,
-                        Err(err) => {
-                            status_error!(err:?; "Failed to compress image data");
-                            continue;
-                        }
-                    };
-
-                    // consume all pending messages, skipping older encode requests
-                    log::debug!("iterating over pending messages");
-                    for msg in receiver.try_iter() {
-                        match msg {
-                            ImageBackendRequest::Stop => break 'outer,
-                            ImageBackendRequest::SetConfig(cfg) => config = cfg,
-                            ImageBackendRequest::Encode(req) => {
-                                pending_req = Some(req);
-                                log::debug!(
-                                    "Skipping image because another one is waiting in the queue"
-                                );
-                                continue 'outer;
-                            }
-                        }
-                    }
-
-                    let w = TERMINAL.writer();
-                    let mut w = w.lock();
-                    let mut w = w.by_ref();
-                    if !IS_SHOWING.load(Ordering::Relaxed) {
-                        log::trace!(
-                            "Not showing image because its not supposed to be displayed anymore"
-                        );
-                        continue;
-                    }
-
-                    try_cont!(
-                        clear_area(&mut w, config.colors, area),
-                        "Failed to clear kitty image area"
-                    );
-                    match data {
-                        Data::ImageData(data) => {
-                            try_cont!(
-                                transfer_image_data(
-                                    &mut w,
-                                    &data.content,
-                                    data.img_width,
-                                    data.img_height
-                                ),
-                                "Failed to transfer image data"
-                            );
-
-                            try_skip!(
-                                create_unicode_placeholder_grid(
-                                    &mut w,
-                                    config.colors,
-                                    data.aligned_area
-                                ),
-                                "Failed to create unicode placeholders"
-                            );
-                        }
-                        Data::AnimationData(data) => {
-                            let aligned_area = data.aligned_area;
-                            try_cont!(
-                                transfer_animation_data(&mut w, data),
-                                "Failed to transfer animation data"
-                            );
-                            try_skip!(
-                                create_unicode_placeholder_grid(
-                                    &mut w,
-                                    config.colors,
-                                    aligned_area
-                                ),
-                                "Failed to create unicode placeholders"
-                            );
-                        }
-                    }
-                }
-            })
-            .expect("Kitty thread to be spawned");
-
-        Self { sender, colors, handle }
-    }
-}
-
-fn create_data_to_transfer(
-    image_data: &[u8],
+fn create_unicode_placeholder_grid(
+    w: &mut impl Write,
+    bg_color: Option<crossterm::style::Color>,
     area: Rect,
-    compression: Compression,
-    max_size: Size,
-    halign: HorizontalAlign,
-    valign: VerticalAlign,
-) -> Result<Data> {
-    let start_time = Instant::now();
-    log::debug!(bytes = image_data.len(); "Compressing image data");
-
-    if let Some(data) = get_gif_frames(image_data)? {
-        let frames = data.frames;
-        let (width, height) = data.dimensions;
-
-        let frames: Vec<AnimationFrame> = frames
-            .map_ok(|frame| {
-                let delay = frame.delay().numer_denom_ms();
-
-                AnimationFrame {
-                    delay: delay.0 / delay.1,
-                    content: base64::engine::general_purpose::STANDARD
-                        .encode(frame.buffer().as_raw()),
-                }
-            })
-            .try_collect()?;
-        let aligned_area =
-            create_aligned_area(area, (width, height), max_size, halign, valign).area;
-
-        Ok(Data::AnimationData(AnimationData {
-            frames,
-            is_compressed: false,
-            img_width: width,
-            img_height: height,
-            aligned_area,
-        }))
-    } else {
-        let (image, aligned_area) = resize_image(image_data, area, max_size, halign, valign)?;
-
-        let mut e = flate2::write::ZlibEncoder::new(Vec::new(), compression);
-        e.write_all(image.to_rgba8().as_raw())
-            .context("Error occurred when writing image bytes to zlib encoder")?;
-
-        let content = base64::engine::general_purpose::STANDARD.encode(
-            e.finish().context("Error occurred when flushing image bytes to zlib encoder")?,
-        );
-
-        log::debug!(input_bytes = image_data.len(), compressed_bytes = content.len(), duration:? = start_time.elapsed(); "Image data compression finished");
-        Ok(Data::ImageData(ImageData {
-            content,
-            aligned_area: aligned_area.area,
-            img_width: image.width(),
-            img_height: image.height(),
-        }))
-    }
-}
-
-fn clear_area(mut w: impl Write, colors: Colors, area: Rect) -> Result<()> {
-    super::clear_area(&mut w, colors, area)?;
-    tmux_write!(w, "\x1b_Ga=d,d=A,q=2\x1b\\")?;
-    Ok(())
-}
-
-fn create_unicode_placeholder_grid(w: &mut impl Write, colors: Colors, area: Rect) -> Result<()> {
+) -> Result<()> {
+    let colors = Colors { background: bg_color, foreground: None };
     let mut buf = Vec::with_capacity(area.width as usize * area.height as usize * 2);
     execute!(buf, SetColors(colors))?;
     for y in 0..area.height {
@@ -348,24 +241,31 @@ fn transfer_image_data(
     Ok(())
 }
 
-enum Data {
+#[derive(Debug)]
+pub enum Data {
     ImageData(ImageData),
     AnimationData(AnimationData),
 }
 
-struct ImageData {
+#[derive(derive_more::Debug)]
+pub struct ImageData {
+    #[debug(skip)]
     content: String,
     img_width: u32,
     img_height: u32,
     aligned_area: Rect,
 }
 
-struct AnimationFrame {
+#[derive(derive_more::Debug)]
+pub struct AnimationFrame {
+    #[debug(skip)]
     content: String,
     delay: u32,
 }
 
-struct AnimationData {
+#[derive(derive_more::Debug)]
+pub struct AnimationData {
+    #[debug(skip)]
     frames: Vec<AnimationFrame>,
     is_compressed: bool,
     img_width: u32,

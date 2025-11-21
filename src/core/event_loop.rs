@@ -246,7 +246,7 @@ fn main_task<B: Backend + std::io::Write>(
                 }
                 AppEvent::IdleEvent(event) => {
                     handle_idle_event(event, &ctx, &mut additional_evs);
-                    for ev in additional_evs.drain() {
+                    for ev in additional_evs.drain().filter_map(|ev| UiEvent::try_from(ev).ok()) {
                         if let Err(err) = ui.on_event(ev, &mut ctx) {
                             status_error!(error:? = err, event:?; "UI failed to handle idle event, event: '{:?}', error: '{}'", event, err.to_status());
                         }
@@ -287,6 +287,16 @@ fn main_task<B: Backend + std::io::Write>(
                         }
 
                         render_wanted = true;
+                    }
+                    WorkDone::ImageResized { data } => {
+                        let event = match data {
+                            Ok(data) => UiEvent::ImageEncoded { data },
+                            Err(err) => UiEvent::ImageEncodeFailed { err },
+                        };
+
+                        if let Err(err) = ui.on_event(event, &mut ctx) {
+                            log::error!(error:? = err; "UI failed to handle image resized event");
+                        }
                     }
                     WorkDone::LyricsIndexed { index } => {
                         ctx.lrc_index = index;
@@ -620,7 +630,7 @@ fn main_task<B: Backend + std::io::Write>(
     terminal
 }
 
-fn handle_idle_event(event: IdleEvent, ctx: &Ctx, result_ui_evs: &mut HashSet<UiEvent>) {
+fn handle_idle_event(event: IdleEvent, ctx: &Ctx, result_ui_evs: &mut HashSet<IdleEvent>) {
     match event {
         IdleEvent::Mixer if ctx.supported_commands.contains("getvol") => {
             ctx.query()
@@ -699,7 +709,5 @@ fn handle_idle_event(event: IdleEvent, ctx: &Ctx, result_ui_evs: &mut HashSet<Ui
         }
     }
 
-    if let Ok(ev) = event.try_into() {
-        result_ui_evs.insert(ev);
-    }
+    result_ui_evs.insert(event);
 }

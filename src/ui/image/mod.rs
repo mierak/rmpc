@@ -1,7 +1,6 @@
-use std::{io::Write, sync::Arc};
+use std::io::Write;
 
 use anyhow::Result;
-use crossbeam::channel::Receiver;
 use crossterm::{
     cursor::{RestorePosition, SavePosition},
     queue,
@@ -11,10 +10,10 @@ use ratatui::layout::Rect;
 
 use crate::{
     config::{
-        Config,
         Size,
         album_art::{HorizontalAlign, VerticalAlign},
     },
+    ctx::Ctx,
     shared::macros::csi_move,
 };
 
@@ -26,16 +25,33 @@ pub mod sixel;
 pub mod ueberzug;
 
 #[allow(unused)]
-trait Backend {
-    fn hide(&mut self, size: Rect) -> Result<()>;
-    fn show(&mut self, data: Arc<Vec<u8>>, area: Rect) -> Result<()>;
+pub trait Backend {
+    type EncodedData;
+    fn hide(
+        &mut self,
+        w: &mut impl Write,
+        size: Rect,
+        bg_color: Option<crossterm::style::Color>,
+    ) -> Result<()>;
     fn cleanup(self: Box<Self>, rect: Rect) -> Result<()> {
         Ok(())
     }
-    fn set_config(&self, config: AlbumArtConfig) -> Result<()>;
+    fn display(&mut self, w: &mut impl Write, data: Self::EncodedData, ctx: &Ctx) -> Result<()>;
+    fn create_data(
+        image_data: &[u8],
+        area: Rect,
+        max_size: Size,
+        halign: HorizontalAlign,
+        valign: VerticalAlign,
+    ) -> Result<Self::EncodedData>;
 }
 
-pub fn clear_area(mut w: impl Write, colors: Colors, area: Rect) -> Result<()> {
+pub fn clear_area(
+    w: &mut impl Write,
+    bg_color: Option<crossterm::style::Color>,
+    area: Rect,
+) -> Result<()> {
+    let colors = Colors { background: bg_color, foreground: None };
     queue!(w, SetColors(colors))?;
     queue!(w, SavePosition)?;
     let capacity: usize = 2usize * area.width as usize * area.height as usize;
@@ -53,72 +69,4 @@ pub fn clear_area(mut w: impl Write, colors: Colors, area: Rect) -> Result<()> {
     queue!(w, ResetColor)?;
 
     Ok(())
-}
-
-#[derive(Debug)]
-struct AlbumArtConfig {
-    max_size: Size,
-    colors: Colors,
-    valign: VerticalAlign,
-    halign: HorizontalAlign,
-}
-impl From<&Config> for AlbumArtConfig {
-    fn from(config: &Config) -> Self {
-        Self {
-            max_size: config.album_art.max_size_px,
-            colors: Colors {
-                background: config.theme.background_color.map(Into::into),
-                foreground: None,
-            },
-            valign: config.album_art.vertical_align,
-            halign: config.album_art.horizontal_align,
-        }
-    }
-}
-
-#[derive(Debug)]
-enum ImageBackendRequest {
-    Stop,
-    Encode(EncodeRequest),
-    SetConfig(AlbumArtConfig),
-}
-
-#[derive(Debug)]
-struct EncodeRequest {
-    area: Rect,
-    data: Arc<Vec<u8>>,
-}
-
-fn recv_data(
-    pending_req: &mut Option<EncodeRequest>,
-    config: &mut AlbumArtConfig,
-    rx: &Receiver<ImageBackendRequest>,
-) -> Result<Option<EncodeRequest>> {
-    let mut message = pending_req.take();
-
-    // consume all pending messages, skipping older encode requests
-    for msg in rx.try_iter() {
-        match msg {
-            ImageBackendRequest::Stop => return Ok(None),
-            ImageBackendRequest::SetConfig(album_art_config) => *config = album_art_config,
-            ImageBackendRequest::Encode(encode_request) => message = Some(encode_request),
-        }
-    }
-
-    if let Some(message) = message {
-        return Ok(Some(message));
-    }
-
-    loop {
-        match rx.recv() {
-            Ok(msg) => match msg {
-                ImageBackendRequest::Stop => return Ok(None),
-                ImageBackendRequest::SetConfig(album_art_config) => *config = album_art_config,
-                ImageBackendRequest::Encode(encode_request) => return Ok(Some(encode_request)),
-            },
-            Err(err) => {
-                return Err(err.into());
-            }
-        }
-    }
 }

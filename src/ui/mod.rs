@@ -52,7 +52,7 @@ use crate::{
         mpd_client_ext::{Enqueue, MpdClientExt},
         ytdlp::YtDlpHostKind,
     },
-    ui::modals::menu::create_rating_modal,
+    ui::{image::facade::EncodeData, modals::menu::create_rating_modal},
 };
 
 pub mod browser;
@@ -899,7 +899,7 @@ pub enum UiAppEvent {
     ChangeTab(TabName),
 }
 
-#[derive(Debug, Eq, Hash, PartialEq)]
+#[derive(Debug)]
 #[allow(dead_code)]
 pub enum UiEvent {
     Player,
@@ -919,6 +919,8 @@ pub enum UiEvent {
     Hidden,
     ConfigChanged,
     PlaybackStateChanged,
+    ImageEncoded { data: EncodeData },
+    ImageEncodeFailed { err: anyhow::Error },
 }
 
 impl TryFrom<IdleEvent> for UiEvent {
