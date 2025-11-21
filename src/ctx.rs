@@ -248,7 +248,7 @@ impl Ctx {
         let path = crate::shared::lrc::get_lrc_path(lyrics_dir, &song.file)
             .ok()
             .filter(|p| p.is_file())
-            .or_else(|| self.lrc_index.find_entry(song).map(|e| e.path.clone()));
+            .or_else(|| self.lrc_index.find_entry(song).map(|(path, _)| path.to_path_buf()));
 
         let artist = song.metadata.get("artist").map(|v| v.last())?;
         let title = song.metadata.get("title").map(|v| v.last())?;

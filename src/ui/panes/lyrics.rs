@@ -1,5 +1,4 @@
 use anyhow::Result;
-use notify_debouncer_full::{Debouncer, RecommendedCache, notify::RecommendedWatcher};
 use ratatui::{
     Frame,
     layout::{Constraint, Layout, Rect},
@@ -23,29 +22,21 @@ use crate::{
 #[derive(Debug)]
 pub struct LyricsPane {
     current_lyrics: Option<Lrc>,
-    watcher: Option<Debouncer<RecommendedWatcher, RecommendedCache>>,
     initialized: bool,
     last_requested_line_idx: usize,
 }
 
 impl LyricsPane {
     pub fn new(_ctx: &Ctx) -> Self {
-        Self { current_lyrics: None, watcher: None, initialized: false, last_requested_line_idx: 0 }
+        Self { current_lyrics: None, initialized: false, last_requested_line_idx: 0 }
     }
 
     fn update_lyrics(&mut self, ctx: &Ctx) -> Result<()> {
         self.current_lyrics = None;
-        self.watcher = None;
 
         let lrc = ctx.find_lrc()?;
-        let Some((path, lrc)) = lrc else { return Ok(()) };
-        let event_tx = ctx.app_event_sender.clone();
-        let watcher = ctx
-            .config
-            .enable_lyrics_hot_reload
-            .then(|| crate::core::lyrics_watcher::init(&path, event_tx));
+        let Some((_, lrc)) = lrc else { return Ok(()) };
 
-        self.watcher = watcher.transpose()?;
         self.current_lyrics = Some(lrc);
         Ok(())
     }
@@ -176,17 +167,7 @@ impl Pane for LyricsPane {
 
     fn on_event(&mut self, event: &mut UiEvent, _is_visible: bool, ctx: &Ctx) -> Result<()> {
         match event {
-            UiEvent::SongChanged
-            | UiEvent::Reconnected
-            | UiEvent::LyricsChanged
-            | UiEvent::ConfigChanged => {
-                if let Err(err) = self.update_lyrics(ctx) {
-                    status_error!("Failed to load lyrics file: '{err}'");
-                }
-                ctx.render()?;
-                self.last_requested_line_idx = 0;
-            }
-            UiEvent::LyricsIndexed if self.current_lyrics.is_none() => {
+            UiEvent::SongChanged | UiEvent::Reconnected | UiEvent::LyricsIndexed => {
                 if let Err(err) = self.update_lyrics(ctx) {
                     status_error!("Failed to load lyrics file: '{err}'");
                 }

@@ -1,13 +1,15 @@
 use std::{path::Path, time::Duration};
 
-use anyhow::{Context, Result, bail};
+use anyhow::{Result, bail};
 use crossbeam::channel::Sender;
 use notify_debouncer_full::{
     DebounceEventResult,
+    DebouncedEvent,
     Debouncer,
     RecommendedCache,
     new_debouncer,
     notify::{
+        Event,
         EventKind,
         RecommendedWatcher,
         RecursiveMode,
@@ -15,58 +17,54 @@ use notify_debouncer_full::{
     },
 };
 
-use crate::{AppEvent, shared::macros::try_skip};
+use crate::shared::{events::WorkRequest, macros::try_skip};
 
 #[must_use = "Returns a drop guard for the config directory watcher"]
 pub(crate) fn init(
-    lyrics_path: &Path,
-    event_tx: Sender<AppEvent>,
+    lyrics_directory: &Path,
+    request_tx: Sender<WorkRequest>,
 ) -> Result<Debouncer<RecommendedWatcher, RecommendedCache>> {
-    if !lyrics_path.exists() {
-        bail!("Lyrics path {} does not exist", lyrics_path.display());
+    if !lyrics_directory.exists() {
+        bail!("Lyrics path {} does not exist", lyrics_directory.display());
     }
 
-    let lyrics_file_name = lyrics_path
-        .file_name()
-        .with_context(|| format!("Invalid config path {}", lyrics_path.display()))?
-        .to_owned();
-    let lyrics_directory = lyrics_path
-        .parent()
-        .with_context(|| format!("Invalid config directory {}", lyrics_path.display()))?
-        .to_owned();
+    let mut watcher = {
+        let lyrics_directory = lyrics_directory.to_path_buf(); // owned value required for error logging
 
-    let mut watcher = new_debouncer(
-        Duration::from_millis(500),
-        None,
-        move |event: DebounceEventResult| {
+        new_debouncer(Duration::from_millis(500), None, move |event: DebounceEventResult| {
             let events = match event {
                 Ok(events) => events,
                 Err(err) => {
-                    log::error!(err:?, lyrics_file_name:?; "Encountered error while watching lyrics file");
+                    log::error!(err:?, lyrics_directory:?; "Encountered error while watching lyrics dir");
                     return;
                 }
             };
 
             for event in events {
-                if !event.paths.iter().any(|path| path.ends_with(&lyrics_file_name)) {
-                    continue;
-                }
-                if !matches!(event.kind, EventKind::Access(AccessKind::Close(AccessMode::Write))) {
+                let DebouncedEvent { event: Event { kind, paths, .. }, .. } = event;
+
+                if !matches!(kind, EventKind::Access(AccessKind::Close(AccessMode::Write))) {
                     continue;
                 }
 
-                log::debug!(event:?; "File event");
+                for path in paths {
+                    if path.extension().is_none_or(|ext| ext != "lrc") {
+                        continue;
+                    }
 
-                try_skip!(
-                    event_tx.send(AppEvent::LyricsChanged),
-                    "Failed to send config changed event"
-                );
+                    log::debug!(path:?; "File event");
+
+                    try_skip!(
+                        request_tx.send(WorkRequest::IndexSingleLrc { path }),
+                        "Failed to send lyrics changed event"
+                    );
+                }
             }
-        },
-    )?;
+        })?
+    };
 
-    watcher.watch(&lyrics_directory, RecursiveMode::Recursive)?;
-    log::info!(lyrics_directory:? = lyrics_directory.to_str(); "Watching for changes");
+    log::info!(lyrics_dir:? = lyrics_directory.to_str(); "Watching for changes");
+    watcher.watch(lyrics_directory, RecursiveMode::Recursive)?;
 
     Ok(watcher)
 }

@@ -1,6 +1,7 @@
-use std::{str::FromStr, time::Duration};
+use std::{io::BufRead, str::FromStr, time::Duration};
 
 use anyhow::Result;
+use serde::Serialize;
 
 use super::{LrcOffset, parse_length};
 
@@ -186,7 +187,7 @@ pub fn parse_metadata_only(content: &str) -> (LrcMetadata, usize) {
 }
 
 /// Metadata extracted from LRC file header tags.
-#[derive(Debug, Default, Clone, PartialEq)]
+#[derive(Debug, Default, Clone, PartialEq, Serialize)]
 pub struct LrcMetadata {
     /// Song title (from [ti:] tag)
     pub title: Option<String>,
@@ -200,6 +201,41 @@ pub struct LrcMetadata {
     pub length: Option<Duration>,
     /// Timing offset in milliseconds (from [offset:] tag)
     pub offset: Option<i64>,
+}
+
+impl LrcMetadata {
+    pub(super) fn read(mut read: impl BufRead) -> Result<Option<Self>> {
+        let mut content = String::new();
+        let mut line = String::new();
+
+        loop {
+            if read.read_line(&mut line)? == 0 {
+                break; // EOF
+            }
+            // if this line has a timestamp, stop reading
+            // We are looking for lines that start with [ and have a timestamp in them
+            // reading all the way to the end of the file is not necessary
+            let trimmed = line.trim();
+            if !trimmed.is_empty()
+                && trimmed.starts_with('[')
+                && let Some(bracket_end) = trimmed.find(']')
+            {
+                let tag_content = &trimmed[1..bracket_end];
+                if tag_content.chars().next().is_some_and(|c| c.is_numeric())
+                    && tag_content.contains(':')
+                {
+                    // timestamp found, add this line and stop
+                    content.push_str(&line);
+                    break;
+                }
+            }
+            content.push_str(&line);
+            line.clear();
+        }
+
+        let (metadata, _) = parse_metadata_only(&content);
+        Ok(Some(metadata))
+    }
 }
 
 impl FromStr for Lrc {
