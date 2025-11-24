@@ -1,5 +1,5 @@
 use std::{
-    collections::HashMap,
+    collections::BTreeMap,
     io::BufReader,
     path::{Path, PathBuf},
     time::Duration,
@@ -24,7 +24,8 @@ use crate::{
 /// processing the entire content of each LRC file during startup.
 #[derive(Debug, Default, Serialize)]
 pub struct LrcIndex {
-    index: HashMap<PathBuf, LrcMetadata>,
+    // Using BTreeMap to have a well-defined iteration order.
+    index: BTreeMap<PathBuf, LrcMetadata>,
 }
 
 impl LrcIndex {
@@ -33,7 +34,7 @@ impl LrcIndex {
         let dir = WalkDir::new(lyrics_dir);
         log::info!(dir:?; "Starting lyrics index lyrics");
 
-        let mut index = HashMap::new();
+        let mut index = BTreeMap::new();
         for child in dir {
             let child = try_cont!(child, "skipping child");
             let child = child.path();
@@ -48,7 +49,7 @@ impl LrcIndex {
             log::trace!(child:?; "Successfully indexed lyrics file");
 
             {
-                use std::collections::hash_map::Entry;
+                use std::collections::btree_map::Entry;
                 match index.entry(child.to_path_buf()) {
                     Entry::Occupied(mut entry) => {
                         entry.insert(metadata);
@@ -178,7 +179,7 @@ impl LrcIndex {
     }
 
     pub(crate) fn add(&mut self, path: PathBuf, metadata: LrcMetadata) {
-        use std::collections::hash_map::Entry;
+        use std::collections::btree_map::Entry;
         match self.index.entry(path) {
             Entry::Occupied(mut entry) => {
                 entry.insert(metadata);
@@ -193,7 +194,11 @@ impl LrcIndex {
 #[cfg(test)]
 #[allow(clippy::unwrap_used)]
 mod tests {
-    use std::{collections::HashMap, path::PathBuf, time::Duration};
+    use std::{
+        collections::{BTreeMap, HashMap},
+        path::PathBuf,
+        time::Duration,
+    };
 
     use bon::builder;
     use chrono::DateTime;
@@ -250,7 +255,7 @@ mod tests {
             .title("asdf")
             .duration(Duration::from_secs(147))
             .call();
-        let index = LrcIndex { index: HashMap::new() };
+        let index = LrcIndex { index: BTreeMap::new() };
 
         let result = index.find_entry(&song);
 
@@ -266,7 +271,7 @@ mod tests {
             .duration(Duration::from_secs(147))
             .call();
         let index = LrcIndex {
-            index: HashMap::from_iter(vec![
+            index: BTreeMap::from_iter(vec![
                 index_entry()
                     .artist("123")
                     .album("333")
@@ -290,7 +295,7 @@ mod tests {
             .duration(Duration::from_secs(147))
             .call();
         let index = LrcIndex {
-            index: HashMap::from_iter(vec![
+            index: BTreeMap::from_iter(vec![
                 index_entry()
                     .artist("aaa")
                     .album("bbb")
@@ -309,7 +314,7 @@ mod tests {
     fn song_without_album_matches_lrc_without_album() {
         let song = song().artist("123").title("asdf").duration(Duration::from_secs(147)).call();
         let index = LrcIndex {
-            index: HashMap::from_iter(vec![
+            index: BTreeMap::from_iter(vec![
                 index_entry().artist("123").title("asdf").length(Duration::from_secs(143)).call(),
             ]),
         };
@@ -323,7 +328,7 @@ mod tests {
     fn song_without_album_matches_lrc_with_album() {
         let song = song().artist("123").title("asdf").duration(Duration::from_secs(147)).call();
         let index = LrcIndex {
-            index: HashMap::from_iter(vec![
+            index: BTreeMap::from_iter(vec![
                 index_entry()
                     .artist("123")
                     .title("asdf")
@@ -347,7 +352,7 @@ mod tests {
             .duration(Duration::from_secs(147))
             .call();
         let index = LrcIndex {
-            index: HashMap::from_iter(vec![
+            index: BTreeMap::from_iter(vec![
                 index_entry().artist("123").title("asdf").length(Duration::from_secs(143)).call(),
             ]),
         };
@@ -360,7 +365,7 @@ mod tests {
     fn length_is_ignored_when_single_match_is_found() {
         let song = song().artist("123").title("asdf").duration(Duration::from_secs(999)).call();
         let index = LrcIndex {
-            index: HashMap::from_iter(vec![
+            index: BTreeMap::from_iter(vec![
                 index_entry()
                     .artist("123")
                     .title("asdf")
@@ -375,12 +380,11 @@ mod tests {
         assert!(result.is_some());
     }
 
-    #[ignore = "there is no rule that specifies which index entry should be returned => flaky test"]
     #[test]
     fn song_has_no_duration() {
         let song = song().artist("123").title("asdf").call();
         let index = LrcIndex {
-            index: HashMap::from_iter(vec![
+            index: BTreeMap::from_iter(vec![
                 index_entry()
                     .path("1")
                     .artist("123")
@@ -407,7 +411,7 @@ mod tests {
     fn length_is_considered_with_multiple_matches() {
         let song = song().artist("123").title("asdf").duration(Duration::from_secs(100)).call();
         let index = LrcIndex {
-            index: HashMap::from_iter(vec![
+            index: BTreeMap::from_iter(vec![
                 index_entry()
                     .path("should not match")
                     .artist("123")
@@ -438,7 +442,7 @@ mod tests {
     fn multiple_matches_no_lrc_without_len_no_length_match() {
         let song = song().artist("123").title("asdf").duration(Duration::from_secs(100)).call();
         let index = LrcIndex {
-            index: HashMap::from_iter(vec![
+            index: BTreeMap::from_iter(vec![
                 index_entry()
                     .path("should not match")
                     .artist("123")
@@ -449,7 +453,7 @@ mod tests {
                     .path("should match")
                     .artist("123")
                     .title("asdf")
-                    .length(Duration::from_secs(195))
+                    .length(Duration::from_secs(199))
                     .call(),
                 index_entry()
                     .path("should not match either")
@@ -469,7 +473,7 @@ mod tests {
     fn both_lrc_with_and_without_len_fallback_to_no_length() {
         let song = song().artist("123").title("asdf").duration(Duration::from_secs(999)).call();
         let index = LrcIndex {
-            index: HashMap::from_iter(vec![
+            index: BTreeMap::from_iter(vec![
                 index_entry()
                     .path("should not match")
                     .artist("123")
@@ -507,7 +511,7 @@ mod tests {
             .duration(Duration::from_secs(200))
             .call();
         let index = LrcIndex {
-            index: HashMap::from_iter(vec![
+            index: BTreeMap::from_iter(vec![
                 index_entry()
                     .path("should not match")
                     .artist("123")
