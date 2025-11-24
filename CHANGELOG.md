@@ -8,6 +8,7 @@ All notable changes to this project will be documented in this file.
 
 - `AfterCurrentAlbum` and `BeforeCurrentAlbum` to `AddOptions` keybind
 - `order` option to `album_art`, sets whether to check embedded image or cover image file first
+- Added hot reload for lyrics and corresponding `enable_lyrics_hot_reload` config option
 
 ### Changed
 

@@ -1,6 +1,7 @@
 use std::{
     collections::HashSet,
     ops::Sub,
+    path::PathBuf,
     sync::{Arc, LazyLock},
     time::{Duration, Instant},
 };
@@ -98,6 +99,17 @@ fn main_task<B: Backend + std::io::Write>(
         run_external(command.clone(), env);
     }
 
+    // Listen to changes to lyrics when enabled
+    let mut lyrics_watcher = if ctx.config.enable_lyrics_hot_reload
+        && let Some(lyrics_dir) = &ctx.config.lyrics_dir
+    {
+        let lyrics_dir = PathBuf::from(lyrics_dir);
+        let request_tx = ctx.work_sender.clone();
+        Some(crate::core::lyrics_watcher::init(&lyrics_dir, request_tx))
+    } else {
+        None
+    };
+
     match ctx.status.state {
         State::Play => {
             // Start update loop since a song is playing on startup
@@ -151,6 +163,20 @@ fn main_task<B: Backend + std::io::Write>(
                     ctx.config = Arc::new(*new_config);
                     let max_fps = f64::from(ctx.config.max_fps);
                     min_frame_duration = Duration::from_secs_f64(1f64 / max_fps);
+
+                    // Update lyrics watcher as needed
+                    if ctx.config.enable_lyrics_hot_reload != lyrics_watcher.is_some() {
+                        // IIFE may be better expressed with try blocks when it becomes stable
+                        lyrics_watcher = (|| {
+                            if !ctx.config.enable_lyrics_hot_reload {
+                                return None;
+                            }
+
+                            let lyrics_dir = PathBuf::from(ctx.config.lyrics_dir.as_ref()?);
+                            let request_tx = ctx.work_sender.clone();
+                            Some(crate::core::lyrics_watcher::init(&lyrics_dir, request_tx))
+                        })();
+                    }
 
                     if let Err(err) = ui.on_event(UiEvent::ConfigChanged, &mut ctx) {
                         log::error!(error:? = err; "UI failed to handle config changed event");
@@ -304,9 +330,9 @@ fn main_task<B: Backend + std::io::Write>(
                             log::error!(error:? = err; "UI failed to handle lyrics indexed event");
                         }
                     }
-                    WorkDone::SingleLrcIndexed { lrc_entry } => {
-                        if let Some(lrc_entry) = lrc_entry {
-                            ctx.lrc_index.add(lrc_entry);
+                    WorkDone::SingleLrcIndexed { path, metadata } => {
+                        if let Some(metadata) = metadata {
+                            ctx.lrc_index.add(path, metadata);
                         }
                         if let Err(err) = ui.on_event(UiEvent::LyricsIndexed, &mut ctx) {
                             log::error!(error:? = err; "UI failed to handle single lyrics indexed event");

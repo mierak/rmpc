@@ -75,7 +75,8 @@ fn handle_work_request(
             Ok(WorkDone::LyricsIndexed { index })
         }
         WorkRequest::IndexSingleLrc { path } => {
-            Ok(WorkDone::SingleLrcIndexed { lrc_entry: LrcIndex::index_single(path)? })
+            let metadata = LrcIndex::index_single(&path)?;
+            Ok(WorkDone::SingleLrcIndexed { path, metadata })
         }
         WorkRequest::ResizeImage(fn_once) => Ok(WorkDone::ImageResized { data: fn_once() }),
     }

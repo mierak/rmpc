@@ -4,8 +4,8 @@ mod lyrics;
 use std::{path::PathBuf, time::Duration};
 
 use anyhow::{Context, Result, bail};
-pub use index::{LrcIndex, LrcIndexEntry};
-pub use lyrics::{Lrc, parse_metadata_only};
+pub use index::LrcIndex;
+pub use lyrics::{Lrc, LrcMetadata};
 
 #[derive(Debug, Default, Clone, Copy)]
 pub struct LrcOffset {

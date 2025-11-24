@@ -6,7 +6,7 @@ use serde::{Deserialize, Serialize};
 
 use super::{
     ipc::ipc_stream::IpcStream,
-    lrc::{LrcIndex, LrcIndexEntry},
+    lrc::LrcIndex,
     mouse_event::MouseEvent,
     mpd_query::{MpdCommand, MpdQuery, MpdQueryResult, MpdQuerySync},
     ytdlp::{SearchItem, YtDlpHostKind},
@@ -20,6 +20,7 @@ use crate::{
         theme::UiConfig,
     },
     mpd::{QueuePosition, commands::IdleEvent},
+    shared::lrc::LrcMetadata,
     ui::{UiAppEvent, image::facade::EncodeData},
 };
 
@@ -55,7 +56,7 @@ pub(crate) enum WorkRequest {
 #[allow(clippy::large_enum_variant)] // the instances are short lived events, its fine.
 pub(crate) enum WorkDone {
     LyricsIndexed { index: LrcIndex },
-    SingleLrcIndexed { lrc_entry: Option<LrcIndexEntry> },
+    SingleLrcIndexed { path: PathBuf, metadata: Option<LrcMetadata> },
     MpdCommandFinished { id: &'static str, target: Option<PaneType>, data: MpdQueryResult },
     SearchYtResults { items: Vec<SearchItem>, position: Option<QueuePosition> },
     ImageResized { data: Result<EncodeData> },
