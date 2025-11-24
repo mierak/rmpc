@@ -1297,7 +1297,7 @@ struct QueueRow {
 impl QueueRow {
     fn into_row<'a>(self, cells: impl Iterator<Item = Line<'a>>) -> Row<'a> {
         let mut row = if let Some(style) = self.cell_style {
-            Row::new(cells.map(|column| column.patch_style(style)))
+            Row::new(cells.map(|column| column.patch_style(style))).style(style)
         } else {
             Row::new(cells)
         };
