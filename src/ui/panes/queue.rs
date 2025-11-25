@@ -61,6 +61,7 @@ use crate::{
             },
             select_modal::SelectModal,
         },
+        widgets::virtualized_table::VirtualizedTable,
     },
 };
 
@@ -293,14 +294,16 @@ impl Pane for QueuePane {
 
         let marker_symbol_len = config.theme.symbols.marker.chars().count();
         let mut table_iter = self.queue.items.iter().enumerate().peekable();
-        let mut table_items = Vec::new();
 
-        while let Some((idx, song)) = table_iter.next() {
+        let marked = self.queue.marked().clone();
+        let filter = self.queue.filter().map(|v| v.to_owned());
+        let table_items = std::iter::from_fn(|| {
+            let (idx, song) = table_iter.next()?;
+
             // Supply default row to skip unnecessary work for rows that are either below or
             // above the visible portion of the table
             if idx < offset || idx > viewport_len + offset {
-                table_items.push(Row::new((0..formats.len()).map(|_| Cell::default())));
-                continue;
+                return Some(Row::new((0..formats.len()).map(|_| Cell::default())));
             }
 
             let is_current = ctx
@@ -308,7 +311,7 @@ impl Pane for QueuePane {
                 .map(|(_, song)| song.id)
                 .is_some_and(|v| v == song.id);
 
-            let is_marked = self.queue.marked().contains(&idx);
+            let is_marked = marked.contains(&idx);
             let columns = (0..formats.len()).map(|i| {
                 let mut max_len: usize = widths[i].width.into();
                 // We have to subtract marker symbol length from max len in order to make space
@@ -342,7 +345,7 @@ impl Pane for QueuePane {
             });
 
             let is_matching_search = is_current
-                || self.queue.filter().is_some_and(|filter| {
+                || filter.as_ref().is_some_and(|filter| {
                     song.matches(self.column_formats.as_slice(), filter, ctx)
                 });
 
@@ -362,8 +365,8 @@ impl Pane for QueuePane {
                 row.underlined = is_new_album;
             }
 
-            table_items.push(row.into_row(columns));
-        }
+            Some(row.into_row(columns))
+        });
 
         if config.theme.show_song_table_header {
             let header_table = Table::default()
@@ -377,16 +380,12 @@ impl Pane for QueuePane {
             frame.render_widget(header_table, self.areas[Areas::TableHeader]);
         }
 
-        let table = Table::new(table_items, self.column_widths.clone())
-            .style(config.as_text_style())
+        let table = VirtualizedTable::new(table_items)
+            .column_widths(self.column_widths.clone())
             .row_highlight_style(config.theme.current_item_style);
 
         frame.render_widget(table_block, self.areas[Areas::TableBlock]);
-        frame.render_stateful_widget(
-            table,
-            self.areas[Areas::Table],
-            self.queue.state.as_render_state_ref(),
-        );
+        frame.render_stateful_widget(table, self.areas[Areas::Table], &mut self.queue.state);
 
         if let Some(scrollbar) = config.as_styled_scrollbar()
             && self.areas[Areas::Scrollbar].width > 0

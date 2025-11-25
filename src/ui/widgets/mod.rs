@@ -8,6 +8,7 @@ pub mod progress_bar;
 pub mod scan_status;
 pub mod scrolling_line;
 pub mod tabs;
+pub mod virtualized_table;
 pub mod volume;
 
 fn get_line_offset(line_width: u16, text_area_width: u16, alignment: Alignment) -> u16 {
