@@ -8,7 +8,7 @@ use ratatui::{
 
 use crate::ui::dirstack::DirState;
 
-/// A simple wrapper around ratatui's Table widget which virtaulizes the rows
+/// A simple wrapper around ratatui's Table widget which virtualizes the rows
 /// iterator to only materialize the rows necessary for rendering. This is why
 /// this table only takes Iterator and not `IntoIterator`.
 #[derive(Debug)]

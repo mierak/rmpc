@@ -315,7 +315,6 @@ impl Pane for QueuePane {
             frame.render_widget(header_table, self.areas[Areas::TableHeader]);
         }
 
-        let start = std::time::Instant::now();
         let table = VirtualizedTable::new(&self.queue.items)
             .column_widths(self.column_widths.clone())
             .row_highlight_style(config.theme.current_item_style)
@@ -381,7 +380,6 @@ impl Pane for QueuePane {
 
         let _ = std::mem::replace(self.queue.marked_mut(), marked);
         let _ = std::mem::replace(self.queue.filter_mut(), filter);
-        log::debug!("Rendered queue table in {:?}", start.elapsed());
 
         if let Some(scrollbar) = config.as_styled_scrollbar()
             && self.areas[Areas::Scrollbar].width > 0
