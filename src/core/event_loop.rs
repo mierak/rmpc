@@ -101,6 +101,7 @@ fn main_task<B: Backend + std::io::Write>(
 
     // Listen to changes to lyrics when enabled
     let mut lyrics_watcher = if ctx.config.enable_lyrics_hot_reload
+        && ctx.config.enable_lyrics_index
         && let Some(lyrics_dir) = &ctx.config.lyrics_dir
     {
         let lyrics_dir = PathBuf::from(lyrics_dir);
@@ -165,7 +166,9 @@ fn main_task<B: Backend + std::io::Write>(
                     min_frame_duration = Duration::from_secs_f64(1f64 / max_fps);
 
                     // Update lyrics watcher as needed
-                    if ctx.config.enable_lyrics_hot_reload != lyrics_watcher.is_some() {
+                    if ctx.config.enable_lyrics_hot_reload != lyrics_watcher.is_some()
+                        && ctx.config.enable_lyrics_index
+                    {
                         // IIFE may be better expressed with try blocks when it becomes stable
                         lyrics_watcher = (|| {
                             if !ctx.config.enable_lyrics_hot_reload {

@@ -336,7 +336,9 @@ fn main() -> Result<()> {
 
             config.validate()?;
 
-            if let Some(lyrics_dir) = &config.lyrics_dir {
+            if let Some(lyrics_dir) = &config.lyrics_dir
+                && config.enable_lyrics_index
+            {
                 worker_tx
                     .send(WorkRequest::IndexLyrics { lyrics_dir: lyrics_dir.clone() })
                     .context("Failed to request lyrics indexing")?;
