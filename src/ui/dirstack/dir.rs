@@ -80,6 +80,10 @@ where
         self.filter.as_deref()
     }
 
+    pub fn filter_mut(&mut self) -> &mut Option<String> {
+        &mut self.filter
+    }
+
     pub fn set_filter(
         &mut self,
         value: Option<String>,

@@ -10,7 +10,7 @@ use ratatui::{
     prelude::{Constraint, Layout, Rect},
     style::{Style, Styled, Stylize},
     text::{Line, Span, Text},
-    widgets::{Block, Borders, Cell, Row, Table, TableState},
+    widgets::{Block, Borders, Row, Table, TableState},
 };
 
 use super::{CommonAction, Pane};
@@ -42,6 +42,7 @@ use crate::{
         macros::{modal, status_error, status_info, status_warn},
         mouse_event::{MouseEvent, MouseEventKind, calculate_scrollbar_position},
         mpd_client_ext::{Enqueue, MpdClientExt},
+        song_ext::SongsExt,
     },
     ui::{
         UiEvent,
@@ -61,6 +62,7 @@ use crate::{
             },
             select_modal::SelectModal,
         },
+        widgets::virtualized_table::VirtualizedTable,
     },
 };
 
@@ -288,82 +290,18 @@ impl Pane for QueuePane {
 
         let formats = &config.theme.song_table_format;
 
-        let offset = self.queue.state.as_render_state_ref().offset();
-        let viewport_len = self.queue.state.viewport_len().unwrap_or_default();
-
         let marker_symbol_len = config.theme.symbols.marker.chars().count();
-        let mut table_iter = self.queue.items.iter().enumerate().peekable();
-        let mut table_items = Vec::new();
 
-        while let Some((idx, song)) = table_iter.next() {
-            // Supply default row to skip unnecessary work for rows that are either below or
-            // above the visible portion of the table
-            if idx < offset || idx > viewport_len + offset {
-                table_items.push(Row::new((0..formats.len()).map(|_| Cell::default())));
-                continue;
-            }
-
-            let is_current = ctx
-                .find_current_song_in_queue()
-                .map(|(_, song)| song.id)
-                .is_some_and(|v| v == song.id);
-
-            let is_marked = self.queue.marked().contains(&idx);
-            let columns = (0..formats.len()).map(|i| {
-                let mut max_len: usize = widths[i].width.into();
-                // We have to subtract marker symbol length from max len in order to make space
-                // for the marker symbol in case we are in the first column of the table and the
-                // song is marked.
-                if is_marked && i == 0 {
-                    max_len = max_len.saturating_sub(marker_symbol_len);
-                }
-
-                let mut line = song
-                    .as_line_ellipsized(
-                        &formats[i].prop,
-                        max_len,
-                        &config.theme.symbols,
-                        &config.theme.format_tag_separator,
-                        config.theme.multiple_tag_resolution_strategy,
-                        ctx,
-                    )
-                    .unwrap_or_default()
-                    .alignment(formats[i].alignment.into());
-
-                if is_marked && i == 0 {
-                    let marker_span = Span::styled(
-                        &config.theme.symbols.marker,
-                        config.theme.highlighted_item_style,
-                    );
-                    line.spans.splice(..0, std::iter::once(marker_span));
-                }
-
-                line
-            });
-
-            let is_matching_search = is_current
-                || self.queue.filter().is_some_and(|filter| {
-                    song.matches(self.column_formats.as_slice(), filter, ctx)
-                });
-
-            let mut row = QueueRow::default();
-            if is_matching_search {
-                row.cell_style = Some(config.theme.highlighted_item_style);
-            }
-
-            if matches!(ctx.config.theme.song_table_album_separator, AlbumSeparator::Underline) {
-                let is_new_album = if let Some((_, next_song)) = table_iter.peek() {
-                    next_song.metadata.get("album") != song.metadata.get("album")
-                        || next_song.metadata.get("album_artist")
-                            != song.metadata.get("album_artist")
-                } else {
-                    false
-                };
-                row.underlined = is_new_album;
-            }
-
-            table_items.push(row.into_row(columns));
-        }
+        let new_album_indices: HashSet<usize> = self
+            .queue
+            .items
+            .as_slice()
+            .to_album_ranges()
+            .map(|range| range.end.saturating_sub(1))
+            .collect();
+        let current_song_id = ctx.find_current_song_in_queue().map(|(_, song)| song.id);
+        let marked = std::mem::take(self.queue.marked_mut());
+        let filter = std::mem::take(self.queue.filter_mut());
 
         if config.theme.show_song_table_header {
             let header_table = Table::default()
@@ -377,16 +315,71 @@ impl Pane for QueuePane {
             frame.render_widget(header_table, self.areas[Areas::TableHeader]);
         }
 
-        let table = Table::new(table_items, self.column_widths.clone())
-            .style(config.as_text_style())
-            .row_highlight_style(config.theme.current_item_style);
+        let table = VirtualizedTable::new(&self.queue.items)
+            .column_widths(self.column_widths.clone())
+            .row_highlight_style(config.theme.current_item_style)
+            .map_fn(|idx, song| {
+                let is_current = current_song_id.is_some_and(|v| v == song.id);
+
+                let is_marked = marked.contains(&idx);
+                let columns = (0..formats.len()).map(|i| {
+                    let mut max_len: usize = widths[i].width.into();
+                    // We have to subtract marker symbol length from max len in order to make space
+                    // for the marker symbol in case we are in the first column of the table and the
+                    // song is marked.
+                    if is_marked && i == 0 {
+                        max_len = max_len.saturating_sub(marker_symbol_len);
+                    }
+
+                    let mut line = song
+                        .as_line_ellipsized(
+                            &formats[i].prop,
+                            max_len,
+                            &config.theme.symbols,
+                            &config.theme.format_tag_separator,
+                            config.theme.multiple_tag_resolution_strategy,
+                            ctx,
+                        )
+                        .unwrap_or_default()
+                        .alignment(formats[i].alignment.into());
+
+                    if is_marked && i == 0 {
+                        let marker_span = Span::styled(
+                            &config.theme.symbols.marker,
+                            config.theme.highlighted_item_style,
+                        );
+                        line.spans.splice(..0, std::iter::once(marker_span));
+                    }
+
+                    line
+                });
+
+                let is_matching_search = is_current
+                    || filter.as_ref().is_some_and(|filter| {
+                        song.matches(self.column_formats.as_slice(), filter, ctx)
+                    });
+
+                let mut row = QueueRow::default();
+                if is_matching_search {
+                    row.cell_style = Some(config.theme.highlighted_item_style);
+                }
+
+                let sep = ctx.config.theme.song_table_album_separator;
+                if new_album_indices.contains(&idx)
+                    && matches!(sep, AlbumSeparator::Underline)
+                    && idx != self.queue.items.len().saturating_sub(1)
+                {
+                    row.underlined = true;
+                }
+
+                row.into_row(columns)
+            });
 
         frame.render_widget(table_block, self.areas[Areas::TableBlock]);
-        frame.render_stateful_widget(
-            table,
-            self.areas[Areas::Table],
-            self.queue.state.as_render_state_ref(),
-        );
+        frame.render_stateful_widget(table, self.areas[Areas::Table], &mut self.queue.state);
+
+        let _ = std::mem::replace(self.queue.marked_mut(), marked);
+        let _ = std::mem::replace(self.queue.filter_mut(), filter);
 
         if let Some(scrollbar) = config.as_styled_scrollbar()
             && self.areas[Areas::Scrollbar].width > 0

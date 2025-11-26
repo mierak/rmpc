@@ -8,7 +8,7 @@ use super::ToDescription;
 use crate::{
     config::{tabs::TabName, utils::tilde_expand},
     mpd::{QueuePosition, commands::Song},
-    shared::macros::status_warn,
+    shared::{macros::status_warn, song_ext::SongsExt},
 };
 
 // Global actions
@@ -490,30 +490,11 @@ impl AddOpts {
         current_song_idx: Option<usize>,
         hovered_song_idx: Option<usize>,
     ) -> anyhow::Result<(Option<usize>, Option<QueuePosition>)> {
-        let ranges = Self::to_album_ranges(queue);
+        let ranges = queue.to_album_ranges().collect_vec();
         Ok((
             self.autoplay_idx(queue, current_song_idx, hovered_song_idx, &ranges)?,
             self.queue_position(current_song_idx, &ranges)?,
         ))
-    }
-
-    fn to_album_ranges(queue: &[Song]) -> Vec<Range<usize>> {
-        let mut out = Vec::new();
-        let mut i = 0;
-        while i < queue.len() {
-            let a = queue[i].metadata.get("album");
-            let aa = queue[i].metadata.get("album_artist");
-            let mut j = i + 1;
-            while j < queue.len()
-                && queue[j].metadata.get("album") == a
-                && queue[j].metadata.get("album_artist") == aa
-            {
-                j += 1;
-            }
-            out.push(i..j);
-            i = j;
-        }
-        out
     }
 
     fn queue_position(
