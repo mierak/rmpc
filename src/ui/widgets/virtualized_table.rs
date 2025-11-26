@@ -12,21 +12,38 @@ use crate::ui::dirstack::DirState;
 /// iterator to only materialize the rows necessary for rendering. This is why
 /// this table only takes Iterator and not `IntoIterator`.
 #[derive(Debug)]
-pub struct VirtualizedTable<'a, T: Iterator<Item = Row<'a>>> {
-    rows: T,
+pub struct VirtualizedTable<'a, 'song, T, F>
+where
+    F: Fn(usize, &'song T) -> Row<'a>,
+{
+    items: &'song [T],
     column_widths: Vec<Constraint>,
     row_highlight_style: Style,
+    map_fn: Option<F>,
 }
 
-impl<'a, T: Iterator<Item = Row<'a>>> VirtualizedTable<'a, T> {
-    pub fn new(rows: T) -> Self {
-        Self { rows, column_widths: Vec::new(), row_highlight_style: Style::default() }
+impl<'a, 'song, T, F> VirtualizedTable<'a, 'song, T, F>
+where
+    F: Fn(usize, &'song T) -> Row<'a>,
+{
+    pub fn new(items: &'song [T]) -> Self {
+        Self {
+            items,
+            column_widths: Vec::new(),
+            row_highlight_style: Style::default(),
+            map_fn: None,
+        }
     }
 
-    pub fn column_widths<I>(mut self, widths: I) -> Self
+    pub fn map_fn(mut self, f: F) -> Self {
+        self.map_fn = Some(f);
+        self
+    }
+
+    pub fn column_widths<W>(mut self, widths: W) -> Self
     where
-        I: IntoIterator,
-        I::Item: Into<Constraint>,
+        W: IntoIterator,
+        W::Item: Into<Constraint>,
     {
         self.column_widths = widths.into_iter().map(Into::into).collect_vec();
         self
@@ -38,7 +55,10 @@ impl<'a, T: Iterator<Item = Row<'a>>> VirtualizedTable<'a, T> {
     }
 }
 
-impl<'a, T: Iterator<Item = Row<'a>>> StatefulWidget for VirtualizedTable<'a, T> {
+impl<'a, 'song, T, F> StatefulWidget for VirtualizedTable<'a, 'song, T, F>
+where
+    F: Fn(usize, &'song T) -> Row<'a>,
+{
     type State = DirState<TableState>;
 
     fn render(self, area: Rect, buf: &mut Buffer, state: &mut Self::State)
@@ -46,6 +66,9 @@ impl<'a, T: Iterator<Item = Row<'a>>> StatefulWidget for VirtualizedTable<'a, T>
         Self: Sized,
     {
         let Some(viewport_len) = state.viewport_len() else {
+            return;
+        };
+        let Some(map_fn) = self.map_fn.as_ref() else {
             return;
         };
 
@@ -56,7 +79,13 @@ impl<'a, T: Iterator<Item = Row<'a>>> StatefulWidget for VirtualizedTable<'a, T>
         *state.inner.offset_mut() = 0;
         state.select(original_selected.map(|v| v.saturating_sub(original_offset)), 0);
 
-        let actual_rows = self.rows.skip(original_offset).take(viewport_len);
+        let actual_rows = self
+            .items
+            .iter()
+            .skip(original_offset)
+            .take(viewport_len)
+            .enumerate()
+            .map(|(idx, item)| map_fn(idx + original_offset, item));
         let table = Table::new(actual_rows, self.column_widths)
             .row_highlight_style(self.row_highlight_style);
 
