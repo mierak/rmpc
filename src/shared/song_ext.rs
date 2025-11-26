@@ -3,14 +3,18 @@ use std::ops::Range;
 use crate::mpd::commands::Song;
 
 pub trait SongsExt {
-    fn to_album_ranges(self) -> Vec<Range<usize>>;
+    fn to_album_ranges(self) -> impl Iterator<Item = Range<usize>>;
 }
 
 impl SongsExt for &[Song] {
-    fn to_album_ranges(self) -> Vec<Range<usize>> {
-        let mut out = Vec::new();
+    fn to_album_ranges(self) -> impl Iterator<Item = Range<usize>> {
         let mut i = 0;
-        while i < self.len() {
+
+        std::iter::from_fn(move || {
+            if self.is_empty() || i >= self.len() {
+                return None;
+            }
+
             let a = self[i].metadata.get("album");
             let aa = self[i].metadata.get("album_artist");
             let mut j = i + 1;
@@ -20,9 +24,10 @@ impl SongsExt for &[Song] {
             {
                 j += 1;
             }
-            out.push(i..j);
+            let range = i..j;
             i = j;
-        }
-        out
+
+            Some(range)
+        })
     }
 }

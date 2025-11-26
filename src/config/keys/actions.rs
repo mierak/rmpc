@@ -490,7 +490,7 @@ impl AddOpts {
         current_song_idx: Option<usize>,
         hovered_song_idx: Option<usize>,
     ) -> anyhow::Result<(Option<usize>, Option<QueuePosition>)> {
-        let ranges = queue.to_album_ranges();
+        let ranges = queue.to_album_ranges().collect_vec();
         Ok((
             self.autoplay_idx(queue, current_song_idx, hovered_song_idx, &ranges)?,
             self.queue_position(current_song_idx, &ranges)?,

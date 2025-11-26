@@ -297,7 +297,6 @@ impl Pane for QueuePane {
             .items
             .as_slice()
             .to_album_ranges()
-            .into_iter()
             .map(|range| range.end.saturating_sub(1))
             .collect();
         let current_song_id = ctx.find_current_song_in_queue().map(|(_, song)| song.id);
@@ -366,11 +365,10 @@ impl Pane for QueuePane {
                     row.cell_style = Some(config.theme.highlighted_item_style);
                 }
 
+                let sep = ctx.config.theme.song_table_album_separator;
                 if new_album_indices.contains(&idx)
-                    && matches!(
-                        ctx.config.theme.song_table_album_separator,
-                        AlbumSeparator::Underline
-                    )
+                    && matches!(sep, AlbumSeparator::Underline)
+                    && idx != self.queue.items.len().saturating_sub(1)
                 {
                     row.underlined = true;
                 }
