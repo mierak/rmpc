@@ -173,6 +173,7 @@ mod tests {
     #[test_case(                  None,           None, "127.0.0.1:7600", None,       Some("secret@/tmp/socket"), Some("6601"), MpdAddress::SocketPath("/tmp/socket".to_string()),        Some("secret".into()) ; "ENV with socket path and password")]
     #[test_case(                  None,           None, "/tmp/cfg_sock",  Some("secret"),                   None,         None, MpdAddress::SocketPath("/tmp/cfg_sock".to_string()),      Some("secret".into()) ; "socket path from config with password")]
     #[test_case(                  None,           None, "@mpd",           Some("secret"),                   None,         None, MpdAddress::AbstractSocket("mpd".to_string()),            Some("secret".into()) ; "abstract socket path from config with password")]
+    #[test_case(                  None,           None, "127.0.0.1:7600", None,              Some("secret@@mpd"),         None, MpdAddress::AbstractSocket("mpd".to_string()),            Some("secret".into()) ; "abstract socket path from ENV with password")]
     #[test_case(                  None,           None, "127.0.0.1:7600", Some("secret"),                   None,         None, MpdAddress::IpAndPort("127.0.0.1:7600".to_string()),      Some("secret".into()) ; "ip and port from config with password")]
     fn resolves(
         cli_addr: Option<&str>,
