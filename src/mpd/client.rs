@@ -1,8 +1,10 @@
+#[cfg(target_os = "linux")]
+use std::os::linux::net::SocketAddrExt;
 use std::{
     collections::HashSet,
     io::{BufRead, BufReader, Write},
     net::{Shutdown, TcpStream},
-    os::unix::net::UnixStream,
+    os::unix::net::{SocketAddr, UnixStream},
 };
 
 use anyhow::Result;
@@ -128,6 +130,15 @@ impl<'name> Client<'name> {
         let mut stream = match addr {
             MpdAddress::IpAndPort(ref addr) => TcpOrUnixStream::Tcp(TcpStream::connect(addr)?),
             MpdAddress::SocketPath(ref addr) => TcpOrUnixStream::Unix(UnixStream::connect(addr)?),
+            MpdAddress::AbstractSocket(ref addr) => {
+                #[cfg(target_os = "linux")]
+                {
+                    let addr = SocketAddr::from_abstract_name(addr)?;
+                    TcpOrUnixStream::Unix(UnixStream::connect_addr(&addr)?)
+                }
+                #[cfg(not(target_os = "linux"))]
+                return Err(MpdError::Generic("Abstract socket only supported on Linux"));
+            }
         };
         stream.set_write_timeout(None)?;
         stream.set_read_timeout(None)?;
@@ -199,6 +210,15 @@ impl<'name> Client<'name> {
         let mut stream = match &self.addr {
             MpdAddress::IpAndPort(addr) => TcpOrUnixStream::Tcp(TcpStream::connect(addr)?),
             MpdAddress::SocketPath(addr) => TcpOrUnixStream::Unix(UnixStream::connect(addr)?),
+            MpdAddress::AbstractSocket(addr) => {
+                #[cfg(target_os = "linux")]
+                {
+                    let addr = SocketAddr::from_abstract_name(addr)?;
+                    TcpOrUnixStream::Unix(UnixStream::connect_addr(&addr)?)
+                }
+                #[cfg(not(target_os = "linux"))]
+                return Err(MpdError::Generic("Abstract socket only supported on Linux"));
+            }
         };
         stream.set_write_timeout(None)?;
         stream.set_read_timeout(None)?;

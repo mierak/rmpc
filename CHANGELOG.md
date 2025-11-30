@@ -10,6 +10,7 @@ All notable changes to this project will be documented in this file.
 - `order` option to `album_art`, sets whether to check embedded image or cover image file first
 - Added hot reload for lyrics and corresponding `enable_lyrics_hot_reload` config option
 - `enable_lyrics_index` to disable `lyrics_dir` indexing on startup
+- Support abstract socket in `MPD_HOST` and config file on Linux
 
 ### Changed
 
@@ -90,8 +91,8 @@ going to the next item
 - Remote commands now check for `$PID` env variable, meaning `--pid` argument is no longer needed for
 remote commands inside scripts triggered by rmpc
 - `AddToPlaylist` binding handles marked songs rather than only the one under your cursor.
-- Paused playback state is now kept by default when using the `NextTrack/PreviousTrack` keybinds. Use 
-`keep_state_on_song_change` to disable this 
+- Paused playback state is now kept by default when using the `NextTrack/PreviousTrack` keybinds. Use
+`keep_state_on_song_change` to disable this
 - Default theme now includes lyrics pane above the album art on queue tab
 - Browsers now properly use case insensitive sorting
 - Refactored and improved image backend detection
