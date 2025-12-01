@@ -137,7 +137,9 @@ impl<'name> Client<'name> {
                     TcpOrUnixStream::Unix(UnixStream::connect_addr(&addr)?)
                 }
                 #[cfg(not(target_os = "linux"))]
-                return Err(MpdError::Generic("Abstract socket only supported on Linux".to_string()));
+                return Err(MpdError::Generic(
+                    "Abstract socket only supported on Linux".to_string(),
+                ));
             }
         };
         stream.set_write_timeout(None)?;
@@ -217,7 +219,9 @@ impl<'name> Client<'name> {
                     TcpOrUnixStream::Unix(UnixStream::connect_addr(&addr)?)
                 }
                 #[cfg(not(target_os = "linux"))]
-                return Err(MpdError::Generic("Abstract socket only supported on Linux".to_string()));
+                return Err(MpdError::Generic(
+                    "Abstract socket only supported on Linux".to_string(),
+                ));
             }
         };
         stream.set_write_timeout(None)?;
