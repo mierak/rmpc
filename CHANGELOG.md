@@ -26,6 +26,7 @@ configured with the new `album_art.order` option
 - Album art (sixel and iterm2) sometimes being aligned to an incorrect pane when in tmux splits
 - Album art (sixel and iterm2) not rendering after detaching and reattaching from tmux session
 - `highlighted_item_style` having unstyled spaces between columns in the queue table
+- rmpc not correctly removing keyboard enhancement flags
 
 ## [0.10.0] - 2025-11-11
 
