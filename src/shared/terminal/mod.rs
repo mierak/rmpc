@@ -6,6 +6,7 @@ use crossterm::{
         DisableMouseCapture,
         EnableMouseCapture,
         KeyboardEnhancementFlags,
+        PopKeyboardEnhancementFlags,
         PushKeyboardEnhancementFlags,
     },
     execute,
@@ -185,13 +186,7 @@ impl Terminal {
             execute!(writer, DisableMouseCapture)?;
         }
         if TERMINAL.kitty_keyboard_protocol {
-            execute!(
-                writer,
-                PushKeyboardEnhancementFlags(
-                    KeyboardEnhancementFlags::DISAMBIGUATE_ESCAPE_CODES
-                        | KeyboardEnhancementFlags::REPORT_ALTERNATE_KEYS,
-                )
-            )?;
+            execute!(writer, PopKeyboardEnhancementFlags)?;
         }
         disable_raw_mode()?;
         execute!(writer, LeaveAlternateScreen)?;
