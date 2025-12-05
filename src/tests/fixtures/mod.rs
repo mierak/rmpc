@@ -20,6 +20,7 @@ use crate::{
         lrc::LrcIndex,
         ring_vec::RingVec,
     },
+    ui::input::InputManager,
 };
 
 pub mod mpd_client;
@@ -78,6 +79,7 @@ pub fn ctx(
         messages: RingVec::default(),
         last_status_update: Instant::now(),
         song_played: None,
+        input: InputManager::default(),
     }
 }
 

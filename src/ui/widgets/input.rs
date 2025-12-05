@@ -1,10 +1,11 @@
-use std::borrow::Cow;
-
+use itertools::Itertools;
 use ratatui::{
     prelude::{Constraint, Layout, Margin},
-    style::Style,
+    style::{Style, Stylize},
+    text::{Line, Span},
     widgets::{Block, Borders, Paragraph, Widget, Wrap},
 };
+use unicode_segmentation::UnicodeSegmentation;
 
 #[derive(Debug, Default)]
 pub struct Input<'a> {
@@ -18,12 +19,14 @@ pub struct Input<'a> {
     unfocused_style: Style,
     borderless: bool,
     spacing: u16,
+    cursor: usize,
 }
 
 impl Widget for Input<'_> {
     fn render(self, area: ratatui::prelude::Rect, buf: &mut ratatui::prelude::Buffer) {
         let label_len = self.label.chars().count() as u16;
         let [text_area, input_area] =
+            // TODO when no label it takes 2 columns, fix that
             *Layout::horizontal([Constraint::Max(label_len + 2), Constraint::Fill(1)])
                 .spacing(self.spacing)
                 .split(area)
@@ -37,7 +40,16 @@ impl Widget for Input<'_> {
             if self.focused { self.focused_style } else { self.unfocused_style };
 
         let label = Paragraph::new(self.label).wrap(Wrap { trim: false }).style(self.label_style);
-        let mut input = Paragraph::new(self.trimmed_text(input_area)).style(self.input_style);
+        let text = self.trimmed_text(input_area);
+        let text_width = text.iter().map(|span| span.width()).sum1::<usize>().unwrap_or_default();
+
+        log::debug!(area = input_area.width; "Input widget text width: {text_width}");
+        // TODO account for borders
+        let mut input = if text_width + 2 <= input_area.width as usize {
+            Paragraph::new(Line::from(text))
+        } else {
+            Paragraph::new(Line::from(""))
+        };
 
         if !self.borderless {
             input = input.block(
@@ -60,9 +72,9 @@ impl Widget for Input<'_> {
 
 #[allow(unused)]
 impl<'a> Input<'a> {
-    fn trimmed_text(&self, input_area: ratatui::layout::Rect) -> Cow<'a, str> {
+    fn trimmed_text(&self, input_area: ratatui::layout::Rect) -> Vec<Span<'a>> {
         if self.text.is_empty() && !self.focused {
-            return Cow::Borrowed(self.placeholder.unwrap_or(""));
+            return vec![Span::default()];
         }
 
         let mut input_len = input_area.inner(Margin { horizontal: 1, vertical: 0 }).width as usize;
@@ -71,11 +83,27 @@ impl<'a> Input<'a> {
             input_len = input_len.saturating_sub(1);
         }
 
-        Cow::Owned(format!(
-            "{}{}",
-            self.text.chars().skip(self.text.len().saturating_sub(input_len)).collect::<String>(),
-            if self.focused { "█" } else { "" },
-        ))
+        if self.text.len() == self.cursor {
+            return vec![
+                Span::styled(&self.text[0..self.cursor], self.input_style),
+                Span::styled(" ", self.input_style.reversed()),
+            ];
+        }
+
+        let grapheme_size = self
+            .text
+            .grapheme_indices(true)
+            .find(|(idx, _)| idx >= &self.cursor)
+            .map_or(self.text.len(), |(idx, g)| g.len());
+
+        return vec![
+            Span::styled(&self.text[0..self.cursor], self.input_style),
+            Span::styled(
+                &self.text[self.cursor..self.cursor + grapheme_size],
+                self.input_style.reversed(),
+            ),
+            Span::styled(&self.text[self.cursor + grapheme_size..], self.input_style),
+        ];
     }
 
     pub fn spacing(mut self, spacing: u16) -> Self {
@@ -125,6 +153,11 @@ impl<'a> Input<'a> {
 
     pub fn set_placeholder(mut self, placeholder: &'a str) -> Self {
         self.placeholder = Some(placeholder);
+        self
+    }
+
+    pub fn cursor(mut self, position: usize) -> Self {
+        self.cursor = position;
         self
     }
 }

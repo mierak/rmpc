@@ -9,7 +9,7 @@ use crate::{
 
 #[derive(Debug, Clone)]
 pub struct KeyEvent {
-    inner: CKeyEvent,
+    pub(crate) inner: CKeyEvent,
     already_handled: bool,
 }
 
