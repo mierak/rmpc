@@ -228,6 +228,7 @@ impl AlbumArtFacade {
         let w = w.by_ref();
         let c = ctx.config.theme.background_color.map(Into::into);
 
+        self.request_queue.clear();
         match &mut self.image_backend {
             ImageBackend::Kitty(s) => s.hide(w, self.last_size, c)?,
             ImageBackend::Ueberzug(s) => s.hide(w, self.last_size, c)?,

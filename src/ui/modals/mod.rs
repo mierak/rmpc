@@ -12,6 +12,7 @@ use crate::{
     MpdQueryResult,
     ctx::Ctx,
     shared::{id::Id, key_event::KeyEvent, mouse_event::MouseEvent},
+    ui::input::InputResultEvent,
 };
 
 pub mod add_random_modal;
@@ -30,6 +31,10 @@ pub(crate) trait Modal: std::fmt::Debug {
     fn id(&self) -> Id;
 
     fn render(&mut self, frame: &mut Frame, ctx: &mut crate::ctx::Ctx) -> Result<()>;
+
+    fn handle_insert_mode(&mut self, kind: InputResultEvent, ctx: &Ctx) -> Result<()> {
+        Ok(())
+    }
 
     fn handle_key(&mut self, key: &mut KeyEvent, ctx: &mut Ctx) -> Result<()>;
 
@@ -52,7 +57,7 @@ pub(crate) trait Modal: std::fmt::Debug {
         None
     }
 
-    fn hide(&mut self, ctx: &mut Ctx) -> Result<()> {
+    fn hide(&mut self, ctx: &Ctx) -> Result<()> {
         ctx.app_event_sender
             .send(crate::AppEvent::UiEvent(crate::ui::UiAppEvent::PopModal(self.id())))?;
         Ok(())

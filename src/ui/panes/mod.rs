@@ -64,6 +64,7 @@ use crate::{
         key_event::KeyEvent,
         mouse_event::MouseEvent,
     },
+    ui::input::InputResultEvent,
 };
 
 pub mod album_art;
@@ -271,6 +272,10 @@ pub(crate) trait Pane {
 
     /// Used to keep the current state but refresh data
     fn on_event(&mut self, event: &mut UiEvent, is_visible: bool, ctx: &Ctx) -> Result<()> {
+        Ok(())
+    }
+
+    fn handle_insert_mode(&mut self, kind: InputResultEvent, ctx: &mut Ctx) -> Result<()> {
         Ok(())
     }
 

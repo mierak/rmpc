@@ -52,13 +52,14 @@ use crate::{
         mpd_client_ext::{Enqueue, MpdClientExt},
         ytdlp::YtDlpHostKind,
     },
-    ui::{image::facade::EncodeData, modals::menu::create_rating_modal},
+    ui::{image::facade::EncodeData, input::InputEvent, modals::menu::create_rating_modal},
 };
 
 pub mod browser;
 pub mod dir_or_song;
 pub mod dirstack;
 pub mod image;
+pub mod input;
 pub mod modals;
 pub mod panes;
 pub mod tab_screen;
@@ -205,7 +206,18 @@ impl<'ui> Ui<'ui> {
 
     pub fn handle_key(&mut self, key: &mut KeyEvent, ctx: &mut Ctx) -> Result<KeyHandleResult> {
         if let Some(ref mut modal) = self.modals.last_mut() {
+            if let Some(kind) = ctx.input.handle_input(InputEvent::from_key_event(key, ctx)) {
+                modal.handle_insert_mode(kind, ctx)?;
+                ctx.render()?;
+                return Ok(KeyHandleResult::None);
+            }
+
             modal.handle_key(key, ctx)?;
+            return Ok(KeyHandleResult::None);
+        }
+
+        if let Some(kind) = ctx.input.handle_input(InputEvent::from_key_event(key, ctx)) {
+            active_tab_call!(self, ctx, handle_insert_mode(kind, ctx))?;
             return Ok(KeyHandleResult::None);
         }
 

@@ -23,21 +23,11 @@ pub enum BrowserArea {
 pub struct Browser<T: std::fmt::Debug + DirStackItem + Clone + Send> {
     state_type_marker: std::marker::PhantomData<T>,
     pub areas: EnumMap<BrowserArea, Rect>,
-    filter_input_active: bool,
 }
 
 impl<T: std::fmt::Debug + DirStackItem + Clone + Send> Browser<T> {
     pub fn new() -> Self {
-        Self {
-            state_type_marker: std::marker::PhantomData,
-            areas: EnumMap::default(),
-            filter_input_active: false,
-        }
-    }
-
-    pub fn set_filter_input_active(&mut self, value: bool) -> &mut Self {
-        self.filter_input_active = value;
-        self
+        Self { state_type_marker: std::marker::PhantomData, areas: EnumMap::default() }
     }
 }
 const MIDDLE_COLUMN_SYMBOLS: symbols::border::Set = symbols::border::Set {
@@ -171,7 +161,7 @@ where
         }
         if config.theme.column_widths[1] > 0 {
             let title = state.current().filter().as_ref().map(|v| {
-                format!("[FILTER]: {v}{} ", if self.filter_input_active { "█" } else { "" })
+                format!("[FILTER]: {v}{} ", if ctx.input.is_insert_mode() { "█" } else { "" })
             });
             let Dir { items, state, .. } = state.current_mut();
             state.set_content_and_viewport_len(items.len(), current_area.height.into());
