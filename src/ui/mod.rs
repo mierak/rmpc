@@ -52,7 +52,11 @@ use crate::{
         mpd_client_ext::{Enqueue, MpdClientExt},
         ytdlp::YtDlpHostKind,
     },
-    ui::{image::facade::EncodeData, input::InputEvent, modals::menu::create_rating_modal},
+    ui::{
+        image::facade::EncodeData,
+        input::{InputEvent, InputResultEvent},
+        modals::menu::create_rating_modal,
+    },
 };
 
 pub mod browser;
@@ -205,19 +209,39 @@ impl<'ui> Ui<'ui> {
     }
 
     pub fn handle_key(&mut self, key: &mut KeyEvent, ctx: &mut Ctx) -> Result<KeyHandleResult> {
+        // Send input to modal if any
         if let Some(ref mut modal) = self.modals.last_mut() {
+            // Handle insert mode for modal
             if let Some(kind) = ctx.input.handle_input(InputEvent::from_key_event(key, ctx)) {
+                let should_exit_insert =
+                    matches!(kind, InputResultEvent::Confirm | InputResultEvent::Cancel);
+
                 modal.handle_insert_mode(kind, ctx)?;
+                if should_exit_insert {
+                    ctx.input.normal_mode();
+                }
+
                 ctx.render()?;
                 return Ok(KeyHandleResult::None);
             }
 
+            // else handle normal mode
             modal.handle_key(key, ctx)?;
             return Ok(KeyHandleResult::None);
         }
 
+        // Handle insert mode for panes
         if let Some(kind) = ctx.input.handle_input(InputEvent::from_key_event(key, ctx)) {
+            let should_exit_insert =
+                matches!(kind, InputResultEvent::Confirm | InputResultEvent::Cancel);
+
             active_tab_call!(self, ctx, handle_insert_mode(kind, ctx))?;
+
+            if should_exit_insert {
+                ctx.input.normal_mode();
+            }
+
+            ctx.render()?;
             return Ok(KeyHandleResult::None);
         }
 

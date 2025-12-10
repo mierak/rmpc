@@ -4,9 +4,9 @@ use crate::{config::keys::CommonAction, ctx::Ctx, shared::key_event::KeyEvent};
 
 #[derive(Debug)]
 pub enum InputResultEvent {
-    Push(String),
-    Pop(String),
-    Confirm(String),
+    Push,
+    Pop,
+    Confirm,
     NoChange,
     Cancel,
 }

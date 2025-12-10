@@ -1,7 +1,6 @@
 use std::{borrow::Cow, collections::HashMap, fmt::Display};
 
 use anyhow::Result;
-use crossterm::event::KeyCode;
 use itertools::Itertools;
 use ratatui::{
     Frame,
@@ -24,7 +23,10 @@ use crate::{
         mouse_event::{MouseEvent, MouseEventKind},
     },
     status_warn,
-    ui::dirstack::DirState,
+    ui::{
+        dirstack::DirState,
+        input::{BufferId, InputResultEvent},
+    },
 };
 
 #[derive(Debug)]
@@ -33,8 +35,8 @@ pub struct KeybindsModal {
     scrolling_state: DirState<TableState>,
     table_area: Rect,
     filter: Option<String>,
-    filter_input_mode: bool,
     filter_rows: Vec<Option<String>>,
+    filter_buffer_id: BufferId,
 }
 
 trait KeybindsExt {
@@ -68,8 +70,8 @@ impl KeybindsModal {
             scrolling_state,
             table_area: Rect::default(),
             filter: None,
-            filter_input_mode: false,
             filter_rows: Vec::new(),
+            filter_buffer_id: BufferId::new(),
         }
     }
 
@@ -330,45 +332,30 @@ impl Modal for KeybindsModal {
         return Ok(());
     }
 
-    fn handle_key(&mut self, key: &mut KeyEvent, ctx: &mut Ctx) -> Result<()> {
-        if self.filter_input_mode {
-            match key.as_common_action(ctx) {
-                Some(CommonAction::Confirm) => {
-                    self.filter_input_mode = false;
-
-                    ctx.render()?;
-                }
-                Some(CommonAction::Close) => {
-                    self.filter_input_mode = false;
-                    self.filter = None;
-
-                    ctx.render()?;
-                }
-                _ => {
-                    key.stop_propagation();
-                    match key.code() {
-                        KeyCode::Char(c) => {
-                            if let Some(ref mut f) = self.filter {
-                                for c in c.to_lowercase() {
-                                    f.push(c);
-                                }
-                            }
-                            self.jump_first(ctx.config.scrolloff);
-
-                            ctx.render()?;
-                        }
-                        KeyCode::Backspace => {
-                            if let Some(ref mut f) = self.filter {
-                                f.pop();
-                            }
-
-                            ctx.render()?;
-                        }
-                        _ => {}
-                    }
-                }
+    fn handle_insert_mode(&mut self, kind: InputResultEvent, ctx: &Ctx) -> Result<()> {
+        match kind {
+            InputResultEvent::Push => {
+                self.filter = Some(ctx.input.value(self.filter_buffer_id));
+                self.jump_first(ctx.config.scrolloff);
             }
-        } else if let Some(action) = key.as_common_action(ctx) {
+            InputResultEvent::Pop => {
+                self.filter = Some(ctx.input.value(self.filter_buffer_id));
+            }
+            InputResultEvent::Confirm => {
+                ctx.input.clear_buffer(self.filter_buffer_id);
+            }
+            InputResultEvent::Cancel => {
+                ctx.input.clear_buffer(self.filter_buffer_id);
+                self.filter = None;
+            }
+            InputResultEvent::NoChange => {}
+        }
+        ctx.render()?;
+        Ok(())
+    }
+
+    fn handle_key(&mut self, key: &mut KeyEvent, ctx: &mut Ctx) -> Result<()> {
+        if let Some(action) = key.as_common_action(ctx) {
             match action {
                 CommonAction::DownHalf => {
                     self.scrolling_state.next_half_viewport(ctx.config.scrolloff);
@@ -404,8 +391,8 @@ impl Modal for KeybindsModal {
                     self.hide(ctx)?;
                 }
                 CommonAction::EnterSearch => {
-                    self.filter_input_mode = true;
-                    self.filter = Some(String::new());
+                    ctx.insert_mode(self.filter_buffer_id);
+                    self.filter = Some(ctx.input.value(self.filter_buffer_id));
 
                     ctx.render()?;
                 }

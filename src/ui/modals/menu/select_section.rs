@@ -116,19 +116,19 @@ impl Section for SelectSection {
         self.state.select(Some(idx), 0);
     }
 
-    fn unselect(&mut self) {
+    fn unselect(&mut self, _ctx: &Ctx) {
         let offset = self.state.offset();
         self.state.inner.select(None);
         self.state.set_offset(offset);
     }
 
-    fn confirm(&mut self, ctx: &Ctx) -> Result<bool> {
+    fn confirm(&mut self, ctx: &Ctx) -> Result<()> {
         if let Some(selected_idx) = self.state.get_selected()
             && let Some(cb) = self.on_confirm.take()
         {
             (cb)(ctx, std::mem::take(&mut self.items[selected_idx].value))?;
         }
-        Ok(false)
+        Ok(())
     }
 
     fn len(&self) -> usize {
@@ -188,7 +188,7 @@ impl Section for SelectSection {
         }
     }
 
-    fn left_click(&mut self, position: Position) {
+    fn left_click(&mut self, position: Position, _ctx: &Ctx) {
         self.select_item_at_position(position);
     }
 

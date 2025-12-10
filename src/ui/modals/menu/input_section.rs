@@ -1,7 +1,6 @@
 use std::borrow::Cow;
 
 use anyhow::Result;
-use crossterm::event::KeyCode;
 use ratatui::{
     buffer::Buffer,
     layout::{Position, Rect},
@@ -10,18 +9,20 @@ use ratatui::{
 };
 
 use super::Section;
-use crate::{ctx::Ctx, shared::key_event::KeyEvent, ui::widgets::input::Input};
+use crate::{
+    ctx::Ctx,
+    ui::{input::BufferId, widgets::input::Input},
+};
 
-#[derive(derive_more::Debug, Default)]
+#[derive(derive_more::Debug)]
 pub struct InputSection<'a> {
-    pub value: String,
     pub label: Cow<'a, str>,
     pub area: Rect,
     pub current_item_style: Style,
     pub is_current: bool,
-    pub is_focused: bool,
     #[debug(skip)]
     pub action: Option<Box<dyn FnOnce(&Ctx, String) + Send + Sync + 'static>>,
+    pub buffer_id: BufferId,
 }
 
 impl<'a> InputSection<'a> {
@@ -29,11 +30,10 @@ impl<'a> InputSection<'a> {
         Self {
             area: Rect::default(),
             current_item_style,
-            value: String::new(),
             label: label.into(),
             action: None,
             is_current: false,
-            is_focused: false,
+            buffer_id: BufferId::new(),
         }
     }
 
@@ -50,8 +50,8 @@ impl<'a> InputSection<'a> {
         self
     }
 
-    pub fn add_initial_value(&mut self, value: impl Into<String>) -> &mut Self {
-        self.value = value.into();
+    pub fn add_initial_value(&mut self, value: impl Into<String>, ctx: &Ctx) -> &mut Self {
+        ctx.input.create_buffer(self.buffer_id, Some(&value.into()));
         self
     }
 }
@@ -75,25 +75,34 @@ impl Section for InputSection<'_> {
         self.is_current = idx == 0;
     }
 
-    fn unfocus(&mut self) {
-        self.is_focused = false;
+    fn unfocus(&mut self, ctx: &Ctx) {
+        if ctx.input.is_active(self.buffer_id) {
+            ctx.input.normal_mode();
+        }
     }
 
-    fn unselect(&mut self) {
-        self.is_focused = false;
+    fn unselect(&mut self, ctx: &Ctx) {
+        if ctx.input.is_active(self.buffer_id) {
+            ctx.input.normal_mode();
+        }
         self.is_current = false;
     }
 
-    fn confirm(&mut self, ctx: &Ctx) -> Result<bool> {
-        if self.is_focused {
+    fn confirm(&mut self, ctx: &Ctx) -> Result<()> {
+        if ctx.input.is_active(self.buffer_id) {
             if let Some(cb) = self.action.take() {
-                (cb)(ctx, std::mem::take(&mut self.value));
+                let value = ctx.input.value(self.buffer_id);
+                (cb)(ctx, value);
             }
-            Ok(false)
         } else {
-            self.is_focused = true;
-            Ok(true)
+            ctx.input.insert_mode(self.buffer_id);
         }
+        Ok(())
+    }
+
+    fn on_close(&mut self, ctx: &Ctx) -> Result<()> {
+        ctx.input.destroy_buffer(self.buffer_id);
+        Ok(())
     }
 
     fn len(&self) -> usize {
@@ -107,7 +116,7 @@ impl Section for InputSection<'_> {
     fn render(&mut self, area: Rect, buf: &mut Buffer, filter: Option<&str>, ctx: &Ctx) {
         self.area = area;
 
-        let input = Input::default()
+        let input = Input::new(ctx, self.buffer_id)
             .set_label_style(if self.is_current {
                 self.current_item_style
             } else {
@@ -116,7 +125,7 @@ impl Section for InputSection<'_> {
             .spacing(1)
             .set_borderless(true)
             .set_label(self.label.as_ref())
-            .set_label_style(if self.is_current && !self.is_focused {
+            .set_label_style(if self.is_current && !ctx.input.is_active(self.buffer_id) {
                 ctx.config.theme.current_item_style
             } else if let Some(f) = filter
                 && self.label.to_lowercase().contains(f)
@@ -124,48 +133,28 @@ impl Section for InputSection<'_> {
                 ctx.config.theme.highlighted_item_style
             } else {
                 Style::default()
-            })
-            .set_focused(self.is_focused)
-            .set_text(&self.value);
+            });
 
         input.render(area, buf);
     }
 
-    fn left_click(&mut self, pos: Position) {
-        if self.is_focused || !self.area.contains(pos) {
+    fn left_click(&mut self, pos: Position, ctx: &Ctx) {
+        if ctx.input.is_active(self.buffer_id) || !self.area.contains(pos) {
             return;
         }
 
         self.is_current = true;
     }
 
-    fn double_click(&mut self, pos: Position, _ctx: &Ctx) -> Result<bool> {
-        if self.is_focused || !self.area.contains(pos) {
+    fn double_click(&mut self, pos: Position, ctx: &Ctx) -> Result<bool> {
+        if ctx.input.is_active(self.buffer_id) || !self.area.contains(pos) {
             return Ok(false);
         }
 
         self.is_current = true;
-        self.is_focused = true;
+        ctx.input.insert_mode(self.buffer_id);
 
         Ok(true)
-    }
-
-    fn key_input(&mut self, key: &mut KeyEvent, ctx: &Ctx) -> Result<()> {
-        match key.code() {
-            KeyCode::Char(c) => {
-                self.value.push(c);
-
-                ctx.render()?;
-            }
-            KeyCode::Backspace => {
-                self.value.pop();
-
-                ctx.render()?;
-            }
-            _ => {}
-        }
-
-        Ok(())
     }
 
     fn item_labels_iter(&self) -> Box<dyn Iterator<Item = &str> + '_> {

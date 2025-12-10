@@ -1,13 +1,13 @@
-use itertools::Itertools;
 use ratatui::{
     prelude::{Constraint, Layout, Margin},
-    style::{Style, Stylize},
+    style::Style,
     text::{Line, Span},
     widgets::{Block, Borders, Paragraph, Widget, Wrap},
 };
-use unicode_segmentation::UnicodeSegmentation;
 
-#[derive(Debug, Default)]
+use crate::{ctx::Ctx, ui::input::BufferId};
+
+#[derive(Debug)]
 pub struct Input<'a> {
     text: &'a str,
     placeholder: Option<&'a str>,
@@ -19,15 +19,52 @@ pub struct Input<'a> {
     unfocused_style: Style,
     borderless: bool,
     spacing: u16,
-    cursor: usize,
+    ctx: &'a Ctx,
+    buffer_id: Option<BufferId>,
+}
+
+impl Input<'_> {
+    pub fn new(ctx: &Ctx, buffer_id: BufferId) -> Input<'_> {
+        Input {
+            ctx,
+            buffer_id: Some(buffer_id),
+            text: "",
+            placeholder: None,
+            label: "",
+            label_style: Style::default(),
+            input_style: Style::default(),
+            focused: false,
+            focused_style: Style::default(),
+            unfocused_style: Style::default(),
+            borderless: false,
+            spacing: 0,
+        }
+    }
+
+    pub fn new_static(ctx: &Ctx) -> Input<'_> {
+        Input {
+            ctx,
+            buffer_id: None,
+            text: "",
+            placeholder: None,
+            label: "",
+            label_style: Style::default(),
+            input_style: Style::default(),
+            focused: false,
+            focused_style: Style::default(),
+            unfocused_style: Style::default(),
+            borderless: false,
+            spacing: 0,
+        }
+    }
 }
 
 impl Widget for Input<'_> {
     fn render(self, area: ratatui::prelude::Rect, buf: &mut ratatui::prelude::Buffer) {
         let label_len = self.label.chars().count() as u16;
+        let label_len = if label_len > 0 { label_len + 2 } else { 0 };
         let [text_area, input_area] =
-            // TODO when no label it takes 2 columns, fix that
-            *Layout::horizontal([Constraint::Max(label_len + 2), Constraint::Fill(1)])
+            *Layout::horizontal([Constraint::Max(label_len), Constraint::Fill(1)])
                 .spacing(self.spacing)
                 .split(area)
         else {
@@ -40,16 +77,25 @@ impl Widget for Input<'_> {
             if self.focused { self.focused_style } else { self.unfocused_style };
 
         let label = Paragraph::new(self.label).wrap(Wrap { trim: false }).style(self.label_style);
-        let text = self.trimmed_text(input_area);
-        let text_width = text.iter().map(|span| span.width()).sum1::<usize>().unwrap_or_default();
 
-        log::debug!(area = input_area.width; "Input widget text width: {text_width}");
-        // TODO account for borders
-        let mut input = if text_width + 2 <= input_area.width as usize {
-            Paragraph::new(Line::from(text))
-        } else {
-            Paragraph::new(Line::from(""))
-        };
+        let mut text =
+            self.buffer_id.map_or(vec![Span::styled(self.text, self.input_style)], |id| {
+                let is_active = self.ctx.input.is_active(id);
+                self.ctx.input.as_spans(
+                    id,
+                    input_area.width.saturating_sub(if self.borderless { 0 } else { 2 }),
+                    self.input_style,
+                    is_active,
+                )
+            });
+
+        if let Some(pl) = self.placeholder
+            && (text.is_empty() || text.iter().all(|s| s.content.is_empty()))
+        {
+            text.clear();
+            text.push(Span::styled(pl, self.input_style));
+        }
+        let mut input = Paragraph::new(Line::from(text)).style(self.input_style);
 
         if !self.borderless {
             input = input.block(
@@ -60,52 +106,16 @@ impl Widget for Input<'_> {
             );
         }
 
-        input = input.wrap(Wrap { trim: true });
-
+        input.render(input_area, buf);
         label.render(
             text_area.inner(Margin { horizontal: 0, vertical: u16::from(!self.borderless) }),
             buf,
         );
-        input.render(input_area, buf);
     }
 }
 
 #[allow(unused)]
 impl<'a> Input<'a> {
-    fn trimmed_text(&self, input_area: ratatui::layout::Rect) -> Vec<Span<'a>> {
-        if self.text.is_empty() && !self.focused {
-            return vec![Span::default()];
-        }
-
-        let mut input_len = input_area.inner(Margin { horizontal: 1, vertical: 0 }).width as usize;
-
-        if self.focused {
-            input_len = input_len.saturating_sub(1);
-        }
-
-        if self.text.len() == self.cursor {
-            return vec![
-                Span::styled(&self.text[0..self.cursor], self.input_style),
-                Span::styled(" ", self.input_style.reversed()),
-            ];
-        }
-
-        let grapheme_size = self
-            .text
-            .grapheme_indices(true)
-            .find(|(idx, _)| idx >= &self.cursor)
-            .map_or(self.text.len(), |(idx, g)| g.len());
-
-        return vec![
-            Span::styled(&self.text[0..self.cursor], self.input_style),
-            Span::styled(
-                &self.text[self.cursor..self.cursor + grapheme_size],
-                self.input_style.reversed(),
-            ),
-            Span::styled(&self.text[self.cursor + grapheme_size..], self.input_style),
-        ];
-    }
-
     pub fn spacing(mut self, spacing: u16) -> Self {
         self.spacing = spacing;
         self
@@ -156,8 +166,13 @@ impl<'a> Input<'a> {
         self
     }
 
-    pub fn cursor(mut self, position: usize) -> Self {
-        self.cursor = position;
+    pub fn buffer_id(mut self, buffer_id: BufferId) -> Self {
+        self.buffer_id = Some(buffer_id);
+        self
+    }
+
+    pub fn ctx(mut self, ctx: &'a Ctx) -> Self {
+        self.ctx = ctx;
         self
     }
 }

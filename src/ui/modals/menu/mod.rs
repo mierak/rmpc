@@ -22,7 +22,6 @@ use crate::{
     },
     shared::{
         cmp::StringCompare,
-        key_event::KeyEvent,
         macros::{modal, status_error, status_info, status_warn},
         mpd_client_ext::{Enqueue, MpdClientExt as _},
     },
@@ -49,11 +48,11 @@ trait Section {
     }
     fn selected(&self) -> Option<usize>;
     fn select(&mut self, idx: usize);
-    fn unselect(&mut self);
-    fn unfocus(&mut self) {}
+    fn unselect(&mut self, ctx: &Ctx);
+    fn unfocus(&mut self, _ctx: &Ctx) {}
 
-    fn confirm(&mut self, ctx: &Ctx) -> Result<bool>;
-    fn key_input(&mut self, _key: &mut KeyEvent, _ctx: &Ctx) -> Result<()> {
+    fn confirm(&mut self, ctx: &Ctx) -> Result<()>;
+    fn on_close(&mut self, _ctx: &Ctx) -> Result<()> {
         Ok(())
     }
 
@@ -61,7 +60,7 @@ trait Section {
     fn preferred_height(&self) -> u16;
     fn render(&mut self, area: Rect, buf: &mut Buffer, filter: Option<&str>, ctx: &Ctx);
 
-    fn left_click(&mut self, pos: ratatui::layout::Position);
+    fn left_click(&mut self, pos: ratatui::layout::Position, ctx: &Ctx);
     fn double_click(&mut self, pos: ratatui::layout::Position, ctx: &Ctx) -> Result<bool>;
 
     fn item_labels_iter(&self) -> Box<dyn Iterator<Item = &str> + '_>;
@@ -130,30 +129,39 @@ impl Section for SectionType<'_> {
         }
     }
 
-    fn unselect(&mut self) {
+    fn unselect(&mut self, ctx: &Ctx) {
         match self {
-            SectionType::Menu(s) => s.unselect(),
-            SectionType::Multi(s) => s.unselect(),
-            SectionType::Input(s) => s.unselect(),
-            SectionType::Select(s) => s.unselect(),
+            SectionType::Menu(s) => s.unselect(ctx),
+            SectionType::Multi(s) => s.unselect(ctx),
+            SectionType::Input(s) => s.unselect(ctx),
+            SectionType::Select(s) => s.unselect(ctx),
         }
     }
 
-    fn unfocus(&mut self) {
+    fn unfocus(&mut self, ctx: &Ctx) {
         match self {
-            SectionType::Menu(s) => s.unfocus(),
-            SectionType::Multi(s) => s.unfocus(),
-            SectionType::Input(s) => s.unfocus(),
-            SectionType::Select(s) => s.unfocus(),
+            SectionType::Menu(s) => s.unfocus(ctx),
+            SectionType::Multi(s) => s.unfocus(ctx),
+            SectionType::Input(s) => s.unfocus(ctx),
+            SectionType::Select(s) => s.unfocus(ctx),
         }
     }
 
-    fn confirm(&mut self, ctx: &Ctx) -> Result<bool> {
+    fn confirm(&mut self, ctx: &Ctx) -> Result<()> {
         match self {
             SectionType::Menu(s) => s.confirm(ctx),
             SectionType::Multi(s) => s.confirm(ctx),
             SectionType::Input(s) => s.confirm(ctx),
             SectionType::Select(s) => s.confirm(ctx),
+        }
+    }
+
+    fn on_close(&mut self, ctx: &Ctx) -> Result<()> {
+        match self {
+            SectionType::Menu(s) => s.on_close(ctx),
+            SectionType::Multi(s) => s.on_close(ctx),
+            SectionType::Input(s) => s.on_close(ctx),
+            SectionType::Select(s) => s.on_close(ctx),
         }
     }
 
@@ -184,21 +192,12 @@ impl Section for SectionType<'_> {
         }
     }
 
-    fn key_input(&mut self, key: &mut KeyEvent, ctx: &Ctx) -> Result<()> {
+    fn left_click(&mut self, pos: Position, ctx: &Ctx) {
         match self {
-            SectionType::Menu(s) => s.key_input(key, ctx),
-            SectionType::Multi(s) => s.key_input(key, ctx),
-            SectionType::Input(s) => s.key_input(key, ctx),
-            SectionType::Select(s) => s.key_input(key, ctx),
-        }
-    }
-
-    fn left_click(&mut self, pos: Position) {
-        match self {
-            SectionType::Menu(s) => s.left_click(pos),
-            SectionType::Multi(s) => s.left_click(pos),
-            SectionType::Input(s) => s.left_click(pos),
-            SectionType::Select(s) => s.left_click(pos),
+            SectionType::Menu(s) => s.left_click(pos, ctx),
+            SectionType::Multi(s) => s.left_click(pos, ctx),
+            SectionType::Input(s) => s.left_click(pos, ctx),
+            SectionType::Select(s) => s.left_click(pos, ctx),
         }
     }
 
@@ -386,7 +385,7 @@ pub fn create_save_modal<'a>(
     Ok(MenuModal::new(ctx)
         .width(80)
         .input_section(ctx, "New playlist", |mut sect| {
-            sect.add_initial_value(initial_playlist_name.unwrap_or_default());
+            sect.add_initial_value(initial_playlist_name.unwrap_or_default(), ctx);
             let song_paths = song_paths.clone();
             sect.add_action(|ctx, value| {
                 if !value.is_empty() {

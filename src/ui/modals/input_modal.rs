@@ -30,7 +30,6 @@ pub struct InputModal<'a, C: FnOnce(&Ctx, &str) -> Result<()> + 'a> {
     id: Id,
     button_group_state: ButtonGroupState,
     button_group: ButtonGroup<'a>,
-    input_focused: bool,
     input_area: Rect,
     callback: Option<C>,
     initial_value: String,
@@ -72,7 +71,6 @@ impl<'a, C: FnOnce(&Ctx, &str) -> Result<()> + 'a> InputModal<'a, C> {
             id: id::new(),
             button_group_state,
             button_group,
-            input_focused: true,
             input_area: Rect::default(),
             callback: None,
             initial_value: String::new(),
@@ -133,17 +131,14 @@ impl<'a, C: FnOnce(&Ctx, &str) -> Result<()> + 'a> Modal for InputModal<'a, C> {
             return Ok(());
         };
 
-        let value = ctx.input.value(self.input_buffer_id);
-        let input = Input::default()
+        let input = Input::new(ctx, self.input_buffer_id)
             .set_label(self.input_label)
             .set_label_style(ctx.config.as_text_style())
-            .set_text(&value)
-            .cursor(ctx.input.position(self.input_buffer_id))
             .set_focused(ctx.input.is_insert_mode())
             .set_focused_style(ctx.config.theme.highlight_border_style)
             .set_unfocused_style(ctx.config.as_border_style());
 
-        self.button_group.set_active_style(if self.input_focused {
+        self.button_group.set_active_style(if ctx.input.is_active(self.input_buffer_id) {
             Style::default().reversed()
         } else {
             ctx.config.theme.current_item_style
@@ -163,32 +158,21 @@ impl<'a, C: FnOnce(&Ctx, &str) -> Result<()> + 'a> Modal for InputModal<'a, C> {
 
     fn handle_insert_mode(&mut self, kind: InputResultEvent, ctx: &Ctx) -> Result<()> {
         match kind {
-            InputResultEvent::Push(buf) => {
-                // self.value = buf;
-                // self.value.push(char);
-                ctx.render()?;
-            }
-            InputResultEvent::Pop(buf) => {
-                // self.value = buf;
-                // self.value.pop();
-                ctx.render()?;
-            }
-            InputResultEvent::Confirm(value) => {
+            InputResultEvent::Push => {}
+            InputResultEvent::Pop => {}
+            InputResultEvent::Confirm => {
                 if self.button_group_state.selected == 0
                     && let Some(callback) = self.callback.take()
                 {
-                    (callback)(ctx, &value)?;
+                    (callback)(ctx, &ctx.input.value(self.input_buffer_id))?;
                 }
                 ctx.input.destroy_buffer(self.input_buffer_id);
                 self.hide(ctx)?;
             }
-            InputResultEvent::NoChange => {
-                ctx.render()?;
-            }
-            InputResultEvent::Cancel => {
-                ctx.input.destroy_buffer(self.input_buffer_id);
-            }
+            InputResultEvent::NoChange => {}
+            InputResultEvent::Cancel => {}
         }
+        ctx.render()?;
         Ok(())
     }
 
@@ -206,6 +190,7 @@ impl<'a, C: FnOnce(&Ctx, &str) -> Result<()> + 'a> Modal for InputModal<'a, C> {
                     ctx.render()?;
                 }
                 CommonAction::Close => {
+                    ctx.input.destroy_buffer(self.input_buffer_id);
                     self.hide(ctx)?;
                 }
                 CommonAction::Confirm => {
@@ -214,6 +199,7 @@ impl<'a, C: FnOnce(&Ctx, &str) -> Result<()> + 'a> Modal for InputModal<'a, C> {
                     {
                         (callback)(ctx, &ctx.input.value(self.input_buffer_id))?;
                     }
+                    ctx.input.destroy_buffer(self.input_buffer_id);
                     self.hide(ctx)?;
                 }
                 CommonAction::FocusInput => {
@@ -232,7 +218,7 @@ impl<'a, C: FnOnce(&Ctx, &str) -> Result<()> + 'a> Modal for InputModal<'a, C> {
             MouseEventKind::LeftClick => {
                 if let Some(idx) = self.button_group.get_button_idx_at(event.into()) {
                     self.button_group_state.select(idx);
-                    self.input_focused = false;
+                    ctx.input.normal_mode();
                     ctx.render()?;
                 }
             }
@@ -242,14 +228,16 @@ impl<'a, C: FnOnce(&Ctx, &str) -> Result<()> + 'a> Modal for InputModal<'a, C> {
                         if let Some(callback) = self.callback.take() {
                             (callback)(ctx, &ctx.input.value(self.input_buffer_id))?;
                         }
+                        ctx.input.destroy_buffer(self.input_buffer_id);
                         self.hide(ctx)?;
                     }
                     Some(_) => {
+                        ctx.input.destroy_buffer(self.input_buffer_id);
                         self.hide(ctx)?;
                     }
                     None => {
                         if self.input_area.contains(event.into()) {
-                            self.input_focused = true;
+                            ctx.input.insert_mode(self.input_buffer_id);
                             ctx.render()?;
                         }
                     }
@@ -259,14 +247,14 @@ impl<'a, C: FnOnce(&Ctx, &str) -> Result<()> + 'a> Modal for InputModal<'a, C> {
             MouseEventKind::RightClick => {}
             MouseEventKind::ScrollUp => {
                 if self.button_group.get_button_idx_at(event.into()).is_some() {
-                    self.input_focused = false;
+                    ctx.input.normal_mode();
                     self.button_group_state.prev();
                     ctx.render()?;
                 }
             }
             MouseEventKind::ScrollDown => {
                 if self.button_group.get_button_idx_at(event.into()).is_some() {
-                    self.input_focused = false;
+                    ctx.input.normal_mode();
                     self.button_group_state.next();
                     ctx.render()?;
                 }

@@ -9,8 +9,12 @@ use strum::{FromRepr, IntoStaticStr, VariantNames};
 
 use crate::{
     config::Search,
+    ctx::Ctx,
     mpd::mpd_client::{FilterKind, StickerFilter},
-    ui::widgets::{button::Button, input::Input},
+    ui::{
+        input::BufferId,
+        widgets::{button::Button, input::Input},
+    },
 };
 
 pub const SEARCH_MODE_KEY: &str = "search_mode";
@@ -32,7 +36,6 @@ pub(super) struct InputGroups {
     initial_strip_diacritics: bool,
 
     focused_idx: usize,
-    pub insert_mode: bool,
     pub area: Rect,
 
     text_style: Style,
@@ -61,6 +64,7 @@ impl InputGroups {
         separator_style: Style,
         current_item_style: Style,
         highlight_item_style: Style,
+        ctx: &Ctx,
     ) -> Self {
         let mut inputs = Vec::new();
         for tag in &search_config.tags {
@@ -68,8 +72,8 @@ impl InputGroups {
                 key: "",
                 filter_key: Some(tag.value.clone()),
                 label: format!(" {:<18}:", tag.label),
-                value: String::new(),
                 initial_value: None,
+                buffer_id: BufferId::new(),
             }));
         }
 
@@ -79,12 +83,15 @@ impl InputGroups {
                 key: RATING_MODE_KEY,
                 label: format!(" {:<18}:", "Rating"),
             }));
+
+            let buffer_id = BufferId::new();
+            ctx.input.create_buffer(buffer_id, Some("0"));
             inputs.push(InputType::Numberbox(TextboxInput {
                 key: RATING_VALUE_KEY,
                 filter_key: None,
                 label: format!(" {:<18}:", "Value"),
-                value: "0".to_owned(),
                 initial_value: Some("0".to_owned()),
+                buffer_id,
             }));
 
             inputs.push(InputType::Separator);
@@ -134,7 +141,6 @@ impl InputGroups {
             search_button,
             initial_fold_case,
             initial_strip_diacritics,
-            insert_mode: false,
 
             text_style,
             separator_style,
@@ -153,16 +159,20 @@ impl InputGroups {
         self.search_mode
     }
 
-    pub fn rating_value(&self) -> &str {
-        self.textbox_value(RATING_VALUE_KEY).unwrap_or_default()
+    pub fn rating_value(&self, ctx: &Ctx) -> String {
+        self.textbox_value(RATING_VALUE_KEY, ctx).unwrap_or_default()
     }
 
     pub fn is_rating_filter_active(&self) -> bool {
         !matches!(self.rating_mode, RatingMode::Any)
     }
 
-    pub fn rating_filter(&self) -> Result<Option<StickerFilter>, std::num::ParseIntError> {
-        let value = self.rating_value().trim().parse()?;
+    pub fn rating_filter(
+        &self,
+        ctx: &Ctx,
+    ) -> Result<Option<StickerFilter>, std::num::ParseIntError> {
+        let value = self.rating_value(ctx);
+        let value = if value.is_empty() { 0 } else { value.trim().parse()? };
         Ok(match self.rating_mode {
             RatingMode::Equals => Some(StickerFilter::EqualsInt(value)),
             RatingMode::GreaterThan => Some(StickerFilter::GreaterThanInt(value)),
@@ -196,18 +206,18 @@ impl InputGroups {
         self.focused_idx = self.inputs.len() - 1;
     }
 
-    pub fn focused_mut(&mut self) -> &mut InputType {
-        &mut self.inputs[self.focused_idx]
-    }
-
     pub fn focused(&self) -> &InputType {
         &self.inputs[self.focused_idx]
     }
 
-    pub fn activate_focused(&mut self) -> ActionResult {
+    pub fn activate_focused(&mut self, ctx: &Ctx) -> ActionResult {
         match &mut self.inputs[self.focused_idx] {
-            InputType::Textbox(_) | InputType::Numberbox(_) => {
-                self.insert_mode = !self.insert_mode;
+            InputType::Textbox(input) | InputType::Numberbox(input) => {
+                if ctx.input.is_active(input.buffer_id) {
+                    ctx.input.normal_mode();
+                } else if ctx.input.is_normal_mode() {
+                    ctx.input.insert_mode(input.buffer_id);
+                }
 
                 if self.search_button { ActionResult::None } else { ActionResult::Search }
             }
@@ -240,7 +250,7 @@ impl InputGroups {
                 if self.search_button { ActionResult::None } else { ActionResult::Search }
             }
             InputType::Button(ButtonInput { key: RESET_BUTTON_KEY, .. }) => {
-                self.reset_all();
+                self.reset_all(ctx);
 
                 ActionResult::Reset
             }
@@ -250,14 +260,14 @@ impl InputGroups {
         }
     }
 
-    fn reset_item(&mut self, idx: usize) {
+    fn reset_item(&mut self, idx: usize, ctx: &Ctx) {
         if let Some(input) = self.inputs.get_mut(idx) {
             match input {
                 InputType::Textbox(input) | InputType::Numberbox(input) => {
                     if let Some(init) = &input.initial_value {
-                        input.value = init.clone();
+                        ctx.input.set_buffer(init.clone(), input.buffer_id);
                     } else {
-                        input.value.clear();
+                        ctx.input.clear_buffer(input.buffer_id);
                     }
                 }
                 InputType::Spinner(spinner) => match spinner.key {
@@ -283,19 +293,19 @@ impl InputGroups {
         }
     }
 
-    pub fn reset_all(&mut self) {
+    pub fn reset_all(&mut self, ctx: &Ctx) {
         for idx in 0..self.inputs.len() {
-            self.reset_item(idx);
+            self.reset_item(idx, ctx);
         }
     }
 
-    pub fn reset_focused(&mut self) {
-        self.reset_item(self.focused_idx);
+    pub fn reset_focused(&mut self, ctx: &Ctx) {
+        self.reset_item(self.focused_idx, ctx);
     }
 
-    pub fn enter_insert_mode(&mut self) {
-        if matches!(self.focused(), InputType::Textbox(_) | InputType::Numberbox(_)) {
-            self.insert_mode = true;
+    pub fn enter_insert_mode(&mut self, ctx: &Ctx) {
+        if let InputType::Textbox(input) | InputType::Numberbox(input) = self.focused() {
+            ctx.input.insert_mode(input.buffer_id);
         }
     }
 
@@ -350,12 +360,12 @@ impl InputGroups {
         }
     }
 
-    fn textbox_value(&self, key: &str) -> Option<&str> {
+    fn textbox_value(&self, key: &str, ctx: &Ctx) -> Option<String> {
         for input in &self.inputs {
             if let InputType::Textbox(input) | InputType::Numberbox(input) = input
                 && input.key == key
             {
-                return Some(input.value.trim());
+                return Some(ctx.input.value(input.buffer_id).trim().to_owned());
             }
         }
         None
@@ -373,11 +383,11 @@ pub(super) enum InputType {
 
 #[derive(Debug)]
 pub(super) struct TextboxInput {
-    pub value: String,
     pub label: String,
     pub key: &'static str,
     pub filter_key: Option<String>,
     pub initial_value: Option<String>,
+    pub buffer_id: BufferId,
 }
 
 #[derive(Debug)]
@@ -486,11 +496,8 @@ pub(super) struct ButtonInput {
     pub label: String,
 }
 
-impl Widget for &mut InputGroups {
-    fn render(self, mut area: Rect, buf: &mut Buffer)
-    where
-        Self: Sized,
-    {
+impl InputGroups {
+    pub fn render(&mut self, mut area: Rect, buf: &mut Buffer, ctx: &Ctx) {
         self.area = area;
         let mut remaining_height = area.height as usize;
         area.height = 1;
@@ -503,23 +510,20 @@ impl Widget for &mut InputGroups {
 
             match input {
                 InputType::Textbox(input) => {
-                    let mut widget = Input::default()
+                    let mut widget = Input::new(ctx, input.buffer_id)
                         .set_borderless(true)
                         .set_label(&input.label)
                         .set_placeholder("<None>")
-                        .set_focused(is_focused && self.insert_mode)
+                        .set_focused(is_focused && ctx.input.is_active(input.buffer_id))
                         .set_label_style(self.text_style)
-                        .set_input_style(self.text_style)
-                        .set_text(&input.value);
+                        .set_input_style(self.text_style);
 
-                    widget = if self.insert_mode && is_focused {
+                    widget = if ctx.input.is_active(input.buffer_id) && is_focused {
                         widget.set_label_style(self.highlight_item_style)
                     } else if is_focused {
                         widget
                             .set_label_style(self.current_item_style)
                             .set_input_style(self.current_item_style)
-                    } else if !input.value.is_empty() {
-                        widget.set_input_style(self.highlight_item_style)
                     } else {
                         widget
                     };
@@ -527,16 +531,15 @@ impl Widget for &mut InputGroups {
                     widget.render(area, buf);
                 }
                 InputType::Numberbox(input) => {
-                    let mut widget = Input::default()
+                    let mut widget = Input::new(ctx, input.buffer_id)
                         .set_borderless(true)
                         .set_label(&input.label)
                         .set_placeholder("<None>")
-                        .set_focused(is_focused && self.insert_mode)
+                        .set_focused(is_focused && ctx.input.is_active(input.buffer_id))
                         .set_label_style(self.text_style)
-                        .set_input_style(self.text_style)
-                        .set_text(&input.value);
+                        .set_input_style(self.text_style);
 
-                    widget = if self.insert_mode && is_focused {
+                    widget = if ctx.input.is_active(input.buffer_id) && is_focused {
                         widget.set_label_style(self.highlight_item_style)
                     } else if is_focused {
                         widget
@@ -549,7 +552,7 @@ impl Widget for &mut InputGroups {
                     widget.render(area, buf);
                 }
                 InputType::Spinner(input) => {
-                    let mut inp = Input::default()
+                    let mut inp = Input::new_static(ctx)
                         .set_borderless(true)
                         .set_label_style(self.text_style)
                         .set_input_style(self.text_style)

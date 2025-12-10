@@ -42,6 +42,7 @@ impl From<CKeyEvent> for Key {
     }
 }
 
+#[allow(unused)]
 impl KeyEvent {
     pub fn code(&self) -> KeyCode {
         self.inner.code

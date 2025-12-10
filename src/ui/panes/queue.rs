@@ -1,7 +1,6 @@
 use std::collections::HashSet;
 
 use anyhow::Result;
-use crossterm::event::KeyCode;
 use enum_map::{Enum, EnumMap, enum_map};
 use itertools::Itertools;
 use ratatui::{
@@ -47,6 +46,7 @@ use crate::{
     ui::{
         UiEvent,
         dirstack::Dir,
+        input::{BufferId, InputResultEvent},
         modals::{
             confirm_modal::{Action, ConfirmModal},
             info_list_modal::InfoListModal,
@@ -69,12 +69,12 @@ use crate::{
 #[derive(Debug)]
 pub struct QueuePane {
     queue: Dir<Song, TableState>,
-    filter_input_mode: bool,
     header: Vec<String>,
     column_widths: Vec<Constraint>,
     column_formats: Vec<Property<SongProperty>>,
     areas: EnumMap<Areas, Rect>,
     should_center_cursor_on_current: bool,
+    filter_buffer_id: BufferId,
 }
 
 #[derive(Debug, Enum)]
@@ -95,7 +95,6 @@ impl QueuePane {
 
         Self {
             queue: Dir::new(ctx.queue.clone()),
-            filter_input_mode: false,
             header,
             column_widths,
             column_formats,
@@ -103,6 +102,7 @@ impl QueuePane {
                 _ => Rect::default(),
             },
             should_center_cursor_on_current: ctx.config.center_current_song_on_change,
+            filter_buffer_id: BufferId::new(),
         }
     }
 
@@ -259,10 +259,12 @@ impl Pane for QueuePane {
         let Ctx { config, .. } = ctx;
         self.calculate_areas(area, ctx)?;
 
-        let filter_text = self
-            .queue
-            .filter()
-            .map(|v| format!("[FILTER]: {v}{} ", if self.filter_input_mode { "█" } else { "" }));
+        let filter_text = self.queue.filter().map(|v| {
+            format!(
+                "[FILTER]: {v}{} ",
+                if ctx.input.is_active(self.filter_buffer_id) { "█" } else { "" }
+            )
+        });
 
         let table_block = {
             let border_style = config.as_border_style();
@@ -697,37 +699,38 @@ impl Pane for QueuePane {
         Ok(())
     }
 
-    fn handle_action(&mut self, event: &mut KeyEvent, ctx: &mut Ctx) -> Result<()> {
-        if self.filter_input_mode {
-            match event.as_common_action(ctx) {
-                Some(CommonAction::Confirm) => {
-                    self.filter_input_mode = false;
-
-                    ctx.render()?;
-                }
-                Some(CommonAction::Close) => {
-                    self.filter_input_mode = false;
-                    self.queue.set_filter(None, self.column_formats.as_slice(), ctx);
-
-                    ctx.render()?;
-                }
-                _ => {
-                    event.stop_propagation();
-                    match event.code() {
-                        KeyCode::Char(c) => {
-                            self.queue.push_filter(c, self.column_formats.as_slice(), ctx);
-                            self.queue.jump_first_matching(self.column_formats.as_slice(), ctx);
-                            ctx.render()?;
-                        }
-                        KeyCode::Backspace => {
-                            self.queue.pop_filter(self.column_formats.as_slice(), ctx);
-                            ctx.render()?;
-                        }
-                        _ => {}
-                    }
-                }
+    fn handle_insert_mode(&mut self, kind: InputResultEvent, ctx: &mut Ctx) -> Result<()> {
+        match kind {
+            InputResultEvent::Push => {
+                self.queue.set_filter(
+                    Some(ctx.input.value(self.filter_buffer_id)),
+                    self.column_formats.as_slice(),
+                    ctx,
+                );
+                self.queue.jump_first_matching(self.column_formats.as_slice(), ctx);
             }
-        } else if let Some(action) = event.as_queue_action(ctx) {
+            InputResultEvent::Pop => {
+                self.queue.set_filter(
+                    Some(ctx.input.value(self.filter_buffer_id)),
+                    self.column_formats.as_slice(),
+                    ctx,
+                );
+            }
+            InputResultEvent::Confirm => {
+                ctx.input.clear_buffer(self.filter_buffer_id);
+            }
+            InputResultEvent::Cancel => {
+                self.queue.set_filter(None, self.column_formats.as_slice(), ctx);
+                ctx.input.clear_buffer(self.filter_buffer_id);
+            }
+            InputResultEvent::NoChange => {}
+        }
+        ctx.render()?;
+        Ok(())
+    }
+
+    fn handle_action(&mut self, event: &mut KeyEvent, ctx: &mut Ctx) -> Result<()> {
+        if let Some(action) = event.as_queue_action(ctx) {
             match action {
                 QueueActions::Delete if !self.queue.marked().is_empty() => {
                     for range in self.queue.marked().ranges().rev() {
@@ -1061,7 +1064,7 @@ impl Pane for QueuePane {
                 CommonAction::Right => {}
                 CommonAction::Left => {}
                 CommonAction::EnterSearch => {
-                    self.filter_input_mode = true;
+                    ctx.input.insert_mode(self.filter_buffer_id);
                     self.queue.set_filter(Some(String::new()), self.column_formats.as_slice(), ctx);
 
                     ctx.render()?;

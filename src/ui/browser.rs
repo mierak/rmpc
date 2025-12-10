@@ -188,29 +188,35 @@ where
         let song_format = ctx.config.theme.browser_song_format.0.as_slice();
         let config = &ctx.config;
         match kind {
-            InputResultEvent::Push(c) => {
-                self.stack_mut().current_mut().set_filter(Some(c), song_format, ctx);
-                // self.stack_mut().current_mut().push_filter(c, song_format, ctx);
+            InputResultEvent::Push => {
+                let id = self.buffer_id();
+                self.stack_mut().current_mut().set_filter(
+                    Some(ctx.input.value(id)),
+                    song_format,
+                    ctx,
+                );
                 self.stack_mut().current_mut().jump_first_matching(song_format, ctx);
                 self.fetch_data_internal(ctx);
-                ctx.render()?;
             }
-            InputResultEvent::Pop(c) => {
-                self.stack_mut().current_mut().set_filter(Some(c), song_format, ctx);
-                // self.stack_mut().current_mut().pop_filter(song_format, ctx);
-                ctx.render()?;
+            InputResultEvent::Pop => {
+                let id = self.buffer_id();
+                self.stack_mut().current_mut().set_filter(
+                    Some(ctx.input.value(id)),
+                    song_format,
+                    ctx,
+                );
             }
-            InputResultEvent::Confirm(value) => {}
-            InputResultEvent::NoChange => {
-                ctx.render()?;
+            InputResultEvent::Confirm => {
+                ctx.input.clear_buffer(self.buffer_id());
             }
+            InputResultEvent::NoChange => {}
             InputResultEvent::Cancel => {
                 self.stack_mut().current_mut().set_filter(None, song_format, ctx);
                 self.fetch_data_internal(ctx);
                 ctx.input.clear_buffer(self.buffer_id());
-                ctx.render()?;
             }
         }
+        ctx.render()?;
         Ok(())
     }
 

@@ -116,11 +116,11 @@ impl Section for MultiActionSection<'_> {
         self.selected_idx = Some(idx);
     }
 
-    fn unselect(&mut self) {
+    fn unselect(&mut self, _ctx: &Ctx) {
         self.selected_idx = None;
     }
 
-    fn confirm(&mut self, ctx: &Ctx) -> Result<bool> {
+    fn confirm(&mut self, ctx: &Ctx) -> Result<()> {
         if let Some(selected_idx) = self.selected_idx {
             let label = std::mem::take(&mut self.items[selected_idx].label);
             let selected_button = self.items[selected_idx].buttons_state.selected;
@@ -129,7 +129,7 @@ impl Section for MultiActionSection<'_> {
             }
         }
 
-        Ok(false)
+        Ok(())
     }
 
     fn len(&self) -> usize {
@@ -173,7 +173,7 @@ impl Section for MultiActionSection<'_> {
         }
     }
 
-    fn left_click(&mut self, position: Position) {
+    fn left_click(&mut self, position: Position, _ctx: &Ctx) {
         if !self.area.contains(position) {
             return;
         }
