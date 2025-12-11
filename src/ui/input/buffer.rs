@@ -49,33 +49,41 @@ impl InputBuffer {
 
     pub fn as_spans(
         &mut self,
+        prefix: Option<&'static str>,
         available_width: impl Into<usize>,
         style: Style,
         is_active: bool,
     ) -> Vec<Span<'static>> {
-        let available_width = available_width.into();
-        let value_len = self.value.len();
+        let value = &self.value;
+        let value_len = value.len();
+        let cursor = self.cursor;
+        let mut visible_slice = self.visible_slice.clone();
 
-        self.available_columns = available_width;
+        self.available_columns = available_width.into();
 
-        if available_width == 0 {
+        // make space for the prefix and the block symbol if active
+        let mut space_left = self
+            .available_columns
+            .saturating_sub(is_active as usize)
+            .saturating_sub(prefix.map_or(0, |p| p.width() + 1 /* +1 for space after */));
+
+        if space_left == 0 {
             self.visible_slice = 0..0;
             return Vec::new();
         }
 
-        if !self.visible_slice.contains(&self.cursor) {
+        if !visible_slice.contains(&cursor) {
             // Resize or initial render happened, simply snapping to end is fine as this
             // should not happen very often and a "jump" here is ok.
-            self.visible_slice.end = self.cursor;
-            self.visible_slice.start = self.cursor;
-            let mut space_left = available_width;
+            visible_slice.end = cursor;
+            visible_slice.start = cursor;
 
-            let graphemes = self.value.grapheme_indices(true).rev();
+            let graphemes = value.grapheme_indices(true).rev();
             for (i, g) in graphemes {
                 let width = g.width();
                 if width <= space_left {
                     space_left = space_left.saturating_sub(width);
-                    self.visible_slice.start = i;
+                    visible_slice.start = i;
                 } else {
                     break;
                 }
@@ -84,13 +92,16 @@ impl InputBuffer {
 
         let mut current_string = String::new();
         let mut result = vec![];
-        for (idx, g) in self
-            .value
+        if let Some(p) = prefix {
+            result.push(Span::styled(p, style));
+            result.push(Span::styled(" ", style));
+        }
+        for (idx, g) in value
             .grapheme_indices(true)
-            .skip_while(|(i, _)| *i < self.visible_slice.start)
-            .take_while(|(i, _)| *i < self.visible_slice.end)
+            .skip_while(|(i, _)| *i < visible_slice.start)
+            .take_while(|(i, _)| *i < visible_slice.end)
         {
-            if idx == self.cursor {
+            if idx == cursor {
                 if !current_string.is_empty() {
                     result.push(Span::styled(std::mem::take(&mut current_string), style));
                 }
@@ -107,9 +118,11 @@ impl InputBuffer {
         if is_active {
             result.push(Span::styled(
                 "█",
-                if self.cursor == value_len { style } else { style.reversed() },
+                if cursor == value_len { style } else { style.reversed() },
             ));
         }
+
+        self.visible_slice = visible_slice;
 
         return result;
     }
@@ -133,9 +146,6 @@ impl InputBuffer {
 
                 self.value.insert(self.cursor, c);
                 self.cursor += c.len_utf8();
-                if self.value.width() < self.available_columns {
-                    self.visible_slice.end += c.len_utf8();
-                }
 
                 InputResultEvent::Push
             }

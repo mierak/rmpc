@@ -4,7 +4,6 @@ use ratatui::{
     prelude::*,
     widgets::{Block, Borders, List, ListItem, ListState, Padding},
 };
-use style::Styled;
 
 use crate::{
     ctx::Ctx,
@@ -119,7 +118,7 @@ where
             && config.theme.column_widths[0] > 0
         {
             let items = previous.to_list_items(song_format, ctx);
-            let title = previous.filter().as_ref().map(|v| format!("[FILTER]: {v} "));
+            let title = previous.filter_text(previous_area.width, ctx);
             let prev_state = &mut previous.state;
             prev_state.set_content_and_viewport_len(items.len(), previous_area.height.into());
 
@@ -133,8 +132,8 @@ where
             } else {
                 Block::default().padding(Padding::new(1, column_right_padding, 0, 0))
             };
-            if let Some(ref title) = title {
-                block = block.title(title.clone().set_style(config.theme.borders_style));
+            if let Some(title) = title {
+                block = block.title(title);
             }
 
             previous = previous.highlight_style(config.theme.current_item_style);
@@ -160,9 +159,8 @@ where
             }
         }
         if config.theme.column_widths[1] > 0 {
-            let title = state.current().filter().as_ref().map(|v| {
-                format!("[FILTER]: {v}{} ", if ctx.input.is_insert_mode() { "█" } else { "" })
-            });
+            let title = state.current().filter_text(current_area.width.saturating_sub(2), ctx);
+
             let Dir { items, state, .. } = state.current_mut();
             state.set_content_and_viewport_len(items.len(), current_area.height.into());
 
@@ -174,8 +172,8 @@ where
                         .border_style(config.as_border_style())
                         .border_set(MIDDLE_COLUMN_SYMBOLS);
                 }
-                if let Some(ref title) = title {
-                    b = b.title(title.clone().set_style(config.theme.borders_style));
+                if let Some(title) = title {
+                    b = b.title(title);
                 }
                 b.padding(Padding::new(0, column_right_padding, 0, 0))
             };

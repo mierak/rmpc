@@ -65,7 +65,7 @@ impl<'a, C: FnOnce(&Ctx, &str) -> Result<()> + 'a> InputModal<'a, C> {
             );
 
         let input_buffer_id = BufferId::new();
-        ctx.insert_mode(input_buffer_id);
+        ctx.input.insert_mode(input_buffer_id);
 
         Self {
             id: id::new(),
@@ -203,7 +203,7 @@ impl<'a, C: FnOnce(&Ctx, &str) -> Result<()> + 'a> Modal for InputModal<'a, C> {
                     self.hide(ctx)?;
                 }
                 CommonAction::FocusInput => {
-                    ctx.insert_mode(self.input_buffer_id);
+                    ctx.input.insert_mode(self.input_buffer_id);
                     ctx.render()?;
                 }
                 _ => {}

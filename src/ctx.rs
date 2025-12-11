@@ -36,10 +36,7 @@ use crate::{
         mpd_query::MpdQuerySync,
         ring_vec::RingVec,
     },
-    ui::{
-        StatusMessage,
-        input::{BufferId, InputManager},
-    },
+    ui::{StatusMessage, input::InputManager},
 };
 
 pub const FETCH_SONG_STICKERS: &str = "fetch_song_stickers";
@@ -144,10 +141,6 @@ impl Ctx {
 
         self.needs_render.replace(true);
         self.app_event_sender.send(AppEvent::RequestRender)
-    }
-
-    pub(crate) fn insert_mode(&self, id: BufferId) {
-        self.input.insert_mode(id);
     }
 
     pub(crate) fn finish_frame(&mut self) {

@@ -24,6 +24,7 @@ use crate::{
     },
     status_warn,
     ui::{
+        FILTER_PREFIX,
         dirstack::DirState,
         input::{BufferId, InputResultEvent},
     },
@@ -226,7 +227,7 @@ impl Modal for KeybindsModal {
             .border_style(ctx.config.as_border_style())
             .title_alignment(ratatui::prelude::Alignment::Center);
         if let Some(filter) = &self.filter {
-            block = block.title(format!("Keybinds | [FILTER]: {filter}"));
+            block = block.title(format!("Keybinds | {FILTER_PREFIX} {filter}"));
         } else {
             block = block.title("Keybinds");
         }
@@ -391,7 +392,7 @@ impl Modal for KeybindsModal {
                     self.hide(ctx)?;
                 }
                 CommonAction::EnterSearch => {
-                    ctx.insert_mode(self.filter_buffer_id);
+                    ctx.input.insert_mode(self.filter_buffer_id);
                     self.filter = Some(ctx.input.value(self.filter_buffer_id));
 
                     ctx.render()?;

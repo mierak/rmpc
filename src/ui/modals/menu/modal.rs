@@ -26,6 +26,7 @@ use crate::{
         mouse_event::{MouseEvent, MouseEventKind},
     },
     ui::{
+        FILTER_PREFIX,
         input::{BufferId, InputResultEvent},
         modals::{Modal, RectExt as _, menu::select_section::SelectSection},
     },
@@ -66,7 +67,7 @@ impl Modal for MenuModal<'_> {
             .border_style(ctx.config.as_border_style())
             .title_alignment(ratatui::prelude::Alignment::Center);
         if let Some(filter) = self.filter.as_ref() {
-            block = block.title(format!(" [FILTER]: {filter} "));
+            block = block.title(format!(" {FILTER_PREFIX}: {filter} "));
         }
 
         let content_area = block.inner(popup_area);

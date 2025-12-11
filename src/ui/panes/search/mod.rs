@@ -5,7 +5,7 @@ use enum_map::EnumMap;
 use itertools::Itertools;
 use ratatui::{
     layout::{Constraint, Layout, Rect},
-    style::{Styled, Stylize},
+    style::Stylize,
     text::Span,
     widgets::{Block, Borders, List, ListItem, ListState, Padding},
 };
@@ -38,7 +38,7 @@ use crate::{
     ui::{
         UiEvent,
         dirstack::Dir,
-        input::{BufferId, InputResultEvent},
+        input::InputResultEvent,
         modals::{
             input_modal::InputModal,
             menu::{
@@ -65,7 +65,6 @@ pub struct SearchPane {
     phase: Phase,
     songs_dir: Dir<Song, ListState>,
     column_areas: EnumMap<BrowserArea, Rect>,
-    filter_buffer_id: BufferId,
 }
 
 const SEARCH: &str = "search";
@@ -93,7 +92,6 @@ impl SearchPane {
             songs_dir: Dir::default(),
             inputs,
             column_areas: EnumMap::default(),
-            filter_buffer_id: BufferId::new(),
         }
     }
 
@@ -140,17 +138,12 @@ impl SearchPane {
     ) {
         let config = &ctx.config;
         let column_right_padding: u16 = config.theme.scrollbar.is_some().into();
-        let title = self.songs_dir.filter().as_ref().map(|v| {
-            format!(
-                "[FILTER]: {v}{} ",
-                if ctx.input.is_active(self.filter_buffer_id) { "█" } else { "" }
-            )
-        });
+        let title = self.songs_dir.filter_text(area.width, ctx);
 
         let block = {
             let mut b = Block::default();
-            if let Some(ref title) = title {
-                b = b.title(title.clone().set_style(config.theme.borders_style));
+            if let Some(title) = title {
+                b = b.title(title);
             }
             b.padding(Padding::new(0, column_right_padding, 0, 0))
         };
@@ -571,12 +564,9 @@ impl SearchPane {
                     ctx.render()?;
                 }
                 CommonAction::EnterSearch => {
-                    self.songs_dir.set_filter(
-                        Some(String::new()),
-                        ctx.config.theme.browser_song_format.0.as_slice(),
-                        ctx,
-                    );
-                    ctx.input.insert_mode(self.filter_buffer_id);
+                    self.songs_dir.set_filter_active(true);
+                    ctx.input.insert_mode(self.songs_dir.filter_buffer_id);
+                    ctx.input.clear_buffer(self.songs_dir.filter_buffer_id);
 
                     ctx.render()?;
                 }
@@ -1223,7 +1213,7 @@ impl Pane for SearchPane {
                 }
             },
             MouseEventKind::RightClick => match self.phase {
-                Phase::BrowseResults if !ctx.input.is_active(self.filter_buffer_id) => {
+                Phase::BrowseResults if !ctx.input.is_active(self.songs_dir.filter_buffer_id) => {
                     let clicked_row =
                         event.y.saturating_sub(self.column_areas[BrowserArea::Current].y).into();
                     if let Some(idx) = self.songs_dir.state.get_at_rendered_row(clicked_row) {
@@ -1261,27 +1251,17 @@ impl Pane for SearchPane {
                 let song_format = ctx.config.theme.browser_song_format.0.as_slice();
                 match kind {
                     InputResultEvent::Push => {
-                        self.songs_dir.set_filter(
-                            Some(ctx.input.value(self.filter_buffer_id)),
-                            song_format,
-                            ctx,
-                        );
+                        self.songs_dir.recalculate_matched_items(song_format, ctx);
                         self.songs_dir.jump_first_matching(song_format, ctx);
                     }
                     InputResultEvent::Pop => {
-                        self.songs_dir.set_filter(
-                            Some(ctx.input.value(self.filter_buffer_id)),
-                            song_format,
-                            ctx,
-                        );
+                        self.songs_dir.recalculate_matched_items(song_format, ctx);
                     }
-                    InputResultEvent::Confirm => {
-                        ctx.input.clear_buffer(self.filter_buffer_id);
-                    }
+                    InputResultEvent::Confirm => {}
                     InputResultEvent::NoChange => {}
                     InputResultEvent::Cancel => {
-                        self.songs_dir.set_filter(None, song_format, ctx);
-                        ctx.input.clear_buffer(self.filter_buffer_id);
+                        self.songs_dir.set_filter_active(false);
+                        ctx.input.clear_buffer(self.songs_dir.filter_buffer_id);
                     }
                 }
             }

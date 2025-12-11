@@ -29,7 +29,7 @@ use crate::{
         browser::{BrowserPane, MoveDirection},
         dir_or_song::DirOrSong,
         dirstack::{DirStack, DirStackItem},
-        input::{BufferId, InputResultEvent},
+        input::InputResultEvent,
         modals::{info_list_modal::InfoListModal, input_modal::InputModal},
         widgets::browser::{Browser, BrowserArea},
     },
@@ -43,7 +43,6 @@ pub struct PlaylistsPane {
     stack: DirStack<DirOrSong, ListState>,
     browser: Browser<DirOrSong>,
     initialized: bool,
-    input_buffer_id: BufferId,
 }
 
 const INIT: &str = "init";
@@ -53,12 +52,7 @@ const PLAYLIST_INFO: &str = "preview";
 
 impl PlaylistsPane {
     pub fn new(_ctx: &Ctx) -> Self {
-        Self {
-            stack: DirStack::default(),
-            browser: Browser::new(),
-            initialized: false,
-            input_buffer_id: BufferId::new(),
-        }
+        Self { stack: DirStack::default(), browser: Browser::new(), initialized: false }
     }
 }
 
@@ -296,10 +290,6 @@ impl Pane for PlaylistsPane {
 }
 
 impl BrowserPane<DirOrSong> for PlaylistsPane {
-    fn buffer_id(&self) -> BufferId {
-        self.input_buffer_id
-    }
-
     fn stack(&self) -> &DirStack<DirOrSong, ListState> {
         &self.stack
     }

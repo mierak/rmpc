@@ -7,8 +7,8 @@ use ratatui::{
     Frame,
     layout::Flex,
     prelude::{Constraint, Layout, Rect},
-    style::{Style, Styled, Stylize},
-    text::{Line, Span, Text},
+    style::{Style, Stylize},
+    text::{Line, Span},
     widgets::{Block, Borders, Row, Table, TableState},
 };
 
@@ -46,7 +46,7 @@ use crate::{
     ui::{
         UiEvent,
         dirstack::Dir,
-        input::{BufferId, InputResultEvent},
+        input::InputResultEvent,
         modals::{
             confirm_modal::{Action, ConfirmModal},
             info_list_modal::InfoListModal,
@@ -74,7 +74,6 @@ pub struct QueuePane {
     column_formats: Vec<Property<SongProperty>>,
     areas: EnumMap<Areas, Rect>,
     should_center_cursor_on_current: bool,
-    filter_buffer_id: BufferId,
 }
 
 #[derive(Debug, Enum)]
@@ -102,7 +101,6 @@ impl QueuePane {
                 _ => Rect::default(),
             },
             should_center_cursor_on_current: ctx.config.center_current_song_on_change,
-            filter_buffer_id: BufferId::new(),
         }
     }
 
@@ -259,12 +257,7 @@ impl Pane for QueuePane {
         let Ctx { config, .. } = ctx;
         self.calculate_areas(area, ctx)?;
 
-        let filter_text = self.queue.filter().map(|v| {
-            format!(
-                "[FILTER]: {v}{} ",
-                if ctx.input.is_active(self.filter_buffer_id) { "█" } else { "" }
-            )
-        });
+        let filter_text = self.queue.filter_text(self.areas[Areas::Table].width, ctx);
 
         let table_block = {
             let border_style = config.as_border_style();
@@ -275,7 +268,7 @@ impl Pane for QueuePane {
             if self.areas[Areas::FilterArea].height == 0
                 && let Some(ref title) = filter_text
             {
-                b = b.title(title.clone().set_style(border_style));
+                b = b.title(title.clone());
             }
             b
         };
@@ -303,7 +296,7 @@ impl Pane for QueuePane {
             .collect();
         let current_song_id = ctx.find_current_song_in_queue().map(|(_, song)| song.id);
         let marked = std::mem::take(self.queue.marked_mut());
-        let filter = std::mem::take(self.queue.filter_mut());
+        let filter = ctx.input.value(self.queue.filter_buffer_id);
 
         if config.theme.show_song_table_header {
             let header_table = Table::default()
@@ -357,9 +350,11 @@ impl Pane for QueuePane {
                 });
 
                 let is_matching_search = is_current
-                    || filter.as_ref().is_some_and(|filter| {
-                        song.matches(self.column_formats.as_slice(), filter, ctx)
-                    });
+                    || if self.queue.filter_active {
+                        song.matches(self.column_formats.as_slice(), &filter, ctx)
+                    } else {
+                        Default::default()
+                    };
 
                 let mut row = QueueRow::default();
                 if is_matching_search {
@@ -381,7 +376,6 @@ impl Pane for QueuePane {
         frame.render_stateful_widget(table, self.areas[Areas::Table], &mut self.queue.state);
 
         let _ = std::mem::replace(self.queue.marked_mut(), marked);
-        let _ = std::mem::replace(self.queue.filter_mut(), filter);
 
         if let Some(scrollbar) = config.as_styled_scrollbar()
             && self.areas[Areas::Scrollbar].width > 0
@@ -397,7 +391,7 @@ impl Pane for QueuePane {
             && self.areas[Areas::FilterArea].height > 0
         {
             frame.render_widget(
-                Text::from(filter_text).style(
+                Line::from(filter_text).style(
                     config.theme.text_color.map(|c| Style::default().fg(c)).unwrap_or_default(),
                 ),
                 self.areas[Areas::FilterArea],
@@ -439,15 +433,14 @@ impl Pane for QueuePane {
             table_block_area
         };
 
-        let table_area =
-            if self.queue.filter().is_some() && !ctx.config.theme.show_song_table_header {
-                self.areas[Areas::FilterArea] =
-                    Rect::new(table_area.x, table_area.y, table_area.width, 1);
-                table_area.shrink_from_top(1)
-            } else {
-                self.areas[Areas::FilterArea] = Rect::default();
-                table_area
-            };
+        let table_area = if self.queue.filter_active && !ctx.config.theme.show_song_table_header {
+            self.areas[Areas::FilterArea] =
+                Rect::new(table_area.x, table_area.y, table_area.width, 1);
+            table_area.shrink_from_top(1)
+        } else {
+            self.areas[Areas::FilterArea] = Rect::default();
+            table_area
+        };
 
         self.areas[Areas::Table] = table_area;
         self.areas[Areas::TableBlock] = table_block_area;
@@ -702,26 +695,16 @@ impl Pane for QueuePane {
     fn handle_insert_mode(&mut self, kind: InputResultEvent, ctx: &mut Ctx) -> Result<()> {
         match kind {
             InputResultEvent::Push => {
-                self.queue.set_filter(
-                    Some(ctx.input.value(self.filter_buffer_id)),
-                    self.column_formats.as_slice(),
-                    ctx,
-                );
+                self.queue.recalculate_matched_items(self.column_formats.as_slice(), ctx);
                 self.queue.jump_first_matching(self.column_formats.as_slice(), ctx);
             }
             InputResultEvent::Pop => {
-                self.queue.set_filter(
-                    Some(ctx.input.value(self.filter_buffer_id)),
-                    self.column_formats.as_slice(),
-                    ctx,
-                );
+                self.queue.recalculate_matched_items(self.column_formats.as_slice(), ctx);
             }
-            InputResultEvent::Confirm => {
-                ctx.input.clear_buffer(self.filter_buffer_id);
-            }
+            InputResultEvent::Confirm => {}
             InputResultEvent::Cancel => {
-                self.queue.set_filter(None, self.column_formats.as_slice(), ctx);
-                ctx.input.clear_buffer(self.filter_buffer_id);
+                self.queue.set_filter_active(false);
+                ctx.input.clear_buffer(self.queue.filter_buffer_id);
             }
             InputResultEvent::NoChange => {}
         }
@@ -1064,8 +1047,9 @@ impl Pane for QueuePane {
                 CommonAction::Right => {}
                 CommonAction::Left => {}
                 CommonAction::EnterSearch => {
-                    ctx.input.insert_mode(self.filter_buffer_id);
-                    self.queue.set_filter(Some(String::new()), self.column_formats.as_slice(), ctx);
+                    ctx.input.insert_mode(self.queue.filter_buffer_id);
+                    ctx.input.clear_buffer(self.queue.filter_buffer_id);
+                    self.queue.set_filter_active(true);
 
                     ctx.render()?;
                 }

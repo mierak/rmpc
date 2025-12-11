@@ -19,7 +19,7 @@ use crate::{
         browser::BrowserPane,
         dir_or_song::DirOrSong,
         dirstack::{DirStack, DirStackItem},
-        input::{BufferId, InputResultEvent},
+        input::InputResultEvent,
         widgets::browser::{Browser, BrowserArea},
     },
 };
@@ -29,7 +29,6 @@ pub struct AlbumsPane {
     stack: DirStack<DirOrSong, ListState>,
     browser: Browser<DirOrSong>,
     initialized: bool,
-    input_buffer_id: BufferId,
 }
 
 const INIT: &str = "init";
@@ -37,12 +36,7 @@ const FETCH_DATA: &str = "fetch_data";
 
 impl AlbumsPane {
     pub fn new(_ctx: &Ctx) -> Self {
-        Self {
-            stack: DirStack::default(),
-            browser: Browser::new(),
-            initialized: false,
-            input_buffer_id: BufferId::new(),
-        }
+        Self { stack: DirStack::default(), browser: Browser::new(), initialized: false }
     }
 }
 
@@ -137,10 +131,6 @@ impl Pane for AlbumsPane {
 }
 
 impl BrowserPane<DirOrSong> for AlbumsPane {
-    fn buffer_id(&self) -> BufferId {
-        self.input_buffer_id
-    }
-
     fn stack(&self) -> &DirStack<DirOrSong, ListState> {
         &self.stack
     }

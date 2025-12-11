@@ -89,6 +89,8 @@ pub struct Ui<'ui> {
 const OPEN_DECODERS_MODAL: &str = "open_decoders_modal";
 const OPEN_OUTPUTS_MODAL: &str = "open_outputs_modal";
 
+pub const FILTER_PREFIX: &str = "[FILTER]:";
+
 macro_rules! active_tab_call {
     ($self:ident, $ctx:ident, $fn:ident($($param:expr),+)) => {
         $self.tabs
@@ -776,6 +778,7 @@ impl<'ui> Ui<'ui> {
     pub fn on_event(&mut self, mut event: UiEvent, ctx: &mut Ctx) -> Result<()> {
         match event {
             UiEvent::Database => {
+                ctx.input.clear_all_buffers();
                 status_warn!(
                     "The music database has been updated. Some parts of the UI may have been reinitialized to prevent inconsistent behaviours."
                 );

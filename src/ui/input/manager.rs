@@ -43,7 +43,18 @@ impl InputManager {
         style: Style,
         is_active: bool,
     ) -> Vec<Span<'static>> {
-        buffer!(self, id).as_spans(available_width, style, is_active)
+        buffer!(self, id).as_spans(None, available_width, style, is_active)
+    }
+
+    pub fn as_spans_prefixed(
+        &self,
+        id: BufferId,
+        prefix: &'static str,
+        available_width: impl Into<usize>,
+        style: Style,
+        is_active: bool,
+    ) -> Vec<Span<'static>> {
+        buffer!(self, id).as_spans(Some(prefix), available_width, style, is_active)
     }
 
     pub fn is_active(&self, id: BufferId) -> bool {
@@ -64,6 +75,10 @@ impl InputManager {
 
     pub fn clear_buffer(&self, id: BufferId) {
         buffer!(self, id).clear();
+    }
+
+    pub fn clear_all_buffers(&self) {
+        self.buffers.borrow_mut().clear();
     }
 
     pub fn is_insert_mode(&self) -> bool {

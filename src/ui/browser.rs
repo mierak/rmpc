@@ -23,7 +23,7 @@ use crate::{
     },
     ui::{
         dirstack::{DirStack, DirStackItem, WalkDirStackItem},
-        input::{BufferId, InputResultEvent},
+        input::InputResultEvent,
         modals::{
             input_modal::InputModal,
             menu::{
@@ -53,7 +53,6 @@ pub(in crate::ui) trait BrowserPane<T>: Pane
 where
     T: DirStackItem + std::fmt::Debug + Clone + Send + Sync + 'static,
 {
-    fn buffer_id(&self) -> BufferId;
     fn stack(&self) -> &DirStack<T, ListState>;
     fn stack_mut(&mut self) -> &mut DirStack<T, ListState>;
     fn browser_areas(&self) -> EnumMap<BrowserArea, Rect>;
@@ -189,31 +188,19 @@ where
         let config = &ctx.config;
         match kind {
             InputResultEvent::Push => {
-                let id = self.buffer_id();
-                self.stack_mut().current_mut().set_filter(
-                    Some(ctx.input.value(id)),
-                    song_format,
-                    ctx,
-                );
                 self.stack_mut().current_mut().jump_first_matching(song_format, ctx);
+                self.stack_mut().current_mut().recalculate_matched_items(song_format, ctx);
                 self.fetch_data_internal(ctx);
             }
             InputResultEvent::Pop => {
-                let id = self.buffer_id();
-                self.stack_mut().current_mut().set_filter(
-                    Some(ctx.input.value(id)),
-                    song_format,
-                    ctx,
-                );
+                self.stack_mut().current_mut().recalculate_matched_items(song_format, ctx);
             }
-            InputResultEvent::Confirm => {
-                ctx.input.clear_buffer(self.buffer_id());
-            }
+            InputResultEvent::Confirm => {}
             InputResultEvent::NoChange => {}
             InputResultEvent::Cancel => {
-                self.stack_mut().current_mut().set_filter(None, song_format, ctx);
+                self.stack_mut().current_mut().set_filter_active(false);
+                ctx.input.clear_buffer(self.stack().current().filter_buffer_id);
                 self.fetch_data_internal(ctx);
-                ctx.input.clear_buffer(self.buffer_id());
             }
         }
         ctx.render()?;
@@ -463,12 +450,9 @@ where
                 ctx.render()?;
             }
             CommonAction::EnterSearch => {
-                self.stack_mut().current_mut().set_filter(
-                    Some(String::new()),
-                    ctx.config.theme.browser_song_format.0.as_slice(),
-                    ctx,
-                );
-                ctx.insert_mode(self.buffer_id());
+                ctx.input.insert_mode(self.stack().current().filter_buffer_id);
+                ctx.input.clear_buffer(self.stack().current().filter_buffer_id);
+                self.stack_mut().current_mut().set_filter_active(true);
                 ctx.render()?;
             }
             CommonAction::NextResult => {

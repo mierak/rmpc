@@ -29,7 +29,7 @@ use crate::{
         browser::BrowserPane,
         dir_or_song::DirOrSong,
         dirstack::{DirStack, DirStackItem, Path},
-        input::{BufferId, InputResultEvent},
+        input::InputResultEvent,
         widgets::browser::{Browser, BrowserArea},
     },
 };
@@ -43,7 +43,6 @@ pub struct TagBrowserPane {
     target_pane: PaneType,
     browser: Browser<DirOrSong>,
     initialized: bool,
-    input_buffer_id: BufferId,
 }
 
 const INIT: &str = "init";
@@ -64,7 +63,6 @@ impl TagBrowserPane {
             stack: DirStack::default(),
             browser: Browser::new(),
             initialized: false,
-            input_buffer_id: BufferId::new(),
         }
     }
 
@@ -269,10 +267,6 @@ impl Pane for TagBrowserPane {
 }
 
 impl BrowserPane<DirOrSong> for TagBrowserPane {
-    fn buffer_id(&self) -> BufferId {
-        self.input_buffer_id
-    }
-
     fn stack(&self) -> &DirStack<DirOrSong, ListState> {
         &self.stack
     }
