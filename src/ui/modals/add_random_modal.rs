@@ -311,6 +311,9 @@ impl Modal for AddRandomModal<'_> {
             MouseEventKind::LeftClick
                 if self.input_areas[InputAreas::Tag].contains(event.into()) =>
             {
+                if ctx.input.is_active(self.count_buffer_id) {
+                    ctx.input.normal_mode();
+                }
                 self.active_input = InputType::Tag;
                 ctx.render()?;
             }
@@ -318,6 +321,9 @@ impl Modal for AddRandomModal<'_> {
                 if self.input_areas[InputAreas::Tag].contains(event.into()) =>
             {
                 self.active_input = InputType::Tag;
+                if ctx.input.is_active(self.count_buffer_id) {
+                    ctx.input.normal_mode();
+                }
                 self.selected_tag = self.selected_tag.next();
                 ctx.render()?;
             }
@@ -337,6 +343,9 @@ impl Modal for AddRandomModal<'_> {
                 if let Some(idx) = self.button_group.get_button_idx_at(event.into()) {
                     self.button_group_state.select(idx);
                     self.active_input = InputType::Buttons;
+                    if ctx.input.is_active(self.count_buffer_id) {
+                        ctx.input.normal_mode();
+                    }
                     ctx.render()?;
                 }
             }
