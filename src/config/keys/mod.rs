@@ -25,12 +25,13 @@ use crossterm::event::{KeyCode, KeyModifiers};
 pub use key::Key;
 use serde::{Deserialize, Serialize};
 
+use super::defaults;
 use crate::config::keys::actions::SaveKind;
 
 pub(crate) mod actions;
 pub mod key;
 
-#[derive(Debug, PartialEq, Default, Clone)]
+#[derive(Debug, PartialEq, Clone)]
 pub struct KeyConfig {
     pub global: HashMap<Key, GlobalAction>,
     pub navigation: HashMap<Key, CommonAction>,
@@ -45,6 +46,8 @@ pub struct KeyConfig {
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct KeyConfigFile {
+    #[serde(default = "defaults::bool::<false>")]
+    pub clear: bool,
     #[serde(default)]
     pub global: HashMap<Key, GlobalActionFile>,
     #[serde(default)]
@@ -71,6 +74,7 @@ impl Default for KeyConfigFile {
         use LogsActionsFile as L;
         use QueueActionsFile as Q;
         Self {
+            clear: false,
             global: HashMap::from([
                 (Key { key: K::Char('q'), modifiers: M::NONE  }, G::Quit),
                 (Key { key: K::Char(':'), modifiers: M::NONE  }, G::CommandMode),
@@ -156,25 +160,69 @@ impl Default for KeyConfigFile {
     }
 }
 
+impl Default for KeyConfig {
+    fn default() -> Self {
+        KeyConfigFile { clear: true, ..Default::default() }
+            .try_into()
+            .expect("Default KeyConfigFile should convert to KeyConfig")
+    }
+}
+
 impl TryFrom<KeyConfigFile> for KeyConfig {
     type Error = anyhow::Error;
 
     fn try_from(value: KeyConfigFile) -> Result<Self, Self::Error> {
-        Ok(KeyConfig {
-            global: value.global.into_iter().map(|(k, v)| (k, v.into())).collect(),
-            navigation: value
+        if value.clear {
+            Ok(KeyConfig {
+                global: value.global.into_iter().map(|(k, v)| (k, v.into())).collect(),
+                navigation: value
+                    .navigation
+                    .into_iter()
+                    .map(|(k, v)| -> anyhow::Result<_> { Ok((k, v.try_into()?)) })
+                    .collect::<anyhow::Result<_>>()?,
+                albums: HashMap::new(),
+                artists: HashMap::new(),
+                directories: HashMap::new(),
+                search: HashMap::new(),
+                #[cfg(debug_assertions)]
+                logs: value.logs.into_iter().map(|(k, v)| (k, v.into())).collect(),
+                queue: value.queue.into_iter().map(|(k, v)| (k, v.into())).collect(),
+            })
+        } else {
+            let global: HashMap<Key, GlobalAction> =
+                value.global.into_iter().map(|(k, v)| (k, v.into())).collect();
+            let navigation: HashMap<Key, CommonAction> = value
                 .navigation
                 .into_iter()
                 .map(|(k, v)| -> anyhow::Result<_> { Ok((k, v.try_into()?)) })
-                .collect::<anyhow::Result<_>>()?,
-            albums: HashMap::new(),
-            artists: HashMap::new(),
-            directories: HashMap::new(),
-            search: HashMap::new(),
+                .collect::<anyhow::Result<_>>()?;
+            let queue: HashMap<Key, QueueActions> =
+                value.queue.into_iter().map(|(k, v)| (k, v.into())).collect();
             #[cfg(debug_assertions)]
-            logs: value.logs.into_iter().map(|(k, v)| (k, v.into())).collect(),
-            queue: value.queue.into_iter().map(|(k, v)| (k, v.into())).collect(),
-        })
+            let logs: HashMap<Key, LogsActions> =
+                value.logs.into_iter().map(|(k, v)| (k, v.into())).collect();
+
+            let mut result = KeyConfig::default();
+
+            for (k, v) in global {
+                result.global.insert(k, v);
+            }
+
+            for (k, v) in navigation {
+                result.navigation.insert(k, v);
+            }
+
+            for (k, v) in queue {
+                result.queue.insert(k, v);
+            }
+
+            #[cfg(debug_assertions)]
+            for (k, v) in logs {
+                result.logs.insert(k, v);
+            }
+
+            Ok(result)
+        }
     }
 }
 
@@ -205,15 +253,13 @@ mod tests {
     #[rustfmt::skip]
     fn converts() {
         let input = KeyConfigFile {
+            clear: true,
             global: HashMap::from([(Key { key: KeyCode::Char('a'), modifiers: KeyModifiers::CONTROL, }, GlobalActionFile::Quit)]),
 
             #[cfg(debug_assertions)]
             logs: HashMap::from([(Key { key: KeyCode::Char('a'), modifiers: KeyModifiers::CONTROL, }, LogsActionsFile::Clear)]),
             queue: HashMap::from([(Key { key: KeyCode::Char('a'), modifiers: KeyModifiers::CONTROL, }, QueueActionsFile::Play),
                                   (Key { key: KeyCode::Char('b'), modifiers: KeyModifiers::SHIFT, }, QueueActionsFile::Save)]),
-            // albums: HashMap::from([]),
-            // artists: HashMap::from([]),
-            // directories: HashMap::from([]),
             navigation: HashMap::from([
                 (Key { key: KeyCode::Char('a'), modifiers: KeyModifiers::CONTROL, }, CommonActionFile::Up),
                 (Key { key: KeyCode::Char('b'), modifiers: KeyModifiers::SHIFT }, CommonActionFile::Up)
@@ -237,5 +283,35 @@ mod tests {
 
 
         assert_eq!(result, expected);
+    }
+
+    #[test]
+    #[rustfmt::skip]
+    fn converts_without_clearing() {
+        let input = KeyConfigFile {
+            clear: false,
+            global: HashMap::from([(Key { key: KeyCode::Char('a'), modifiers: KeyModifiers::CONTROL, }, GlobalActionFile::Quit)]),
+            queue: HashMap::from([(Key { key: KeyCode::Char('a'), modifiers: KeyModifiers::CONTROL, }, QueueActionsFile::Play),
+                                  (Key { key: KeyCode::Char('b'), modifiers: KeyModifiers::SHIFT, }, QueueActionsFile::Save)]),
+            navigation: HashMap::from([
+                (Key { key: KeyCode::Char('a'), modifiers: KeyModifiers::CONTROL, }, CommonActionFile::Up),
+                (Key { key: KeyCode::Char('b'), modifiers: KeyModifiers::SHIFT }, CommonActionFile::Up)
+            ]),
+            #[cfg(debug_assertions)]
+            logs: HashMap::from([(Key { key: KeyCode::Char('a'), modifiers: KeyModifiers::CONTROL, }, LogsActionsFile::Clear)]),
+        };
+
+        let mut default: KeyConfig = KeyConfig::default();
+        default.global.insert(Key { key: KeyCode::Char('a'), modifiers: KeyModifiers::CONTROL, }, GlobalAction::Quit);
+        default.queue.insert(Key { key: KeyCode::Char('a'), modifiers: KeyModifiers::CONTROL, }, QueueActions::Play);
+        default.queue.insert(Key { key: KeyCode::Char('b'), modifiers: KeyModifiers::SHIFT, }, QueueActions::Save);
+        default.navigation.insert(Key { key: KeyCode::Char('a'), modifiers: KeyModifiers::CONTROL }, CommonAction::Up);
+        default.navigation.insert(Key { key: KeyCode::Char('b'), modifiers: KeyModifiers::SHIFT }, CommonAction::Up);
+        #[cfg(debug_assertions)]
+        default.logs.insert(Key { key: KeyCode::Char('a'), modifiers: KeyModifiers::CONTROL, }, LogsActions::Clear);
+
+        let result: KeyConfig = input.try_into().unwrap();
+
+        assert_eq!(result, default);
     }
 }

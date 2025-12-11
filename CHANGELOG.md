@@ -13,9 +13,13 @@ All notable changes to this project will be documented in this file.
 - Support abstract socket in `MPD_HOST` and config file on Linux
 - Improved text input fields, supports shortcuts similar to default bash, like ctrl+w to delete a
 word, ctrl+f/b to move forward/backwards etc.
+- `clear` options to keybinds, keep the default keybinds and only override the specified keybinds
+if false
 
 ### Changed
 
+- **Breaking** Keybinds now only override the defaults. Meaning your configured keybinds are combined
+with the default ones. Set `clear` to true to keep the old behavior.
 - Moved docs to a new [repository](https://github.com/rmpc-org/rmpc-org.github.io) and [domain](https://rmpc.mierak.dev/)
 - Rmpc now checks for embedded image first and cover image in a file second by default, this can be
 configured with the new `album_art.order` option
