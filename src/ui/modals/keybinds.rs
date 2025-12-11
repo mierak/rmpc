@@ -35,7 +35,7 @@ pub struct KeybindsModal {
     id: Id,
     scrolling_state: DirState<TableState>,
     table_area: Rect,
-    filter: Option<String>,
+    filter_active: bool,
     filter_rows: Vec<Option<String>>,
     filter_buffer_id: BufferId,
 }
@@ -70,17 +70,18 @@ impl KeybindsModal {
             id: id::new(),
             scrolling_state,
             table_area: Rect::default(),
-            filter: None,
+            filter_active: false,
             filter_rows: Vec::new(),
             filter_buffer_id: BufferId::new(),
         }
     }
 
-    pub fn jump_forward(&mut self, scrolloff: usize) {
-        let Some(filter) = self.filter.as_ref() else {
+    pub fn jump_forward(&mut self, scrolloff: usize, ctx: &Ctx) {
+        if !self.filter_active {
             status_warn!("No filter set");
             return;
-        };
+        }
+        let filter = ctx.input.value(self.filter_buffer_id);
         let Some(selected) = self.scrolling_state.get_selected() else {
             log::error!(state:? = self.scrolling_state; "No song selected");
             return;
@@ -91,7 +92,7 @@ impl KeybindsModal {
             let i = i % length;
             if let Some(row) = &self.filter_rows[i]
                 && !row.is_empty()
-                && row.contains(filter)
+                && row.contains(&filter)
             {
                 self.scrolling_state.select(Some(i), scrolloff);
                 break;
@@ -99,22 +100,23 @@ impl KeybindsModal {
         }
     }
 
-    pub fn jump_back(&mut self, scrolloff: usize) {
-        let Some(filter) = self.filter.as_ref() else {
+    pub fn jump_back(&mut self, scrolloff: usize, ctx: &Ctx) {
+        if !self.filter_active {
             status_warn!("No filter set");
             return;
-        };
+        }
         let Some(selected) = self.scrolling_state.get_selected() else {
             log::error!(state:? = self.scrolling_state; "No song selected");
             return;
         };
 
+        let filter = ctx.input.value(self.filter_buffer_id);
         let length = self.filter_rows.len();
         for i in (0..length).rev() {
             let i = (i + selected) % length;
             if let Some(row) = &self.filter_rows[i]
                 && !row.is_empty()
-                && row.contains(filter)
+                && row.contains(&filter)
             {
                 self.scrolling_state.select(Some(i), scrolloff);
                 break;
@@ -122,16 +124,17 @@ impl KeybindsModal {
         }
     }
 
-    pub fn jump_first(&mut self, scrolloff: usize) {
-        let Some(filter) = self.filter.as_ref() else {
+    pub fn jump_first(&mut self, scrolloff: usize, ctx: &Ctx) {
+        if !self.filter_active {
             status_warn!("No filter set");
             return;
-        };
+        }
 
+        let filter = ctx.input.value(self.filter_buffer_id);
         self.filter_rows
             .iter()
             .enumerate()
-            .find(|(_, item)| item.as_ref().is_some_and(|item| item.contains(filter)))
+            .find(|(_, item)| item.as_ref().is_some_and(|item| item.contains(&filter)))
             .inspect(|(idx, _)| self.scrolling_state.select(Some(*idx), scrolloff));
     }
 }
@@ -220,13 +223,14 @@ impl Modal for KeybindsModal {
         if let Some(bg_color) = ctx.config.theme.modal_background_color {
             frame.render_widget(Block::default().style(Style::default().bg(bg_color)), popup_area);
         }
+        let filter = ctx.input.value(self.filter_buffer_id);
 
         let mut block = Block::default()
             .borders(Borders::ALL)
             .border_set(border::ROUNDED)
             .border_style(ctx.config.as_border_style())
             .title_alignment(ratatui::prelude::Alignment::Center);
-        if let Some(filter) = &self.filter {
+        if self.filter_active {
             block = block.title(format!("Keybinds | {FILTER_PREFIX} {filter}"));
         } else {
             block = block.title("Keybinds");
@@ -261,7 +265,7 @@ impl Modal for KeybindsModal {
             key_area.width,
             action_area.width,
             desc_area.width,
-            self.filter.as_deref(),
+            self.filter_active.then_some(filter.as_str()),
             ctx.config.theme.highlighted_item_style,
         )
         .unzip();
@@ -270,7 +274,7 @@ impl Modal for KeybindsModal {
             key_area.width,
             action_area.width,
             desc_area.width,
-            self.filter.as_deref(),
+            self.filter_active.then_some(filter.as_str()),
             ctx.config.theme.highlighted_item_style,
         )
         .unzip();
@@ -279,7 +283,7 @@ impl Modal for KeybindsModal {
             key_area.width,
             action_area.width,
             desc_area.width,
-            self.filter.as_deref(),
+            self.filter_active.then_some(filter.as_str()),
             ctx.config.theme.highlighted_item_style,
         )
         .unzip();
@@ -336,18 +340,13 @@ impl Modal for KeybindsModal {
     fn handle_insert_mode(&mut self, kind: InputResultEvent, ctx: &Ctx) -> Result<()> {
         match kind {
             InputResultEvent::Push => {
-                self.filter = Some(ctx.input.value(self.filter_buffer_id));
-                self.jump_first(ctx.config.scrolloff);
+                self.jump_first(ctx.config.scrolloff, ctx);
             }
-            InputResultEvent::Pop => {
-                self.filter = Some(ctx.input.value(self.filter_buffer_id));
-            }
-            InputResultEvent::Confirm => {
-                ctx.input.clear_buffer(self.filter_buffer_id);
-            }
+            InputResultEvent::Pop => {}
+            InputResultEvent::Confirm => {}
             InputResultEvent::Cancel => {
                 ctx.input.clear_buffer(self.filter_buffer_id);
-                self.filter = None;
+                self.filter_active = false;
             }
             InputResultEvent::NoChange => {}
         }
@@ -392,18 +391,19 @@ impl Modal for KeybindsModal {
                     self.hide(ctx)?;
                 }
                 CommonAction::EnterSearch => {
+                    ctx.input.clear_buffer(self.filter_buffer_id);
                     ctx.input.insert_mode(self.filter_buffer_id);
-                    self.filter = Some(ctx.input.value(self.filter_buffer_id));
+                    self.filter_active = true;
 
                     ctx.render()?;
                 }
                 CommonAction::NextResult => {
-                    self.jump_forward(ctx.config.scrolloff);
+                    self.jump_forward(ctx.config.scrolloff, ctx);
 
                     ctx.render()?;
                 }
                 CommonAction::PreviousResult => {
-                    self.jump_back(ctx.config.scrolloff);
+                    self.jump_back(ctx.config.scrolloff, ctx);
 
                     ctx.render()?;
                 }
