@@ -496,6 +496,7 @@ impl Pane for QueuePane {
     fn on_event(&mut self, event: &mut UiEvent, is_visible: bool, ctx: &Ctx) -> Result<()> {
         match event {
             UiEvent::Database => {
+                self.queue.filter_active = false;
                 self.queue.items.clone_from(&ctx.queue);
                 self.queue.unmark_all();
             }

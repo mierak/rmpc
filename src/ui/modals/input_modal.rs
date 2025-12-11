@@ -131,12 +131,15 @@ impl<'a, C: FnOnce(&Ctx, &str) -> Result<()> + 'a> Modal for InputModal<'a, C> {
             return Ok(());
         };
 
-        let input = Input::new(ctx, self.input_buffer_id)
-            .set_label(self.input_label)
-            .set_label_style(ctx.config.as_text_style())
-            .set_focused(ctx.input.is_insert_mode())
-            .set_focused_style(ctx.config.theme.highlight_border_style)
-            .set_unfocused_style(ctx.config.as_border_style());
+        let input = Input::builder()
+            .ctx(ctx)
+            .buffer_id(self.input_buffer_id)
+            .label(self.input_label)
+            .label_style(ctx.config.as_text_style())
+            .focused(ctx.input.is_insert_mode())
+            .focused_style(ctx.config.theme.highlight_border_style)
+            .unfocused_style(ctx.config.as_border_style())
+            .build();
 
         self.button_group.set_active_style(if ctx.input.is_active(self.input_buffer_id) {
             Style::default().reversed()

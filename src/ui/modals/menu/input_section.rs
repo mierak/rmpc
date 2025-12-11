@@ -18,7 +18,6 @@ use crate::{
 pub struct InputSection<'a> {
     pub label: Cow<'a, str>,
     pub area: Rect,
-    pub current_item_style: Style,
     pub is_current: bool,
     #[debug(skip)]
     pub action: Option<Box<dyn FnOnce(&Ctx, String) + Send + Sync + 'static>>,
@@ -26,10 +25,9 @@ pub struct InputSection<'a> {
 }
 
 impl<'a> InputSection<'a> {
-    pub fn new(label: impl Into<Cow<'a, str>>, current_item_style: Style) -> Self {
+    pub fn new(label: impl Into<Cow<'a, str>>) -> Self {
         Self {
             area: Rect::default(),
-            current_item_style,
             label: label.into(),
             action: None,
             is_current: false,
@@ -116,16 +114,13 @@ impl Section for InputSection<'_> {
     fn render(&mut self, area: Rect, buf: &mut Buffer, filter: Option<&str>, ctx: &Ctx) {
         self.area = area;
 
-        let input = Input::new(ctx, self.buffer_id)
-            .set_label_style(if self.is_current {
-                self.current_item_style
-            } else {
-                Style::default()
-            })
+        let input = Input::builder()
+            .ctx(ctx)
+            .buffer_id(self.buffer_id)
             .spacing(1)
-            .set_borderless(true)
-            .set_label(self.label.as_ref())
-            .set_label_style(if self.is_current && !ctx.input.is_active(self.buffer_id) {
+            .borderless(true)
+            .label(self.label.as_ref())
+            .label_style(if self.is_current && !ctx.input.is_active(self.buffer_id) {
                 ctx.config.theme.current_item_style
             } else if let Some(f) = filter
                 && self.label.to_lowercase().contains(f)
@@ -133,7 +128,8 @@ impl Section for InputSection<'_> {
                 ctx.config.theme.highlighted_item_style
             } else {
                 Style::default()
-            });
+            })
+            .build();
 
         input.render(area, buf);
     }

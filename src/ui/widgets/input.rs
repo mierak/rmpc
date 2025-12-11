@@ -1,3 +1,4 @@
+use bon::bon;
 use ratatui::{
     prelude::{Constraint, Layout, Margin},
     style::Style,
@@ -9,6 +10,9 @@ use crate::{ctx::Ctx, ui::input::BufferId};
 
 #[derive(Debug)]
 pub struct Input<'a> {
+    ctx: &'a Ctx,
+    buffer_id: Option<BufferId>,
+
     text: &'a str,
     placeholder: Option<&'a str>,
     label: &'a str,
@@ -19,42 +23,67 @@ pub struct Input<'a> {
     unfocused_style: Style,
     borderless: bool,
     spacing: u16,
-    ctx: &'a Ctx,
-    buffer_id: Option<BufferId>,
 }
 
-impl Input<'_> {
-    pub fn new(ctx: &Ctx, buffer_id: BufferId) -> Input<'_> {
+#[bon]
+impl<'a> Input<'a> {
+    #[builder]
+    pub fn new(
+        ctx: &'a Ctx,
+        buffer_id: BufferId,
+        placeholder: Option<&'a str>,
+        label: &'a str,
+        #[builder(default)] label_style: Style,
+        #[builder(default)] input_style: Style,
+        #[builder(default)] focused: bool,
+        #[builder(default)] focused_style: Style,
+        #[builder(default)] unfocused_style: Style,
+        #[builder(default)] borderless: bool,
+        #[builder(default)] spacing: u16,
+    ) -> Input<'a> {
         Input {
             ctx,
             buffer_id: Some(buffer_id),
             text: "",
-            placeholder: None,
-            label: "",
-            label_style: Style::default(),
-            input_style: Style::default(),
-            focused: false,
-            focused_style: Style::default(),
-            unfocused_style: Style::default(),
-            borderless: false,
-            spacing: 0,
+            placeholder,
+            label,
+            label_style,
+            input_style,
+            focused,
+            focused_style,
+            unfocused_style,
+            borderless,
+            spacing,
         }
     }
 
-    pub fn new_static(ctx: &Ctx) -> Input<'_> {
+    #[builder]
+    pub fn new_static(
+        ctx: &'a Ctx,
+        text: &'a str,
+        placeholder: Option<&'a str>,
+        label: &'a str,
+        #[builder(default)] label_style: Style,
+        #[builder(default)] input_style: Style,
+        #[builder(default)] focused: bool,
+        #[builder(default)] focused_style: Style,
+        #[builder(default)] unfocused_style: Style,
+        #[builder(default)] borderless: bool,
+        #[builder(default)] spacing: u16,
+    ) -> Input<'a> {
         Input {
             ctx,
             buffer_id: None,
-            text: "",
-            placeholder: None,
-            label: "",
-            label_style: Style::default(),
-            input_style: Style::default(),
-            focused: false,
-            focused_style: Style::default(),
-            unfocused_style: Style::default(),
-            borderless: false,
-            spacing: 0,
+            text,
+            placeholder,
+            label,
+            label_style,
+            input_style,
+            focused,
+            focused_style,
+            unfocused_style,
+            borderless,
+            spacing,
         }
     }
 }
@@ -111,68 +140,5 @@ impl Widget for Input<'_> {
             text_area.inner(Margin { horizontal: 0, vertical: u16::from(!self.borderless) }),
             buf,
         );
-    }
-}
-
-#[allow(unused)]
-impl<'a> Input<'a> {
-    pub fn spacing(mut self, spacing: u16) -> Self {
-        self.spacing = spacing;
-        self
-    }
-
-    pub fn set_text(mut self, text: &'a str) -> Self {
-        self.text = text;
-        self
-    }
-
-    pub fn set_label(mut self, label: &'a str) -> Self {
-        self.label = label;
-        self
-    }
-
-    pub fn set_focused(mut self, focused: bool) -> Self {
-        self.focused = focused;
-        self
-    }
-
-    pub fn set_focused_style(mut self, focused_style: Style) -> Self {
-        self.focused_style = focused_style;
-        self
-    }
-
-    pub fn set_unfocused_style(mut self, unfocused_style: Style) -> Self {
-        self.unfocused_style = unfocused_style;
-        self
-    }
-
-    pub fn set_borderless(mut self, borderless: bool) -> Self {
-        self.borderless = borderless;
-        self
-    }
-
-    pub fn set_label_style(mut self, label_style: Style) -> Self {
-        self.label_style = label_style;
-        self
-    }
-
-    pub fn set_input_style(mut self, input_style: Style) -> Self {
-        self.input_style = input_style;
-        self
-    }
-
-    pub fn set_placeholder(mut self, placeholder: &'a str) -> Self {
-        self.placeholder = Some(placeholder);
-        self
-    }
-
-    pub fn buffer_id(mut self, buffer_id: BufferId) -> Self {
-        self.buffer_id = Some(buffer_id);
-        self
-    }
-
-    pub fn ctx(mut self, ctx: &'a Ctx) -> Self {
-        self.ctx = ctx;
-        self
     }
 }

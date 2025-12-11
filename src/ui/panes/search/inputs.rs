@@ -510,79 +510,90 @@ impl InputGroups {
 
             match input {
                 InputType::Textbox(input) => {
-                    let mut widget = Input::new(ctx, input.buffer_id)
-                        .set_borderless(true)
-                        .set_label(&input.label)
-                        .set_placeholder("<None>")
-                        .set_focused(is_focused && ctx.input.is_active(input.buffer_id))
-                        .set_label_style(self.text_style)
-                        .set_input_style(self.text_style);
+                    let widget = Input::builder()
+                        .ctx(ctx)
+                        .buffer_id(input.buffer_id)
+                        .borderless(true)
+                        .label(&input.label)
+                        .placeholder("<None>")
+                        .focused(is_focused && ctx.input.is_active(input.buffer_id));
 
-                    widget = if ctx.input.is_active(input.buffer_id) && is_focused {
-                        widget.set_label_style(self.highlight_item_style)
+                    let widget = if ctx.input.is_active(input.buffer_id) && is_focused {
+                        widget
+                            .label_style(self.highlight_item_style)
+                            .input_style(self.text_style)
+                            .build()
                     } else if is_focused {
                         widget
-                            .set_label_style(self.current_item_style)
-                            .set_input_style(self.current_item_style)
+                            .label_style(self.current_item_style)
+                            .input_style(self.current_item_style)
+                            .build()
                     } else {
-                        widget
+                        widget.label_style(self.text_style).input_style(self.text_style).build()
                     };
 
                     widget.render(area, buf);
                 }
                 InputType::Numberbox(input) => {
-                    let mut widget = Input::new(ctx, input.buffer_id)
-                        .set_borderless(true)
-                        .set_label(&input.label)
-                        .set_placeholder("<None>")
-                        .set_focused(is_focused && ctx.input.is_active(input.buffer_id))
-                        .set_label_style(self.text_style)
-                        .set_input_style(self.text_style);
+                    let widget = Input::builder()
+                        .ctx(ctx)
+                        .buffer_id(input.buffer_id)
+                        .borderless(true)
+                        .label(&input.label)
+                        .placeholder("<None>")
+                        .focused(is_focused && ctx.input.is_active(input.buffer_id));
 
-                    widget = if ctx.input.is_active(input.buffer_id) && is_focused {
-                        widget.set_label_style(self.highlight_item_style)
+                    let widget = if ctx.input.is_active(input.buffer_id) && is_focused {
+                        widget
+                            .label_style(self.highlight_item_style)
+                            .input_style(self.text_style)
+                            .build()
                     } else if is_focused {
                         widget
-                            .set_label_style(self.current_item_style)
-                            .set_input_style(self.current_item_style)
+                            .label_style(self.current_item_style)
+                            .input_style(self.current_item_style)
+                            .build()
                     } else {
-                        widget
+                        widget.label_style(self.text_style).input_style(self.text_style).build()
                     };
 
                     widget.render(area, buf);
                 }
                 InputType::Spinner(input) => {
-                    let mut inp = Input::new_static(ctx)
-                        .set_borderless(true)
-                        .set_label_style(self.text_style)
-                        .set_input_style(self.text_style)
-                        .set_label(&input.label)
-                        .set_text(match input.key {
-                            FOLD_CASE_KEY => {
-                                if self.fold_case {
-                                    "No"
-                                } else {
-                                    "Yes"
-                                }
+                    let text = match input.key {
+                        FOLD_CASE_KEY => {
+                            if self.fold_case {
+                                "No"
+                            } else {
+                                "Yes"
                             }
-                            STRIP_DIACRITICS_KEY => {
-                                if self.strip_diacritics {
-                                    "Yes"
-                                } else {
-                                    "No"
-                                }
+                        }
+                        STRIP_DIACRITICS_KEY => {
+                            if self.strip_diacritics {
+                                "Yes"
+                            } else {
+                                "No"
                             }
-                            SEARCH_MODE_KEY => self.search_mode.into(),
-                            RATING_MODE_KEY => self.rating_mode.into(),
-                            LIKE_KEY => self.liked_mode.into(),
-                            _ => "",
-                        });
+                        }
+                        SEARCH_MODE_KEY => self.search_mode.into(),
+                        RATING_MODE_KEY => self.rating_mode.into(),
+                        LIKE_KEY => self.liked_mode.into(),
+                        _ => "",
+                    };
+                    let inp = Input::new_static()
+                        .ctx(ctx)
+                        .text(text)
+                        .borderless(true)
+                        .label(&input.label);
 
-                    if is_focused {
-                        inp = inp
-                            .set_label_style(self.current_item_style)
-                            .set_input_style(self.current_item_style);
-                    }
+                    let inp = if is_focused {
+                        inp.label_style(self.current_item_style)
+                            .input_style(self.current_item_style)
+                            .call()
+                    } else {
+                        inp.label_style(self.text_style).input_style(self.text_style).call()
+                    };
+
                     inp.render(area, buf);
                 }
                 InputType::Button(input) => {

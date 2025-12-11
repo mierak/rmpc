@@ -101,7 +101,6 @@ impl Pane for DirectoriesPane {
     }
 
     fn handle_insert_mode(&mut self, kind: InputResultEvent, ctx: &mut Ctx) -> Result<()> {
-        log::debug!(kind:?; "Handling insert mode in DirectoriesPane");
         BrowserPane::handle_insert_mode(self, kind, ctx)?;
         Ok(())
     }

@@ -419,11 +419,11 @@ impl<'a> MenuModal<'a> {
 
     pub fn input_section(
         mut self,
-        ctx: &Ctx,
+        _ctx: &Ctx,
         label: impl Into<Cow<'a, str>>,
         cb: impl FnOnce(InputSection) -> Option<InputSection<'_>>,
     ) -> Self {
-        let section = InputSection::new(label, ctx.config.theme.current_item_style);
+        let section = InputSection::new(label);
         let section = cb(section);
         if let Some(section) = section {
             self.sections.push(SectionType::Input(section));

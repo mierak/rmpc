@@ -78,6 +78,7 @@ impl InputManager {
     }
 
     pub fn clear_all_buffers(&self) {
+        self.normal_mode();
         self.buffers.borrow_mut().clear();
     }
 
