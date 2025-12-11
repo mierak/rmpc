@@ -4,14 +4,14 @@ use std::{
 };
 
 use log::error;
-use ratatui::widgets::ListItem;
+use ratatui::{text::Span, widgets::ListItem};
 
 use super::{DirStackItem, state::DirState};
 use crate::{
     config::theme::properties::{Property, SongProperty},
     ctx::Ctx,
     shared::macros::status_warn,
-    ui::dirstack::ScrollingState,
+    ui::{FILTER_PREFIX, dirstack::ScrollingState, input::BufferId},
 };
 
 #[derive(Debug)]
@@ -22,8 +22,9 @@ where
 {
     pub items: Vec<T>,
     pub state: DirState<S>,
-    filter: Option<String>,
     matched_item_count: usize,
+    pub filter_buffer_id: BufferId,
+    pub filter_active: bool,
 }
 
 impl<T, S> Default for Dir<T, S>
@@ -35,8 +36,9 @@ where
         Self {
             items: Vec::default(),
             state: DirState::default(),
-            filter: None,
             matched_item_count: 0,
+            filter_buffer_id: BufferId::new(),
+            filter_active: false,
         }
     }
 }
@@ -51,8 +53,9 @@ where
         let mut result = Self {
             items: Vec::new(),
             state: DirState::default(),
-            filter: None,
             matched_item_count: 0,
+            filter_buffer_id: BufferId::new(),
+            filter_active: false,
         };
 
         if !root.is_empty() {
@@ -73,45 +76,42 @@ where
     }
 
     pub fn new_with_state(items: Vec<T>, state: DirState<S>) -> Self {
-        return Self { items, state, filter: None, matched_item_count: 0 };
+        return Self {
+            items,
+            state,
+            matched_item_count: 0,
+            filter_buffer_id: BufferId::new(),
+            filter_active: false,
+        };
     }
 
-    pub fn filter(&self) -> Option<&str> {
-        self.filter.as_deref()
+    pub fn set_filter_active(&mut self, active: bool) {
+        self.filter_active = active;
     }
 
-    pub fn filter_mut(&mut self) -> &mut Option<String> {
-        &mut self.filter
+    pub fn filter(&self, ctx: &Ctx) -> String {
+        ctx.input.value(self.filter_buffer_id)
     }
 
-    pub fn set_filter(
-        &mut self,
-        value: Option<String>,
-        song_format: &[Property<SongProperty>],
-        ctx: &Ctx,
-    ) {
-        self.matched_item_count = if let Some(ref filter) = value {
-            self.items.iter().filter(|item| item.matches(song_format, ctx, filter)).count()
+    pub fn filter_text<'a>(&self, available_width: u16, ctx: &Ctx) -> Option<Vec<Span<'a>>> {
+        self.filter_active.then(|| {
+            ctx.input.as_spans_prefixed(
+                self.filter_buffer_id,
+                FILTER_PREFIX,
+                available_width,
+                ctx.config.as_border_style(),
+                ctx.input.is_active(self.filter_buffer_id),
+            )
+        })
+    }
+
+    pub fn recalculate_matched_items(&mut self, song_format: &[Property<SongProperty>], ctx: &Ctx) {
+        let filter = ctx.input.value(self.filter_buffer_id);
+        self.matched_item_count = if self.filter_active {
+            self.items.iter().filter(|item| item.matches(song_format, ctx, &filter)).count()
         } else {
             0
         };
-        self.filter = value;
-    }
-
-    pub fn push_filter(&mut self, char: char, song_format: &[Property<SongProperty>], ctx: &Ctx) {
-        if let Some(ref mut filter) = self.filter {
-            filter.push(char);
-            self.matched_item_count =
-                self.items.iter().filter(|item| item.matches(song_format, ctx, filter)).count();
-        }
-    }
-
-    pub fn pop_filter(&mut self, song_format: &[Property<SongProperty>], ctx: &Ctx) {
-        if let Some(ref mut filter) = self.filter {
-            filter.pop();
-            self.matched_item_count =
-                self.items.iter().filter(|item| item.matches(song_format, ctx, filter)).count();
-        }
     }
 
     pub fn to_list_items_range<'a>(
@@ -135,14 +135,18 @@ where
             Bound::Unbounded => self.items.len(),
         };
 
+        let filter = ctx.input.value(self.filter_buffer_id);
         self.items
             .iter()
             .enumerate()
             .skip(start)
             .take(end.saturating_sub(start))
             .map(|(i, item)| {
-                let matches =
-                    self.filter.as_ref().is_some_and(|v| item.matches(song_format, ctx, v));
+                let matches = if self.filter_active {
+                    item.matches(song_format, ctx, &filter)
+                } else {
+                    false
+                };
                 let is_current = current_item_idx.is_some_and(|idx| i == idx);
                 if matches {
                     already_matched = already_matched.saturating_add(1);
@@ -282,19 +286,21 @@ where
     }
 
     pub fn jump_next_matching(&mut self, song_format: &[Property<SongProperty>], ctx: &Ctx) {
-        let Some(filter) = self.filter.as_ref() else {
+        if !self.filter_active {
             status_warn!("No filter set");
             return;
-        };
+        }
+
         let Some(selected) = self.state.get_selected() else {
             error!(state:? = self.state; "No song selected");
             return;
         };
 
         let length = self.items.len();
+        let filter = ctx.input.value(self.filter_buffer_id);
         for i in selected + 1..length + selected {
             let i = i % length;
-            if self.items[i].matches(song_format, ctx, filter) {
+            if self.items[i].matches(song_format, ctx, &filter) {
                 self.state.select(Some(i), ctx.config.scrolloff);
                 break;
             }
@@ -302,19 +308,20 @@ where
     }
 
     pub fn jump_previous_matching(&mut self, song_format: &[Property<SongProperty>], ctx: &Ctx) {
-        let Some(filter) = self.filter.as_ref() else {
+        if !self.filter_active {
             status_warn!("No filter set");
             return;
-        };
+        }
         let Some(selected) = self.state.get_selected() else {
             error!(state:? = self.state; "No song selected");
             return;
         };
 
         let length = self.items.len();
+        let filter = ctx.input.value(self.filter_buffer_id);
         for i in (0..length).rev() {
             let i = (i + selected) % length;
-            if self.items[i].matches(song_format, ctx, filter) {
+            if self.items[i].matches(song_format, ctx, &filter) {
                 self.state.select(Some(i), ctx.config.scrolloff);
                 break;
             }
@@ -322,15 +329,16 @@ where
     }
 
     pub fn jump_first_matching(&mut self, song_format: &[Property<SongProperty>], ctx: &Ctx) {
-        let Some(filter) = self.filter.as_ref() else {
+        if !self.filter_active {
             status_warn!("No filter set");
             return;
-        };
+        }
 
+        let filter = ctx.input.value(self.filter_buffer_id);
         self.items
             .iter()
             .enumerate()
-            .find(|(_, item)| item.matches(song_format, ctx, filter))
+            .find(|(_, item)| item.matches(song_format, ctx, &filter))
             .inspect(|(idx, _)| self.state.select(Some(*idx), ctx.config.scrolloff));
     }
 }
@@ -343,14 +351,15 @@ mod tests {
     use rstest::rstest;
 
     use super::{Dir, DirState};
-    use crate::{ctx::Ctx, tests::fixtures::ctx};
+    use crate::{ctx::Ctx, tests::fixtures::ctx, ui::input::BufferId};
 
     fn create_subject() -> Dir<String, ListState> {
         let mut res = Dir {
             items: vec!["a", "b", "c", "d", "f"].into_iter().map(ToOwned::to_owned).collect(),
             state: DirState::default(),
-            filter: None,
             matched_item_count: 0,
+            filter_buffer_id: BufferId::new(),
+            filter_active: false,
         };
         res.state.set_content_and_viewport_len(res.items.len(), res.items.len());
         res
@@ -519,7 +528,8 @@ mod tests {
             val.state.set_content_and_viewport_len(val.items.len(), 2);
             val.state.select(Some(0), 0);
 
-            val.filter = Some("a".to_string());
+            val.set_filter_active(true);
+            ctx.input.set_buffer("a".to_string(), val.filter_buffer_id);
 
             val.jump_next_matching(&[], &ctx);
             assert_eq!(val.state.get_selected(), Some(1));
@@ -544,43 +554,14 @@ mod tests {
             val.state.set_content_and_viewport_len(val.items.len(), 2);
             val.state.select(Some(4), 0);
 
-            val.filter = Some("a".to_string());
+            val.set_filter_active(true);
+            ctx.input.set_buffer("a".to_string(), val.filter_buffer_id);
 
             val.jump_previous_matching(&[], &ctx);
             assert_eq!(val.state.get_selected(), Some(3));
 
             val.jump_previous_matching(&[], &ctx);
             assert_eq!(val.state.get_selected(), Some(1));
-        }
-    }
-
-    mod matched_item_count {
-        use super::*;
-
-        #[rstest]
-        fn filter_changes_recounts_matched_items(ctx: Ctx) {
-            let mut val: Dir<String, ListState> = Dir {
-                items: vec!["aa", "ab", "c", "ad", "padding"]
-                    .into_iter()
-                    .map(ToOwned::to_owned)
-                    .collect(),
-                filter: None,
-                ..Default::default()
-            };
-            val.set_filter(Some("a".to_string()), &[], &ctx);
-            assert_eq!(val.matched_item_count, 4);
-
-            val.push_filter('d', &[], &ctx);
-            assert_eq!(val.matched_item_count, 2);
-
-            val.pop_filter(&[], &ctx);
-            assert_eq!(val.matched_item_count, 4);
-
-            val.pop_filter(&[], &ctx);
-            assert_eq!(val.matched_item_count, 5);
-
-            val.set_filter(None, &[], &ctx);
-            assert_eq!(val.matched_item_count, 0);
         }
     }
 }

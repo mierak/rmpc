@@ -36,7 +36,7 @@ use crate::{
         mpd_query::MpdQuerySync,
         ring_vec::RingVec,
     },
-    ui::StatusMessage,
+    ui::{StatusMessage, input::InputManager},
 };
 
 pub const FETCH_SONG_STICKERS: &str = "fetch_song_stickers";
@@ -73,6 +73,7 @@ pub struct Ctx {
     pub(crate) last_status_update: Instant,
     pub(crate) song_played: Option<Duration>,
     pub(crate) stickers_supported: StickersSupport,
+    pub(crate) input: InputManager,
 }
 
 #[bon]
@@ -126,6 +127,7 @@ impl Ctx {
             song_played: None,
             last_status_update: Instant::now(),
             stickers_supported,
+            input: InputManager::default(),
         })
     }
 

@@ -29,6 +29,7 @@ use crate::{
         browser::{BrowserPane, MoveDirection},
         dir_or_song::DirOrSong,
         dirstack::{DirStack, DirStackItem},
+        input::InputResultEvent,
         modals::{info_list_modal::InfoListModal, input_modal::InputModal},
         widgets::browser::{Browser, BrowserArea},
     },
@@ -40,7 +41,6 @@ mod tests;
 #[derive(Debug)]
 pub struct PlaylistsPane {
     stack: DirStack<DirOrSong, ListState>,
-    filter_input_mode: bool,
     browser: Browser<DirOrSong>,
     initialized: bool,
 }
@@ -52,23 +52,13 @@ const PLAYLIST_INFO: &str = "preview";
 
 impl PlaylistsPane {
     pub fn new(_ctx: &Ctx) -> Self {
-        Self {
-            stack: DirStack::default(),
-            filter_input_mode: false,
-            browser: Browser::new(),
-            initialized: false,
-        }
+        Self { stack: DirStack::default(), browser: Browser::new(), initialized: false }
     }
 }
 
 impl Pane for PlaylistsPane {
     fn render(&mut self, frame: &mut Frame, area: Rect, ctx: &Ctx) -> Result<()> {
-        self.browser.set_filter_input_active(self.filter_input_mode).render(
-            area,
-            frame.buffer_mut(),
-            &mut self.stack,
-            ctx,
-        );
+        self.browser.render(area, frame.buffer_mut(), &mut self.stack, ctx);
 
         Ok(())
     }
@@ -133,8 +123,12 @@ impl Pane for PlaylistsPane {
         self.handle_mouse_action(event, ctx)
     }
 
+    fn handle_insert_mode(&mut self, kind: InputResultEvent, ctx: &mut Ctx) -> Result<()> {
+        BrowserPane::handle_insert_mode(self, kind, ctx)?;
+        Ok(())
+    }
+
     fn handle_action(&mut self, event: &mut KeyEvent, ctx: &mut Ctx) -> Result<()> {
-        self.handle_filter_input(event, ctx)?;
         self.handle_common_action(event, ctx)?;
         self.handle_global_action(event, ctx)?;
         Ok(())
@@ -306,14 +300,6 @@ impl BrowserPane<DirOrSong> for PlaylistsPane {
 
     fn browser_areas(&self) -> EnumMap<BrowserArea, Rect> {
         self.browser.areas
-    }
-
-    fn set_filter_input_mode_active(&mut self, active: bool) {
-        self.filter_input_mode = active;
-    }
-
-    fn is_filter_input_mode_active(&self) -> bool {
-        self.filter_input_mode
     }
 
     fn list_songs_in_item(

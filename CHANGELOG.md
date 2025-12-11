@@ -11,6 +11,8 @@ All notable changes to this project will be documented in this file.
 - Added hot reload for lyrics and corresponding `enable_lyrics_hot_reload` config option
 - `enable_lyrics_index` to disable `lyrics_dir` indexing on startup
 - Support abstract socket in `MPD_HOST` and config file on Linux
+- Improved text input fields, supports shortcuts similar to default bash, like ctrl+w to delete a
+word, ctrl+f/b to move forward/backwards etc.
 
 ### Changed
 

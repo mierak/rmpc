@@ -1,7 +1,6 @@
 use std::borrow::Cow;
 
 use anyhow::Result;
-use crossterm::event::KeyCode;
 use itertools::Itertools;
 use ratatui::{
     Frame,
@@ -26,7 +25,11 @@ use crate::{
         key_event::KeyEvent,
         mouse_event::{MouseEvent, MouseEventKind},
     },
-    ui::modals::{Modal, RectExt as _, menu::select_section::SelectSection},
+    ui::{
+        FILTER_PREFIX,
+        input::{BufferId, InputResultEvent},
+        modals::{Modal, RectExt as _, menu::select_section::SelectSection},
+    },
 };
 
 #[derive(Debug)]
@@ -35,11 +38,10 @@ pub struct MenuModal<'a> {
     sections_labels: Vec<Vec<String>>,
     current_section_idx: usize,
     areas: Vec<Rect>,
-    input_focused: bool,
     width: u16,
     id: Id,
     filter: Option<String>,
-    input_mode: bool,
+    filter_buffer_id: BufferId,
 }
 
 impl Modal for MenuModal<'_> {
@@ -65,7 +67,7 @@ impl Modal for MenuModal<'_> {
             .border_style(ctx.config.as_border_style())
             .title_alignment(ratatui::prelude::Alignment::Center);
         if let Some(filter) = self.filter.as_ref() {
-            block = block.title(format!(" [FILTER]: {filter} "));
+            block = block.title(format!(" {FILTER_PREFIX}: {filter} "));
         }
 
         let content_area = block.inner(popup_area);
@@ -102,64 +104,50 @@ impl Modal for MenuModal<'_> {
         Ok(())
     }
 
-    fn handle_key(&mut self, key: &mut KeyEvent, ctx: &mut Ctx) -> Result<()> {
-        if self.input_focused {
-            let action = key.as_common_action(ctx);
-            if let Some(CommonAction::Close) = action {
-                self.input_focused = false;
-                self.sections[self.current_section_idx].unfocus();
-
-                ctx.render()?;
-                return Ok(());
-            } else if let Some(CommonAction::Confirm) = action {
-                self.sections[self.current_section_idx].confirm(ctx)?;
-
-                self.hide(ctx)?;
-                return Ok(());
-            }
-
-            self.sections[self.current_section_idx].key_input(key, ctx)?;
-
-            return Ok(());
-        }
-
-        if let Some(filter) = &mut self.filter
-            && self.input_mode
+    fn handle_insert_mode(&mut self, kind: InputResultEvent, ctx: &Ctx) -> Result<()> {
+        if ctx.input.is_active(self.filter_buffer_id)
+            && let Some(filter) = &mut self.filter
         {
-            match key.as_common_action(ctx) {
-                Some(CommonAction::Close) => {
-                    self.input_mode = false;
+            match kind {
+                InputResultEvent::Push => {
+                    *filter = ctx.input.value(self.filter_buffer_id);
+                    self.first_result(ctx);
+                }
+                InputResultEvent::Pop => {
+                    *filter = ctx.input.value(self.filter_buffer_id);
+                }
+                InputResultEvent::Confirm => {
+                    ctx.input.clear_buffer(self.filter_buffer_id);
+                }
+                InputResultEvent::Cancel => {
                     self.filter = None;
-                    ctx.render()?;
+                    ctx.input.clear_buffer(self.filter_buffer_id);
                 }
-                Some(CommonAction::Confirm) => {
-                    self.input_mode = false;
-                    ctx.render()?;
-                }
-                _ => {
-                    key.stop_propagation();
-                    match key.code() {
-                        KeyCode::Char(c) => {
-                            filter.push(c);
-                            self.first_result();
-                            ctx.render()?;
-                        }
-                        KeyCode::Backspace => {
-                            filter.pop();
-                            ctx.render()?;
-                        }
-                        _ => {}
-                    }
-                }
+                InputResultEvent::NoChange => {}
             }
-            return Ok(());
+        } else {
+            match kind {
+                InputResultEvent::Push => {}
+                InputResultEvent::Pop => {}
+                InputResultEvent::Confirm => {
+                    self.sections[self.current_section_idx].confirm(ctx)?;
+                }
+                InputResultEvent::Cancel => {
+                    self.sections[self.current_section_idx].unfocus(ctx);
+                }
+                InputResultEvent::NoChange => {}
+            }
         }
+        ctx.render()?;
+        Ok(())
+    }
 
+    fn handle_key(&mut self, key: &mut KeyEvent, ctx: &mut Ctx) -> Result<()> {
         if let Some(action) = key.as_common_action(ctx) {
             match action {
                 CommonAction::EnterSearch => {
+                    ctx.input.insert_mode(self.filter_buffer_id);
                     self.filter = Some(String::new());
-                    self.input_mode = true;
                     ctx.render()?;
                 }
                 CommonAction::Up => {
@@ -180,7 +168,7 @@ impl Modal for MenuModal<'_> {
                 }
                 CommonAction::Top => {
                     if self.current_section_idx != 0 {
-                        self.sections[self.current_section_idx].unselect();
+                        self.sections[self.current_section_idx].unselect(ctx);
                     }
                     self.current_section_idx = 0;
                     self.sections[0].select(0);
@@ -191,29 +179,29 @@ impl Modal for MenuModal<'_> {
                     let last_sect_item_idx = self.sections[sect_idx].len() - 1;
 
                     if self.current_section_idx != sect_idx {
-                        self.sections[self.current_section_idx].unselect();
+                        self.sections[self.current_section_idx].unselect(ctx);
                     }
                     self.current_section_idx = sect_idx;
                     self.sections[sect_idx].select(last_sect_item_idx);
                     ctx.render()?;
                 }
                 CommonAction::Close => {
-                    self.hide(ctx)?;
+                    self.destroy(ctx)?;
                 }
                 CommonAction::Confirm => {
-                    self.input_focused = self.sections[self.current_section_idx].confirm(ctx)?;
-                    if self.input_focused {
+                    self.sections[self.current_section_idx].confirm(ctx)?;
+                    if ctx.input.is_insert_mode() {
                         ctx.render()?;
                     } else {
-                        self.hide(ctx)?;
+                        self.destroy(ctx)?;
                     }
                 }
                 CommonAction::NextResult => {
-                    self.next_result();
+                    self.next_result(ctx);
                     ctx.render()?;
                 }
                 CommonAction::PreviousResult => {
-                    self.prev_result();
+                    self.prev_result(ctx);
                     ctx.render()?;
                 }
                 _ => {}
@@ -228,20 +216,20 @@ impl Modal for MenuModal<'_> {
             MouseEventKind::LeftClick => {
                 if let Some(idx) = self.section_idx_at_position(event.into()) {
                     if idx != self.current_section_idx {
-                        self.sections[self.current_section_idx].unselect();
+                        self.sections[self.current_section_idx].unselect(ctx);
                     }
                     self.current_section_idx = idx;
-                    self.sections[idx].left_click(event.into());
+                    self.sections[idx].left_click(event.into(), ctx);
                     ctx.render()?;
                 }
             }
             MouseEventKind::DoubleClick => {
                 if let Some(idx) = self.section_idx_at_position(event.into()) {
-                    self.input_focused = self.sections[idx].double_click(event.into(), ctx)?;
-                    if self.input_focused {
+                    self.sections[idx].double_click(event.into(), ctx)?;
+                    if ctx.input.is_insert_mode() {
                         ctx.render()?;
                     } else {
-                        self.hide(ctx)?;
+                        self.destroy(ctx)?;
                     }
                 }
             }
@@ -268,15 +256,23 @@ impl<'a> MenuModal<'a> {
             sections_labels: Vec::default(),
             current_section_idx: 0,
             areas: Vec::new(),
-            input_focused: false,
             width: 40,
             id: id::new(),
             filter: None,
-            input_mode: false,
+            filter_buffer_id: BufferId::new(),
         }
     }
 
-    fn next_result(&mut self) {
+    pub fn destroy(&mut self, ctx: &Ctx) -> Result<()> {
+        for s in &mut self.sections {
+            s.on_close(ctx)?;
+        }
+        ctx.input.destroy_buffer(self.filter_buffer_id);
+        self.hide(ctx)?;
+        Ok(())
+    }
+
+    fn next_result(&mut self, ctx: &Ctx) {
         let Some(filter) = self.filter.as_ref() else {
             return;
         };
@@ -293,7 +289,7 @@ impl<'a> MenuModal<'a> {
                 let label = &self.sections_labels[sect_i][label_idx];
                 if label.contains(filter) {
                     if sect_i != self.current_section_idx {
-                        self.sections[self.current_section_idx].unselect();
+                        self.sections[self.current_section_idx].unselect(ctx);
                     }
                     self.current_section_idx = sect_i;
                     self.sections[sect_i].select(label_idx);
@@ -314,7 +310,7 @@ impl<'a> MenuModal<'a> {
         }
     }
 
-    fn prev_result(&mut self) {
+    fn prev_result(&mut self, ctx: &mut Ctx) {
         let Some(filter) = self.filter.as_ref() else {
             return;
         };
@@ -331,7 +327,7 @@ impl<'a> MenuModal<'a> {
                 let label = &self.sections_labels[sect_i][label_idx];
                 if label.contains(filter) {
                     if sect_i != self.current_section_idx {
-                        self.sections[self.current_section_idx].unselect();
+                        self.sections[self.current_section_idx].unselect(ctx);
                     }
                     self.current_section_idx = sect_i;
                     self.sections[sect_i].select(label_idx);
@@ -352,7 +348,7 @@ impl<'a> MenuModal<'a> {
         }
     }
 
-    fn first_result(&mut self) {
+    fn first_result(&mut self, ctx: &Ctx) {
         let Some(filter) = self.filter.as_ref() else {
             return;
         };
@@ -362,7 +358,7 @@ impl<'a> MenuModal<'a> {
                 let label = &self.sections_labels[sect_i][label_idx];
                 if label.contains(filter) {
                     if sect_i != self.current_section_idx {
-                        self.sections[self.current_section_idx].unselect();
+                        self.sections[self.current_section_idx].unselect(ctx);
                     }
                     self.current_section_idx = sect_i;
                     self.sections[sect_i].select(label_idx);
@@ -423,11 +419,11 @@ impl<'a> MenuModal<'a> {
 
     pub fn input_section(
         mut self,
-        ctx: &Ctx,
+        _ctx: &Ctx,
         label: impl Into<Cow<'a, str>>,
         cb: impl FnOnce(InputSection) -> Option<InputSection<'_>>,
     ) -> Self {
-        let section = InputSection::new(label, ctx.config.theme.current_item_style);
+        let section = InputSection::new(label);
         let section = cb(section);
         if let Some(section) = section {
             self.sections.push(SectionType::Input(section));

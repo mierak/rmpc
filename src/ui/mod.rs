@@ -52,13 +52,18 @@ use crate::{
         mpd_client_ext::{Enqueue, MpdClientExt},
         ytdlp::YtDlpHostKind,
     },
-    ui::{image::facade::EncodeData, modals::menu::create_rating_modal},
+    ui::{
+        image::facade::EncodeData,
+        input::{InputEvent, InputResultEvent},
+        modals::menu::create_rating_modal,
+    },
 };
 
 pub mod browser;
 pub mod dir_or_song;
 pub mod dirstack;
 pub mod image;
+pub mod input;
 pub mod modals;
 pub mod panes;
 pub mod tab_screen;
@@ -83,6 +88,8 @@ pub struct Ui<'ui> {
 
 const OPEN_DECODERS_MODAL: &str = "open_decoders_modal";
 const OPEN_OUTPUTS_MODAL: &str = "open_outputs_modal";
+
+pub const FILTER_PREFIX: &str = "[FILTER]:";
 
 macro_rules! active_tab_call {
     ($self:ident, $ctx:ident, $fn:ident($($param:expr),+)) => {
@@ -204,8 +211,39 @@ impl<'ui> Ui<'ui> {
     }
 
     pub fn handle_key(&mut self, key: &mut KeyEvent, ctx: &mut Ctx) -> Result<KeyHandleResult> {
+        // Send input to modal if any
         if let Some(ref mut modal) = self.modals.last_mut() {
+            // Handle insert mode for modal
+            if let Some(kind) = ctx.input.handle_input(InputEvent::from_key_event(key, ctx)) {
+                let should_exit_insert =
+                    matches!(kind, InputResultEvent::Confirm | InputResultEvent::Cancel);
+
+                modal.handle_insert_mode(kind, ctx)?;
+                if should_exit_insert {
+                    ctx.input.normal_mode();
+                }
+
+                ctx.render()?;
+                return Ok(KeyHandleResult::None);
+            }
+
+            // else handle normal mode
             modal.handle_key(key, ctx)?;
+            return Ok(KeyHandleResult::None);
+        }
+
+        // Handle insert mode for panes
+        if let Some(kind) = ctx.input.handle_input(InputEvent::from_key_event(key, ctx)) {
+            let should_exit_insert =
+                matches!(kind, InputResultEvent::Confirm | InputResultEvent::Cancel);
+
+            active_tab_call!(self, ctx, handle_insert_mode(kind, ctx))?;
+
+            if should_exit_insert {
+                ctx.input.normal_mode();
+            }
+
+            ctx.render()?;
             return Ok(KeyHandleResult::None);
         }
 
@@ -740,6 +778,7 @@ impl<'ui> Ui<'ui> {
     pub fn on_event(&mut self, mut event: UiEvent, ctx: &mut Ctx) -> Result<()> {
         match event {
             UiEvent::Database => {
+                ctx.input.clear_all_buffers();
                 status_warn!(
                     "The music database has been updated. Some parts of the UI may have been reinitialized to prevent inconsistent behaviours."
                 );

@@ -1,12 +1,11 @@
 use std::collections::HashSet;
 
 use anyhow::Result;
-use crossterm::event::KeyCode;
 use enum_map::EnumMap;
 use itertools::Itertools;
 use ratatui::{
     layout::{Constraint, Layout, Rect},
-    style::{Styled, Stylize},
+    style::Stylize,
     text::Span,
     widgets::{Block, Borders, List, ListItem, ListState, Padding},
 };
@@ -39,6 +38,7 @@ use crate::{
     ui::{
         UiEvent,
         dirstack::Dir,
+        input::InputResultEvent,
         modals::{
             input_modal::InputModal,
             menu::{
@@ -74,6 +74,7 @@ impl SearchPane {
         let config = &ctx.config;
 
         let inputs = InputGroups::builder()
+            .ctx(ctx)
             .search_config(&config.search)
             .initial_fold_case(!config.search.case_sensitive)
             .initial_strip_diacritics(config.search.ignore_diacritics)
@@ -137,21 +138,12 @@ impl SearchPane {
     ) {
         let config = &ctx.config;
         let column_right_padding: u16 = config.theme.scrollbar.is_some().into();
-        let title = self.songs_dir.filter().as_ref().map(|v| {
-            format!(
-                "[FILTER]: {v}{} ",
-                if matches!(self.phase, Phase::BrowseResults { filter_input_on: true }) {
-                    "█"
-                } else {
-                    ""
-                }
-            )
-        });
+        let title = self.songs_dir.filter_text(area.width, ctx);
 
         let block = {
             let mut b = Block::default();
-            if let Some(ref title) = title {
-                b = b.title(title.clone().set_style(config.theme.borders_style));
+            if let Some(title) = title {
+                b = b.title(title);
             }
             b.padding(Padding::new(0, column_right_padding, 0, 0))
         };
@@ -169,7 +161,7 @@ impl SearchPane {
 
         self.column_areas[BrowserArea::Current] = inner_block;
         self.column_areas[BrowserArea::Scrollbar] =
-            if matches!(self.phase, Phase::BrowseResults { .. }) { area } else { Rect::default() };
+            if matches!(self.phase, Phase::BrowseResults) { area } else { Rect::default() };
         frame.render_widget(block, area);
         frame.render_stateful_widget(current, inner_block, directory.state.as_render_state_ref());
         if let Some(scrollbar) = config.as_styled_scrollbar() {
@@ -192,10 +184,13 @@ impl SearchPane {
     fn search(&mut self, ctx: &Ctx) {
         let search_mode = self.inputs.search_mode();
         let filter = self.inputs.inputs.iter().filter_map(|input| match &input {
-            InputType::Textbox(TextboxInput { value, filter_key: Some(key), .. })
-                if !value.is_empty() && !key.is_empty() =>
-            {
-                Some((key.to_owned(), value.to_owned(), search_mode))
+            InputType::Textbox(TextboxInput { buffer_id, filter_key: Some(key), .. }) => {
+                let value = ctx.input.value(*buffer_id).trim().to_owned();
+                if !value.is_empty() && !key.is_empty() {
+                    Some((key.to_owned(), value, search_mode))
+                } else {
+                    None
+                }
             }
             _ => None,
         });
@@ -206,8 +201,8 @@ impl SearchPane {
         let liked_filter = self.inputs.liked_filter();
 
         let rating_filter = if self.inputs.is_rating_filter_active() {
-            let Ok(rating_filter) = self.inputs.rating_filter() else {
-                status_error!("Rating must be a valid integer {:?}", self.inputs.rating_value());
+            let Ok(rating_filter) = self.inputs.rating_filter(ctx) else {
+                status_error!("Rating must be a valid integer {:?}", self.inputs.rating_value(ctx));
                 return;
             };
             rating_filter
@@ -352,7 +347,7 @@ impl SearchPane {
                 CommonAction::PageDown => {}
                 CommonAction::PageUp => {}
                 CommonAction::Right if !self.songs_dir.items.is_empty() => {
-                    self.phase = Phase::BrowseResults { filter_input_on: false };
+                    self.phase = Phase::BrowseResults;
 
                     ctx.render()?;
                 }
@@ -376,12 +371,12 @@ impl SearchPane {
                 CommonAction::Rename => {}
                 CommonAction::Close => {}
                 CommonAction::Confirm => {
-                    match self.inputs.activate_focused() {
+                    match self.inputs.activate_focused(ctx) {
                         ActionResult::Search => {
                             self.search(ctx);
                         }
                         ActionResult::Reset => {
-                            self.inputs.reset_focused();
+                            self.inputs.reset_focused(ctx);
                             self.songs_dir = Dir::default();
                         }
                         ActionResult::None => {}
@@ -389,7 +384,7 @@ impl SearchPane {
                     ctx.render()?;
                 }
                 CommonAction::FocusInput => {
-                    self.inputs.enter_insert_mode();
+                    self.inputs.enter_insert_mode(ctx);
                     ctx.render()?;
                 }
                 // Modal while we are on search column does not support all options. It can
@@ -413,7 +408,7 @@ impl SearchPane {
                 // search column.
                 CommonAction::AddOptions { kind: AddKind::Action(_) } => {}
                 CommonAction::Delete => {
-                    self.inputs.reset_focused();
+                    self.inputs.reset_focused(ctx);
                     self.songs_dir = Dir::default();
                     ctx.render()?;
                 }
@@ -488,47 +483,8 @@ impl SearchPane {
         Ok(())
     }
 
-    fn handle_result_phase_search(&mut self, event: &mut KeyEvent, ctx: &mut Ctx) -> Result<()> {
-        let Phase::BrowseResults { filter_input_on } = &mut self.phase else {
-            return Ok(());
-        };
-        let song_format = ctx.config.theme.browser_song_format.0.as_slice();
-        match event.as_common_action(ctx) {
-            Some(CommonAction::Close) => {
-                *filter_input_on = false;
-                self.songs_dir.set_filter(None, song_format, ctx);
-
-                ctx.render()?;
-            }
-            Some(CommonAction::Confirm) => {
-                *filter_input_on = false;
-
-                ctx.render()?;
-            }
-            _ => {
-                event.stop_propagation();
-                match event.code() {
-                    KeyCode::Char(c) => {
-                        self.songs_dir.push_filter(c, song_format, ctx);
-                        self.songs_dir.jump_first_matching(song_format, ctx);
-
-                        ctx.render()?;
-                    }
-                    KeyCode::Backspace => {
-                        self.songs_dir.pop_filter(song_format, ctx);
-
-                        ctx.render()?;
-                    }
-                    _ => {}
-                }
-            }
-        }
-
-        Ok(())
-    }
-
     fn handle_result_phase_action(&mut self, event: &mut KeyEvent, ctx: &mut Ctx) -> Result<()> {
-        let Phase::BrowseResults { filter_input_on } = &mut self.phase else {
+        let Phase::BrowseResults = &mut self.phase else {
             return Ok(());
         };
         if let Some(action) = event.as_global_action(ctx) {
@@ -608,12 +564,9 @@ impl SearchPane {
                     ctx.render()?;
                 }
                 CommonAction::EnterSearch => {
-                    self.songs_dir.set_filter(
-                        Some(String::new()),
-                        ctx.config.theme.browser_song_format.0.as_slice(),
-                        ctx,
-                    );
-                    *filter_input_on = true;
+                    self.songs_dir.set_filter_active(true);
+                    ctx.input.insert_mode(self.songs_dir.filter_buffer_id);
+                    ctx.input.clear_buffer(self.songs_dir.filter_buffer_id);
 
                     ctx.render()?;
                 }
@@ -955,7 +908,7 @@ impl SearchPane {
     }
 
     fn handle_scrollbar_interaction(&mut self, event: MouseEvent, ctx: &Ctx) -> Result<bool> {
-        if !matches!(self.phase, Phase::BrowseResults { .. }) {
+        if !matches!(self.phase, Phase::BrowseResults) {
             return Ok(false);
         }
         let Some(_) = ctx.config.theme.scrollbar else {
@@ -1019,7 +972,7 @@ impl Pane for SearchPane {
         match self.phase {
             Phase::Search => {
                 self.column_areas[BrowserArea::Current] = current_area;
-                frame.render_widget(&mut self.inputs, current_area);
+                self.inputs.render(current_area, frame.buffer_mut(), ctx);
 
                 // Render only the part of the preview that is actually supposed to be shown
                 let offset = self.songs_dir.state.offset();
@@ -1031,9 +984,9 @@ impl Pane for SearchPane {
                 let preview = List::new(items).style(ctx.config.as_text_style());
                 frame.render_widget(preview, preview_area);
             }
-            Phase::BrowseResults { filter_input_on: _ } => {
+            Phase::BrowseResults => {
                 self.render_song_column(frame, current_area, ctx);
-                frame.render_widget(&mut self.inputs, previous_area);
+                self.inputs.render(previous_area, frame.buffer_mut(), ctx);
                 if let Some(song) = self.songs_dir.selected() {
                     let preview = song.to_preview(
                         ctx.config.theme.preview_label_style,
@@ -1119,7 +1072,7 @@ impl Pane for SearchPane {
                 match self.phase {
                     Phase::Search => {
                         if !self.songs_dir.items.is_empty() {
-                            self.phase = Phase::BrowseResults { filter_input_on: false };
+                            self.phase = Phase::BrowseResults;
 
                             let clicked_row: usize = event
                                 .y
@@ -1138,7 +1091,7 @@ impl Pane for SearchPane {
                             ctx.render()?;
                         }
                     }
-                    Phase::BrowseResults { .. } => {
+                    Phase::BrowseResults => {
                         let (_, items) = self.enqueue(false);
                         if !items.is_empty() {
                             ctx.command(move |client| {
@@ -1154,16 +1107,16 @@ impl Pane for SearchPane {
             {
                 match self.phase {
                     Phase::Search => {
-                        if self.inputs.insert_mode {
+                        if ctx.input.is_insert_mode() {
                             self.phase = Phase::Search;
-                            self.inputs.insert_mode = false;
+                            ctx.input.normal_mode();
                             self.maybe_search_on_change(ctx);
                         }
 
                         self.inputs.focus_input_at(event.into());
                         ctx.render()?;
                     }
-                    Phase::BrowseResults { .. } => {
+                    Phase::BrowseResults => {
                         let clicked_row = event
                             .y
                             .saturating_sub(self.column_areas[BrowserArea::Current].y)
@@ -1180,12 +1133,12 @@ impl Pane for SearchPane {
             MouseEventKind::DoubleClick => match self.phase {
                 Phase::Search => {
                     if self.column_areas[BrowserArea::Current].contains(event.into()) {
-                        match self.inputs.activate_focused() {
+                        match self.inputs.activate_focused(ctx) {
                             ActionResult::Search => {
                                 self.search(ctx);
                             }
                             ActionResult::Reset => {
-                                self.inputs.reset_focused();
+                                self.inputs.reset_focused(ctx);
                                 self.songs_dir = Dir::default();
                             }
                             ActionResult::None => {}
@@ -1193,7 +1146,7 @@ impl Pane for SearchPane {
                     }
                     ctx.render()?;
                 }
-                Phase::BrowseResults { .. } => {
+                Phase::BrowseResults => {
                     let (_, items) = self.enqueue(false);
                     if !items.is_empty() {
                         ctx.command(move |client| {
@@ -1208,7 +1161,7 @@ impl Pane for SearchPane {
             {
                 match self.phase {
                     Phase::Search => {}
-                    Phase::BrowseResults { .. } => {
+                    Phase::BrowseResults => {
                         let clicked_row = event
                             .y
                             .saturating_sub(self.column_areas[BrowserArea::Current].y)
@@ -1231,36 +1184,36 @@ impl Pane for SearchPane {
             }
             MouseEventKind::ScrollDown => match self.phase {
                 Phase::Search => {
-                    if self.inputs.insert_mode {
-                        self.inputs.insert_mode = false;
+                    if ctx.input.is_insert_mode() {
+                        ctx.input.normal_mode();
                         self.phase = Phase::Search;
                         self.maybe_search_on_change(ctx);
                     }
                     self.inputs.next_non_wrapping();
                     ctx.render()?;
                 }
-                Phase::BrowseResults { .. } => {
+                Phase::BrowseResults => {
                     self.songs_dir.scroll_down(1, ctx.config.scrolloff);
                     ctx.render()?;
                 }
             },
             MouseEventKind::ScrollUp => match self.phase {
                 Phase::Search => {
-                    if self.inputs.insert_mode {
-                        self.inputs.insert_mode = false;
+                    if ctx.input.is_insert_mode() {
+                        ctx.input.normal_mode();
                         self.phase = Phase::Search;
                         self.maybe_search_on_change(ctx);
                     }
                     self.inputs.prev_non_wrapping();
                     ctx.render()?;
                 }
-                Phase::BrowseResults { .. } => {
+                Phase::BrowseResults => {
                     self.songs_dir.scroll_up(1, ctx.config.scrolloff);
                     ctx.render()?;
                 }
             },
             MouseEventKind::RightClick => match self.phase {
-                Phase::BrowseResults { filter_input_on: false } => {
+                Phase::BrowseResults if !ctx.input.is_active(self.songs_dir.filter_buffer_id) => {
                     let clicked_row =
                         event.y.saturating_sub(self.column_areas[BrowserArea::Current].y).into();
                     if let Some(idx) = self.songs_dir.state.get_at_rendered_row(clicked_row) {
@@ -1281,70 +1234,48 @@ impl Pane for SearchPane {
         Ok(())
     }
 
-    fn handle_action(&mut self, event: &mut KeyEvent, ctx: &mut Ctx) -> Result<()> {
-        match &mut self.phase {
-            Phase::Search if self.inputs.insert_mode => match event.as_common_action(ctx) {
-                Some(CommonAction::Close) => {
-                    self.phase = Phase::Search;
-                    self.inputs.insert_mode = false;
-                    if let InputType::Numberbox(TextboxInput { value, .. }) =
-                        self.inputs.focused_mut()
-                        && value.is_empty()
-                    {
-                        value.push('0');
-                    }
-
+    fn handle_insert_mode(&mut self, kind: InputResultEvent, ctx: &mut Ctx) -> Result<()> {
+        match self.phase {
+            Phase::Search => match kind {
+                InputResultEvent::Push => {}
+                InputResultEvent::Pop => {}
+                InputResultEvent::Confirm => {
                     self.maybe_search_on_change(ctx);
-                    ctx.render()?;
                 }
-                Some(CommonAction::Confirm) => {
-                    self.phase = Phase::Search;
-                    self.inputs.insert_mode = false;
-                    if let InputType::Numberbox(TextboxInput { value, .. }) =
-                        self.inputs.focused_mut()
-                        && value.is_empty()
-                    {
-                        value.push('0');
-                    }
-
+                InputResultEvent::NoChange => {}
+                InputResultEvent::Cancel => {
                     self.maybe_search_on_change(ctx);
-                    ctx.render()?;
-                }
-                _ => {
-                    event.stop_propagation();
-                    match event.code() {
-                        KeyCode::Char(c) => match self.inputs.focused_mut() {
-                            InputType::Textbox(TextboxInput { value, .. }) => {
-                                value.push(c);
-                                ctx.render()?;
-                            }
-                            InputType::Numberbox(TextboxInput { value, .. }) => {
-                                if c.is_numeric() {
-                                    value.push(c);
-                                    ctx.render()?;
-                                }
-                            }
-                            _ => {}
-                        },
-                        KeyCode::Backspace => match self.inputs.focused_mut() {
-                            InputType::Textbox(TextboxInput { value, .. })
-                            | InputType::Numberbox(TextboxInput { value, .. }) => {
-                                value.pop();
-                                ctx.render()?;
-                            }
-                            _ => {}
-                        },
-                        _ => {}
-                    }
                 }
             },
+            Phase::BrowseResults => {
+                let song_format = ctx.config.theme.browser_song_format.0.as_slice();
+                match kind {
+                    InputResultEvent::Push => {
+                        self.songs_dir.recalculate_matched_items(song_format, ctx);
+                        self.songs_dir.jump_first_matching(song_format, ctx);
+                    }
+                    InputResultEvent::Pop => {
+                        self.songs_dir.recalculate_matched_items(song_format, ctx);
+                    }
+                    InputResultEvent::Confirm => {}
+                    InputResultEvent::NoChange => {}
+                    InputResultEvent::Cancel => {
+                        self.songs_dir.set_filter_active(false);
+                        ctx.input.clear_buffer(self.songs_dir.filter_buffer_id);
+                    }
+                }
+            }
+        }
+        ctx.render()?;
+        Ok(())
+    }
+
+    fn handle_action(&mut self, event: &mut KeyEvent, ctx: &mut Ctx) -> Result<()> {
+        match &mut self.phase {
             Phase::Search => {
                 self.handle_search_phase_action(event, ctx)?;
             }
-            Phase::BrowseResults { filter_input_on: true } => {
-                self.handle_result_phase_search(event, ctx)?;
-            }
-            Phase::BrowseResults { filter_input_on: false } => {
+            Phase::BrowseResults => {
                 self.handle_result_phase_action(event, ctx)?;
             }
         }
@@ -1355,7 +1286,7 @@ impl Pane for SearchPane {
 #[derive(Debug)]
 enum Phase {
     Search,
-    BrowseResults { filter_input_on: bool },
+    BrowseResults,
 }
 
 #[cfg(test)]

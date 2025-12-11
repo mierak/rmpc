@@ -14,6 +14,7 @@ use crate::{
         key_event::KeyEvent,
         mouse_event::{MouseEvent, MouseEventKind},
     },
+    ui::input::InputResultEvent,
 };
 
 #[derive(Debug)]
@@ -93,6 +94,25 @@ impl TabScreen {
                 Ok(())
             },
         )?;
+        Ok(())
+    }
+
+    pub(in crate::ui) fn handle_insert_mode(
+        &mut self,
+        panes: &mut PaneContainer,
+        kind: InputResultEvent,
+        ctx: &mut Ctx,
+    ) -> Result<()> {
+        let Some(focused) = self.panes.panes_iter().find(|pane| pane.id == self.focused) else {
+            log::error!(
+                "Unable to find focused pane, this should not happen. Please report this issue."
+            );
+            return Ok(());
+        };
+
+        let mut pane = panes.get_mut(&focused.pane, ctx)?;
+        pane_call!(pane, handle_insert_mode(kind, ctx))?;
+
         Ok(())
     }
 

@@ -1,5 +1,4 @@
 use anyhow::Result;
-use crossterm::event::KeyCode;
 use enum_map::{Enum, EnumMap, enum_map};
 use ratatui::{
     Frame,
@@ -23,9 +22,12 @@ use crate::{
         key_event::KeyEvent,
         mouse_event::{MouseEvent, MouseEventKind},
     },
-    ui::widgets::{
-        button::{Button, ButtonGroup, ButtonGroupState},
-        input::Input,
+    ui::{
+        input::{BufferId, InputResultEvent},
+        widgets::{
+            button::{Button, ButtonGroup, ButtonGroupState},
+            input::Input,
+        },
     },
 };
 
@@ -36,8 +38,8 @@ pub struct AddRandomModal<'a> {
     button_group: ButtonGroup<'a>,
     active_input: InputType,
     input_areas: EnumMap<InputAreas, Rect>,
-    count: String,
     selected_tag: AddRandom,
+    count_buffer_id: BufferId,
 }
 
 #[derive(Debug, Enum)]
@@ -51,7 +53,6 @@ enum InputAreas {
 enum InputType {
     Tag,
     Count,
-    CountFocused,
     Buttons,
 }
 
@@ -83,6 +84,8 @@ impl AddRandomModal<'_> {
                     .border_style(ctx.config.as_border_style()),
             );
 
+        let buffer_id = BufferId::new();
+        ctx.input.create_buffer(buffer_id, Some("5"));
         Self {
             id: id::new(),
             button_group_state,
@@ -91,8 +94,8 @@ impl AddRandomModal<'_> {
             input_areas: enum_map! {
                 _ => Rect::default(),
             },
-            count: String::from("5"),
             selected_tag: AddRandom::Song,
+            count_buffer_id: buffer_id,
         }
     }
 
@@ -100,6 +103,12 @@ impl AddRandomModal<'_> {
         Ok(ctx
             .work_sender
             .send(WorkRequest::Command(Command::AddRandom { tag, count: count.parse()? }))?)
+    }
+
+    fn destroy(&mut self, ctx: &Ctx) -> Result<()> {
+        ctx.input.destroy_buffer(self.count_buffer_id);
+        self.hide(ctx)?;
+        Ok(())
     }
 }
 
@@ -128,34 +137,43 @@ impl Modal for AddRandomModal<'_> {
             Layout::vertical([Constraint::Length(1), Constraint::Length(1)])
                 .areas(block.inner(body_area));
 
-        let mut combobox = Input::default()
-            .set_label("Tag:   ")
-            .set_label_style(ctx.config.as_text_style())
-            .set_text(self.selected_tag.into())
-            .set_focused(false)
-            .set_borderless(true)
-            .set_unfocused_style(ctx.config.as_border_style());
+        let combobox = Input::new_static()
+            .ctx(ctx)
+            .label("Tag:   ")
+            .text(self.selected_tag.into())
+            .focused(false)
+            .borderless(true)
+            .unfocused_style(ctx.config.as_border_style());
 
-        if matches!(self.active_input, InputType::Tag) {
-            combobox = combobox
-                .set_label_style(ctx.config.theme.current_item_style)
-                .set_input_style(ctx.config.theme.current_item_style);
-        }
+        let combobox = if matches!(self.active_input, InputType::Tag) {
+            combobox
+                .label_style(ctx.config.theme.current_item_style)
+                .input_style(ctx.config.theme.current_item_style)
+                .call()
+        } else {
+            combobox.label_style(ctx.config.as_text_style()).call()
+        };
 
-        let mut count = Input::default()
-            .set_label("Count: ")
-            .set_label_style(ctx.config.as_text_style())
-            .set_text(&self.count)
-            .set_focused(matches!(self.active_input, InputType::CountFocused))
-            .set_focused_style(ctx.config.theme.highlight_border_style)
-            .set_borderless(true)
-            .set_unfocused_style(ctx.config.as_border_style());
+        let count = Input::builder()
+            .ctx(ctx)
+            .buffer_id(self.count_buffer_id)
+            .label("Count: ")
+            .focused(
+                matches!(self.active_input, InputType::Count)
+                    && ctx.input.is_active(self.count_buffer_id),
+            )
+            .focused_style(ctx.config.theme.highlight_border_style)
+            .borderless(true)
+            .unfocused_style(ctx.config.as_border_style());
 
-        if matches!(self.active_input, InputType::Count) {
-            count = count
-                .set_label_style(ctx.config.theme.current_item_style)
-                .set_input_style(ctx.config.theme.current_item_style);
-        }
+        let count = if matches!(self.active_input, InputType::Count) {
+            count
+                .label_style(ctx.config.theme.current_item_style)
+                .input_style(ctx.config.theme.current_item_style)
+                .build()
+        } else {
+            count.label_style(ctx.config.as_text_style()).build()
+        };
 
         self.button_group.set_active_style(match self.active_input {
             InputType::Buttons => ctx.config.theme.current_item_style,
@@ -177,35 +195,23 @@ impl Modal for AddRandomModal<'_> {
         Ok(())
     }
 
+    fn handle_insert_mode(&mut self, kind: InputResultEvent, ctx: &Ctx) -> Result<()> {
+        match kind {
+            InputResultEvent::Push => {}
+            InputResultEvent::Pop => {}
+            InputResultEvent::Confirm => {
+                Self::add_random(self.selected_tag, &ctx.input.value(self.count_buffer_id), ctx)?;
+                self.destroy(ctx)?;
+            }
+            InputResultEvent::NoChange => {}
+            InputResultEvent::Cancel => {}
+        }
+        Ok(())
+    }
+
     fn handle_key(&mut self, key: &mut KeyEvent, ctx: &mut Ctx) -> Result<()> {
         let action = key.as_common_action(ctx);
         match self.active_input {
-            InputType::CountFocused => {
-                // handle typing into input field
-                if let Some(CommonAction::Close) = action {
-                    self.active_input = InputType::Count;
-                    ctx.render()?;
-                    return Ok(());
-                } else if let Some(CommonAction::Confirm) = action {
-                    Self::add_random(self.selected_tag, &self.count, ctx)?;
-                    self.hide(ctx)?;
-                    return Ok(());
-                }
-
-                match key.code() {
-                    KeyCode::Char(c) => {
-                        self.count.push(c);
-
-                        ctx.render()?;
-                    }
-                    KeyCode::Backspace => {
-                        self.count.pop();
-
-                        ctx.render()?;
-                    }
-                    _ => {}
-                }
-            }
             InputType::Tag => {
                 let Some(action) = action else {
                     return Ok(());
@@ -225,7 +231,7 @@ impl Modal for AddRandomModal<'_> {
                         ctx.render()?;
                     }
                     CommonAction::Close => {
-                        self.hide(ctx)?;
+                        self.destroy(ctx)?;
                     }
                     _ => {}
                 }
@@ -245,11 +251,11 @@ impl Modal for AddRandomModal<'_> {
                         ctx.render()?;
                     }
                     CommonAction::FocusInput | CommonAction::Confirm => {
-                        self.active_input = InputType::CountFocused;
+                        ctx.input.insert_mode(self.count_buffer_id);
                         ctx.render()?;
                     }
                     CommonAction::Close => {
-                        self.hide(ctx)?;
+                        self.destroy(ctx)?;
                     }
                     _ => {}
                 }
@@ -280,13 +286,17 @@ impl Modal for AddRandomModal<'_> {
                         ctx.render()?;
                     }
                     CommonAction::Close => {
-                        self.hide(ctx)?;
+                        self.destroy(ctx)?;
                     }
                     CommonAction::Confirm => {
                         if state.selected == 0 {
-                            Self::add_random(self.selected_tag, &self.count, ctx)?;
+                            Self::add_random(
+                                self.selected_tag,
+                                &ctx.input.value(self.count_buffer_id),
+                                ctx,
+                            )?;
                         }
-                        self.hide(ctx)?;
+                        self.destroy(ctx)?;
                     }
                     _ => {}
                 }
@@ -301,6 +311,9 @@ impl Modal for AddRandomModal<'_> {
             MouseEventKind::LeftClick
                 if self.input_areas[InputAreas::Tag].contains(event.into()) =>
             {
+                if ctx.input.is_active(self.count_buffer_id) {
+                    ctx.input.normal_mode();
+                }
                 self.active_input = InputType::Tag;
                 ctx.render()?;
             }
@@ -308,6 +321,9 @@ impl Modal for AddRandomModal<'_> {
                 if self.input_areas[InputAreas::Tag].contains(event.into()) =>
             {
                 self.active_input = InputType::Tag;
+                if ctx.input.is_active(self.count_buffer_id) {
+                    ctx.input.normal_mode();
+                }
                 self.selected_tag = self.selected_tag.next();
                 ctx.render()?;
             }
@@ -320,24 +336,31 @@ impl Modal for AddRandomModal<'_> {
             MouseEventKind::DoubleClick
                 if self.input_areas[InputAreas::Count].contains(event.into()) =>
             {
-                self.active_input = InputType::CountFocused;
+                ctx.input.insert_mode(self.count_buffer_id);
                 ctx.render()?;
             }
             MouseEventKind::LeftClick => {
                 if let Some(idx) = self.button_group.get_button_idx_at(event.into()) {
                     self.button_group_state.select(idx);
                     self.active_input = InputType::Buttons;
+                    if ctx.input.is_active(self.count_buffer_id) {
+                        ctx.input.normal_mode();
+                    }
                     ctx.render()?;
                 }
             }
             MouseEventKind::DoubleClick => {
                 match self.button_group.get_button_idx_at(event.into()) {
                     Some(0) => {
-                        Self::add_random(self.selected_tag, &self.count, ctx)?;
-                        self.hide(ctx)?;
+                        Self::add_random(
+                            self.selected_tag,
+                            &ctx.input.value(self.count_buffer_id),
+                            ctx,
+                        )?;
+                        self.destroy(ctx)?;
                     }
                     Some(_) => {
-                        self.hide(ctx)?;
+                        self.destroy(ctx)?;
                     }
                     None => {}
                 }
@@ -354,7 +377,7 @@ impl Modal for AddRandomModal<'_> {
                             self.active_input = InputType::Buttons;
                             self.button_group_state.last();
                         }
-                        InputType::Count | InputType::CountFocused => {
+                        InputType::Count => {
                             self.active_input = InputType::Tag;
                         }
                         InputType::Buttons
@@ -379,7 +402,7 @@ impl Modal for AddRandomModal<'_> {
                         InputType::Tag => {
                             self.active_input = InputType::Count;
                         }
-                        InputType::Count | InputType::CountFocused => {
+                        InputType::Count => {
                             self.active_input = InputType::Buttons;
                             self.button_group_state.first();
                         }

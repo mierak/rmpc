@@ -9,7 +9,7 @@ use crate::{
 
 #[derive(Debug, Clone)]
 pub struct KeyEvent {
-    inner: CKeyEvent,
+    pub(crate) inner: CKeyEvent,
     already_handled: bool,
 }
 
@@ -42,6 +42,7 @@ impl From<CKeyEvent> for Key {
     }
 }
 
+#[allow(unused)]
 impl KeyEvent {
     pub fn code(&self) -> KeyCode {
         self.inner.code
