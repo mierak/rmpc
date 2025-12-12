@@ -4,8 +4,11 @@ use std::{
     collections::HashSet,
     io::{BufRead, BufReader, Write},
     net::{Shutdown, TcpStream},
-    os::unix::net::{SocketAddr, UnixStream},
+    os::unix::net::UnixStream,
 };
+
+#[cfg(target_os = "linux")]
+use std::os::unix::net::SocketAddr;
 
 use anyhow::Result;
 use log::debug;
@@ -130,10 +133,10 @@ impl<'name> Client<'name> {
         let mut stream = match addr {
             MpdAddress::IpAndPort(ref addr) => TcpOrUnixStream::Tcp(TcpStream::connect(addr)?),
             MpdAddress::SocketPath(ref addr) => TcpOrUnixStream::Unix(UnixStream::connect(addr)?),
-            MpdAddress::AbstractSocket(ref addr) => {
+            MpdAddress::AbstractSocket(ref _addr) => {
                 #[cfg(target_os = "linux")]
                 {
-                    let addr = SocketAddr::from_abstract_name(addr)?;
+                    let addr = SocketAddr::from_abstract_name(_addr)?;
                     TcpOrUnixStream::Unix(UnixStream::connect_addr(&addr)?)
                 }
                 #[cfg(not(target_os = "linux"))]
@@ -212,10 +215,10 @@ impl<'name> Client<'name> {
         let mut stream = match &self.addr {
             MpdAddress::IpAndPort(addr) => TcpOrUnixStream::Tcp(TcpStream::connect(addr)?),
             MpdAddress::SocketPath(addr) => TcpOrUnixStream::Unix(UnixStream::connect(addr)?),
-            MpdAddress::AbstractSocket(addr) => {
+            MpdAddress::AbstractSocket(_addr) => {
                 #[cfg(target_os = "linux")]
                 {
-                    let addr = SocketAddr::from_abstract_name(addr)?;
+                    let addr = SocketAddr::from_abstract_name(_addr)?;
                     TcpOrUnixStream::Unix(UnixStream::connect_addr(&addr)?)
                 }
                 #[cfg(not(target_os = "linux"))]
