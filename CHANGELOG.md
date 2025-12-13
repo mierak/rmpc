@@ -34,6 +34,7 @@ configured with the new `album_art.order` option
 - Album art (sixel and iterm2) not rendering after detaching and reattaching from tmux session
 - `highlighted_item_style` having unstyled spaces between columns in the queue table
 - rmpc not correctly removing keyboard enhancement flags
+- Unfocusable panes being unable to receive mouse events when put inside a tab
 
 ## [0.10.0] - 2025-11-11
 
