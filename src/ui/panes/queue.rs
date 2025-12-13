@@ -772,7 +772,13 @@ impl Pane for QueuePane {
                     if let Some((idx, _)) = ctx.status.songid.and_then(|id| {
                         self.queue.items.iter().enumerate().find(|(_, song)| song.id == id)
                     }) {
-                        self.queue.select_idx(idx, ctx.config.scrolloff);
+                        let scrolloff =
+                            if self.queue.selected_with_idx().is_some_and(|(i, _)| i == idx) {
+                                usize::MAX
+                            } else {
+                                ctx.config.scrolloff
+                            };
+                        self.queue.select_idx(idx, scrolloff);
                         ctx.render()?;
                     } else {
                         status_info!("No song is currently playing");
