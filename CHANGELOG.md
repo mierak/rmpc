@@ -15,6 +15,7 @@ All notable changes to this project will be documented in this file.
 word, ctrl+f/b to move forward/backwards etc.
 - `clear` options to keybinds, keep the default keybinds and only override the specified keybinds
 if false
+- Triggering `JumpToCurrent` twice will now center the currently playing song
 
 ### Changed
 
