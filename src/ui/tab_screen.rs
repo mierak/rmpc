@@ -208,29 +208,31 @@ impl TabScreen {
         event: MouseEvent,
         ctx: &Ctx,
     ) -> Result<()> {
-        if matches!(event.kind, MouseEventKind::LeftClick) {
-            let Some(pane) = self
+        let pane_id = {
+            let Some((pane_id, data)) = self
                 .pane_data
                 .iter()
                 .find(|(_, PaneData { area, .. })| area.contains(event.into()))
-                .and_then(|(pane_id, _)| {
-                    self.panes.panes_iter().find(|pane| &pane.id == pane_id && pane.is_focusable())
-                })
             else {
                 return Ok(());
             };
-            self.set_focused(pane.id);
-            ctx.render()?;
-        }
 
-        let Some(focused) = self.panes.panes_iter().find(|pane| pane.id == self.focused) else {
-            log::error!(
-                "Unable to find focused pane, this should not happen. Please report this issue."
-            );
+            let id = *pane_id;
+
+            if matches!(event.kind, MouseEventKind::LeftClick) && data.focusable {
+                self.set_focused(id);
+            }
+
+            id
+        };
+
+        let Some(pane) = self.panes.panes_iter().find(|pane| pane.id == pane_id) else {
             return Ok(());
         };
-        let mut pane = panes.get_mut(&focused.pane, ctx)?;
+
+        let mut pane = panes.get_mut(&pane.pane, ctx)?;
         pane_call!(pane, handle_mouse_event(event, ctx))?;
+
         Ok(())
     }
 
