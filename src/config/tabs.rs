@@ -4,7 +4,11 @@ use std::collections::HashMap;
 use anyhow::{Result, ensure};
 use derive_more::{Deref, Display, Into};
 use itertools::Itertools;
-use ratatui::{layout::Direction, widgets::Borders};
+use ratatui::{
+    layout::Direction,
+    style::Style,
+    widgets::{Borders, block::Position},
+};
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
 use unicase::UniCase;
@@ -15,7 +19,10 @@ use super::theme::{
     queue_table::ParseSizeError,
     volume_slider::{VolumeSliderConfig, VolumeSliderConfigFile},
 };
-use crate::shared::id::{self, Id};
+use crate::{
+    config::theme::{StyleFile, properties::Alignment, style::ToConfigOr},
+    shared::id::{self, Id},
+};
 
 #[derive(Debug, Into, Deref, Display)]
 pub struct TabName(pub std::sync::Arc<String>);
@@ -290,6 +297,7 @@ pub enum PaneOrSplitFile {
     Component(String),
     Split {
         direction: DirectionFile,
+        // Maybe these should be deprecated in favor of using the SubPaneFile borders?
         #[serde(default)]
         borders: BordersFile,
         panes: Vec<SubPaneFile>,
@@ -305,21 +313,37 @@ impl Default for PaneOrSplitFile {
                 SubPaneFile {
                     size: "2".to_string(),
                     borders: BordersFile::NONE,
+                    border_title: None,
+                    border_title_style: StyleFile::default(),
+                    border_title_position: BorderTitlePosition::Top,
+                    border_title_alignment: Alignment::Left,
                     pane: PaneOrSplitFile::Pane(PaneTypeFile::Header),
                 },
                 SubPaneFile {
                     size: "3".to_string(),
                     borders: BordersFile::NONE,
+                    border_title: None,
+                    border_title_style: StyleFile::default(),
+                    border_title_position: BorderTitlePosition::Top,
+                    border_title_alignment: Alignment::Left,
                     pane: PaneOrSplitFile::Pane(PaneTypeFile::Tabs),
                 },
                 SubPaneFile {
                     size: "100%".to_string(),
                     borders: BordersFile::NONE,
+                    border_title: None,
+                    border_title_style: StyleFile::default(),
+                    border_title_position: BorderTitlePosition::Top,
+                    border_title_alignment: Alignment::Left,
                     pane: PaneOrSplitFile::Pane(PaneTypeFile::TabContent),
                 },
                 SubPaneFile {
                     size: "1".to_string(),
                     borders: BordersFile::NONE,
+                    border_title: None,
+                    border_title_style: StyleFile::default(),
+                    border_title_position: BorderTitlePosition::Top,
+                    border_title_alignment: Alignment::Left,
                     pane: PaneOrSplitFile::Pane(PaneTypeFile::ProgressBar),
                 },
             ],
@@ -346,11 +370,26 @@ impl From<BordersFile> for Borders {
     }
 }
 
+#[derive(Debug, Default, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub enum BorderTitlePosition {
+    #[default]
+    Top,
+    Bottom,
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct SubPaneFile {
     pub size: String,
     #[serde(default)]
     pub borders: BordersFile,
+    #[serde(default)]
+    pub border_title: Option<String>,
+    #[serde(default)]
+    pub border_title_style: StyleFile,
+    #[serde(default)]
+    pub border_title_position: BorderTitlePosition,
+    #[serde(default)]
+    pub border_title_alignment: Alignment,
     pub pane: PaneOrSplitFile,
 }
 
@@ -358,18 +397,38 @@ pub struct SubPaneFile {
 pub struct Pane {
     pub pane: PaneType,
     pub borders: Borders,
+    pub border_title: Option<String>,
+    pub border_title_style: Style,
+    pub border_title_position: Position,
+    pub border_title_alignment: ratatui::layout::Alignment,
     pub id: Id,
 }
 
 #[derive(Debug, Clone)]
 pub enum SizedPaneOrSplit {
     Pane(Pane),
-    Split { borders: Borders, direction: Direction, panes: Vec<SizedSubPane> },
+    Split {
+        borders: Borders,
+        border_title: Option<String>,
+        border_title_style: Style,
+        border_title_position: Position,
+        border_title_alignment: ratatui::layout::Alignment,
+        direction: Direction,
+        panes: Vec<SizedSubPane>,
+    },
 }
 
 impl Default for SizedPaneOrSplit {
     fn default() -> Self {
-        Self::Split { direction: Direction::Horizontal, panes: Vec::new(), borders: Borders::NONE }
+        Self::Split {
+            direction: Direction::Horizontal,
+            panes: Vec::new(),
+            borders: Borders::NONE,
+            border_title: None,
+            border_title_style: Style::default(),
+            border_title_position: Position::Top,
+            border_title_alignment: ratatui::layout::Alignment::Left,
+        }
     }
 }
 
@@ -393,38 +452,75 @@ impl PaneOrSplitFile {
     pub fn convert_recursive(
         &self,
         b: Borders,
+        b_title: Option<String>,
+        b_style: Style,
+        b_pos: Position,
+        b_alignment: ratatui::layout::Alignment,
         library: &HashMap<String, SizedPaneOrSplit>,
     ) -> Result<SizedPaneOrSplit, PaneConversionError> {
         Ok(match self {
             PaneOrSplitFile::Pane(pane_type_file) => SizedPaneOrSplit::Pane(Pane {
                 pane: pane_type_file.clone().try_into()?,
                 borders: b,
+                border_title: b_title,
+                border_title_style: b_style,
+                border_title_position: b_pos,
+                border_title_alignment: b_alignment,
                 id: id::new(),
             }),
             PaneOrSplitFile::Component(name) => match library.get(name) {
                 Some(SizedPaneOrSplit::Pane(pane)) => {
                     let mut v = pane.clone();
                     v.borders = b;
+                    v.border_title.clone_from(&b_title);
                     SizedPaneOrSplit::Pane(v)
                 }
-                Some(SizedPaneOrSplit::Split { borders, direction, panes }) => {
-                    SizedPaneOrSplit::Split {
-                        borders: *borders | b,
-                        direction: *direction,
-                        panes: panes.clone(),
-                    }
-                }
+                Some(SizedPaneOrSplit::Split {
+                    borders,
+                    direction,
+                    panes,
+                    border_title,
+                    border_title_style,
+                    border_title_position,
+                    border_title_alignment,
+                }) => SizedPaneOrSplit::Split {
+                    borders: *borders | b,
+                    border_title: border_title.clone(),
+                    border_title_style: *border_title_style,
+                    border_title_position: *border_title_position,
+                    border_title_alignment: *border_title_alignment,
+                    direction: *direction,
+                    panes: panes.clone(),
+                },
                 None => return Err(PaneConversionError::MissingComponent(name.clone())),
             },
             PaneOrSplitFile::Split { direction, borders, panes } => SizedPaneOrSplit::Split {
                 direction: direction.into(),
                 borders: Into::<Borders>::into(*borders) | b,
+                border_title: b_title,
+                border_title_style: b_style,
+                border_title_position: b_pos,
+                border_title_alignment: b_alignment,
                 panes: panes
                     .iter()
                     .map(|sub_pane| -> Result<SizedSubPane, PaneConversionError> {
-                        let borders: Borders = sub_pane.borders.into();
                         let size: PercentOrLength = sub_pane.size.parse()?;
-                        let pane = sub_pane.pane.convert_recursive(borders, library)?;
+                        let borders: Borders = sub_pane.borders.into();
+                        let b_title = sub_pane.border_title.clone();
+                        let b_style = sub_pane.border_title_style.to_config_or(None, None)?;
+                        let b_pos = match sub_pane.border_title_position {
+                            BorderTitlePosition::Top => Position::Top,
+                            BorderTitlePosition::Bottom => Position::Bottom,
+                        };
+                        let b_alignment = sub_pane.border_title_alignment.into();
+                        let pane = sub_pane.pane.convert_recursive(
+                            borders,
+                            b_title,
+                            b_style,
+                            b_pos,
+                            b_alignment,
+                            library,
+                        )?;
 
                         Ok(SizedSubPane { size, pane })
                     })
@@ -437,7 +533,14 @@ impl PaneOrSplitFile {
         &self,
         library: &HashMap<String, SizedPaneOrSplit>,
     ) -> Result<SizedPaneOrSplit, PaneConversionError> {
-        self.convert_recursive(Borders::NONE, library)
+        self.convert_recursive(
+            Borders::NONE,
+            None,
+            Style::default(),
+            Position::default(),
+            ratatui::layout::Alignment::default(),
+            library,
+        )
     }
 }
 
@@ -486,6 +589,10 @@ impl Default for TabsFile {
                         SubPaneFile {
                             size: "40%".to_string(),
                             borders: BordersFile::NONE,
+                            border_title: None,
+                            border_title_style: StyleFile::default(),
+                            border_title_position: BorderTitlePosition::Top,
+                            border_title_alignment: Alignment::Left,
                             pane: PaneOrSplitFile::Split {
                                 direction: DirectionFile::Vertical,
                                 borders: BordersFile::NONE,
@@ -493,12 +600,20 @@ impl Default for TabsFile {
                                     SubPaneFile {
                                         pane: PaneOrSplitFile::Pane(PaneTypeFile::Lyrics),
                                         size: "3".to_string(),
+                                        border_title: None,
+                                        border_title_style: StyleFile::default(),
+                                        border_title_position: BorderTitlePosition::Top,
+                                        border_title_alignment: Alignment::Left,
                                         borders: BordersFile::NONE,
                                     },
                                     SubPaneFile {
                                         pane: PaneOrSplitFile::Pane(PaneTypeFile::AlbumArt),
                                         size: "100%".to_string(),
                                         borders: BordersFile::NONE,
+                                        border_title_style: StyleFile::default(),
+                                        border_title_position: BorderTitlePosition::Top,
+                                        border_title_alignment: Alignment::Left,
+                                        border_title: None,
                                     },
                                 ],
                             },
@@ -507,6 +622,10 @@ impl Default for TabsFile {
                             pane: PaneOrSplitFile::Pane(PaneTypeFile::Queue),
                             size: "60%".to_string(),
                             borders: BordersFile::NONE,
+                            border_title: None,
+                            border_title_style: StyleFile::default(),
+                            border_title_position: BorderTitlePosition::Top,
+                            border_title_alignment: Alignment::Left,
                         },
                     ],
                 },

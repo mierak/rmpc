@@ -5,7 +5,7 @@ use ratatui::style::Color as RColor;
 use serde::{Deserialize, Serialize};
 use serde_with::skip_serializing_none;
 
-pub(super) trait ToConfigOr {
+pub trait ToConfigOr {
     fn to_config_or(
         &self,
         default_fg: Option<RColor>,

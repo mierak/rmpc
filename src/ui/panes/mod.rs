@@ -1163,19 +1163,41 @@ impl SizedPaneOrSplit {
         while let Some((configured_panes, area)) = stack.pop() {
             match configured_panes {
                 SizedPaneOrSplit::Pane(pane) => {
-                    let block = Block::default().borders(pane.borders);
+                    let mut block = Block::default().borders(pane.borders);
+                    if let Some(title) = &pane.border_title {
+                        block = block
+                            .title(title.as_str())
+                            .title_style(pane.border_title_style)
+                            .title_position(pane.border_title_position)
+                            .title_alignment(pane.border_title_alignment);
+                    }
                     let pane_area = block.inner(area);
 
                     pane_callback(pane, pane_area, block, area, &mut custom_data)?;
                 }
-                SizedPaneOrSplit::Split { direction, panes, borders } => {
+                SizedPaneOrSplit::Split {
+                    direction,
+                    panes,
+                    borders,
+                    border_title,
+                    border_title_style,
+                    border_title_position,
+                    border_title_alignment,
+                } => {
                     let parent_other_size = match direction {
                         ratatui::layout::Direction::Horizontal => area.height,
                         ratatui::layout::Direction::Vertical => area.width,
                     };
                     let constraints =
                         panes.iter().map(|pane| pane.size.into_constraint(parent_other_size));
-                    let block = Block::default().borders(*borders);
+                    let mut block = Block::default().borders(*borders);
+                    if let Some(title) = border_title {
+                        block = block
+                            .title(title.as_str())
+                            .title_style(*border_title_style)
+                            .title_position(*border_title_position)
+                            .title_alignment(*border_title_alignment);
+                    }
                     let pane_areas = block.inner(area);
                     let areas = Layout::new(*direction, constraints).split(pane_areas);
 
