@@ -203,6 +203,16 @@ impl TryFrom<KeyConfigFile> for KeyConfig {
                 value.logs.into_iter().map(|(k, v)| (k, v.into())).collect();
 
             let mut result = KeyConfig::default();
+            let all_key_overrides = global.keys().chain(navigation.keys()).chain(queue.keys());
+            #[cfg(debug_assertions)]
+            let all_key_overrides = all_key_overrides.chain(logs.keys());
+            for key in all_key_overrides {
+                result.global.remove(key);
+                result.navigation.remove(key);
+                result.queue.remove(key);
+                #[cfg(debug_assertions)]
+                result.logs.remove(key);
+            }
 
             for (k, v) in global {
                 result.global.insert(k, v);
@@ -290,12 +300,15 @@ mod tests {
     fn converts_without_clearing() {
         let input = KeyConfigFile {
             clear: false,
-            global: HashMap::from([(Key { key: KeyCode::Char('a'), modifiers: KeyModifiers::CONTROL, }, GlobalActionFile::Quit)]),
+            global: HashMap::from([
+                (Key { key: KeyCode::Char('a'), modifiers: KeyModifiers::CONTROL, }, GlobalActionFile::Quit),
+                (Key { key: KeyCode::Char(' '), modifiers: KeyModifiers::NONE }, GlobalActionFile::TogglePause),
+            ]),
             queue: HashMap::from([(Key { key: KeyCode::Char('a'), modifiers: KeyModifiers::CONTROL, }, QueueActionsFile::Play),
                                   (Key { key: KeyCode::Char('b'), modifiers: KeyModifiers::SHIFT, }, QueueActionsFile::Save)]),
             navigation: HashMap::from([
                 (Key { key: KeyCode::Char('a'), modifiers: KeyModifiers::CONTROL, }, CommonActionFile::Up),
-                (Key { key: KeyCode::Char('b'), modifiers: KeyModifiers::SHIFT }, CommonActionFile::Up)
+                (Key { key: KeyCode::Char('b'), modifiers: KeyModifiers::SHIFT }, CommonActionFile::Up),
             ]),
             #[cfg(debug_assertions)]
             logs: HashMap::from([(Key { key: KeyCode::Char('a'), modifiers: KeyModifiers::CONTROL, }, LogsActionsFile::Clear)]),
@@ -309,6 +322,10 @@ mod tests {
         default.navigation.insert(Key { key: KeyCode::Char('b'), modifiers: KeyModifiers::SHIFT }, CommonAction::Up);
         #[cfg(debug_assertions)]
         default.logs.insert(Key { key: KeyCode::Char('a'), modifiers: KeyModifiers::CONTROL, }, LogsActions::Clear);
+
+        // <Space> is mapped in global keys, it has to remove the default `Select` mapping from navigation keys
+        default.global.insert(Key { key: KeyCode::Char(' '), modifiers: KeyModifiers::NONE, }, GlobalAction::TogglePause);
+        default.navigation.remove(&Key { key: KeyCode::Char(' '), modifiers: KeyModifiers::NONE, });
 
         let result: KeyConfig = input.try_into().unwrap();
 
