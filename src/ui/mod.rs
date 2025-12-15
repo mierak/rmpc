@@ -127,28 +127,36 @@ impl<'ui> Ui<'ui> {
     }
 
     pub fn change_tab(&mut self, new_tab: TabName, ctx: &mut Ctx) -> Result<()> {
-        self.layout.for_each_pane(self.area, &mut |pane, _, _, _| {
-            match self.panes.get_mut(&pane.pane, ctx)? {
-                Panes::TabContent => {
-                    active_tab_call!(self, ctx, on_hide(ctx))?;
+        self.layout.for_each_pane(
+            self.area,
+            &mut |pane, _, _, _| {
+                match self.panes.get_mut(&pane.pane, ctx)? {
+                    Panes::TabContent => {
+                        active_tab_call!(self, ctx, on_hide(ctx))?;
+                    }
+                    _ => {}
                 }
-                _ => {}
-            }
-            Ok(())
-        })?;
+                Ok(())
+            },
+            ctx,
+        )?;
 
         ctx.active_tab = new_tab.clone();
         self.on_event(UiEvent::TabChanged(new_tab), ctx)?;
 
-        self.layout.for_each_pane(self.area, &mut |pane, pane_area, _, _| {
-            match self.panes.get_mut(&pane.pane, ctx)? {
-                Panes::TabContent => {
-                    active_tab_call!(self, ctx, before_show(pane_area, ctx))?;
+        self.layout.for_each_pane(
+            self.area,
+            &mut |pane, pane_area, _, _| {
+                match self.panes.get_mut(&pane.pane, ctx)? {
+                    Panes::TabContent => {
+                        active_tab_call!(self, ctx, before_show(pane_area, ctx))?;
+                    }
+                    _ => {}
                 }
-                _ => {}
-            }
-            Ok(())
-        })
+                Ok(())
+            },
+            ctx,
+        )
     }
 
     pub fn render(&mut self, frame: &mut Frame, ctx: &mut Ctx) -> Result<()> {
@@ -177,6 +185,7 @@ impl<'ui> Ui<'ui> {
                 frame.render_widget(block.border_style(ctx.config.as_border_style()), block_area);
                 Ok(())
             },
+            ctx,
         )?;
 
         if ctx.config.theme.modal_backdrop && !self.modals.is_empty() {
@@ -197,17 +206,21 @@ impl<'ui> Ui<'ui> {
             return Ok(());
         }
 
-        self.layout.for_each_pane(self.area, &mut |pane, _, _, _| {
-            match self.panes.get_mut(&pane.pane, ctx)? {
-                Panes::TabContent => {
-                    active_tab_call!(self, ctx, handle_mouse_event(event, ctx))?;
+        self.layout.for_each_pane(
+            self.area,
+            &mut |pane, _, _, _| {
+                match self.panes.get_mut(&pane.pane, ctx)? {
+                    Panes::TabContent => {
+                        active_tab_call!(self, ctx, handle_mouse_event(event, ctx))?;
+                    }
+                    mut pane_instance => {
+                        pane_call!(pane_instance, handle_mouse_event(event, ctx))?;
+                    }
                 }
-                mut pane_instance => {
-                    pane_call!(pane_instance, handle_mouse_event(event, ctx))?;
-                }
-            }
-            Ok(())
-        })
+                Ok(())
+            },
+            ctx,
+        )
     }
 
     pub fn handle_key(&mut self, key: &mut KeyEvent, ctx: &mut Ctx) -> Result<KeyHandleResult> {
@@ -694,18 +707,22 @@ impl<'ui> Ui<'ui> {
     pub fn before_show(&mut self, area: Rect, ctx: &mut Ctx) -> Result<()> {
         self.calc_areas(area, ctx);
 
-        self.layout.for_each_pane(self.area, &mut |pane, pane_area, _, _| {
-            match self.panes.get_mut(&pane.pane, ctx)? {
-                Panes::TabContent => {
-                    active_tab_call!(self, ctx, before_show(pane_area, ctx))?;
+        self.layout.for_each_pane(
+            self.area,
+            &mut |pane, pane_area, _, _| {
+                match self.panes.get_mut(&pane.pane, ctx)? {
+                    Panes::TabContent => {
+                        active_tab_call!(self, ctx, before_show(pane_area, ctx))?;
+                    }
+                    mut pane_instance => {
+                        pane_call!(pane_instance, calculate_areas(pane_area, ctx))?;
+                        pane_call!(pane_instance, before_show(ctx))?;
+                    }
                 }
-                mut pane_instance => {
-                    pane_call!(pane_instance, calculate_areas(pane_area, ctx))?;
-                    pane_call!(pane_instance, before_show(ctx))?;
-                }
-            }
-            Ok(())
-        })
+                Ok(())
+            },
+            ctx,
+        )
     }
 
     pub fn on_ui_app_event(&mut self, event: UiAppEvent, ctx: &mut Ctx) -> Result<()> {
@@ -761,18 +778,22 @@ impl<'ui> Ui<'ui> {
         log::trace!(area:?; "Terminal was resized");
         self.calc_areas(area, ctx);
 
-        self.layout.for_each_pane(self.area, &mut |pane, pane_area, _, _| {
-            match self.panes.get_mut(&pane.pane, ctx)? {
-                Panes::TabContent => {
-                    active_tab_call!(self, ctx, resize(pane_area, ctx))?;
+        self.layout.for_each_pane(
+            self.area,
+            &mut |pane, pane_area, _, _| {
+                match self.panes.get_mut(&pane.pane, ctx)? {
+                    Panes::TabContent => {
+                        active_tab_call!(self, ctx, resize(pane_area, ctx))?;
+                    }
+                    mut pane_instance => {
+                        pane_call!(pane_instance, calculate_areas(pane_area, ctx))?;
+                        pane_call!(pane_instance, resize(pane_area, ctx))?;
+                    }
                 }
-                mut pane_instance => {
-                    pane_call!(pane_instance, calculate_areas(pane_area, ctx))?;
-                    pane_call!(pane_instance, resize(pane_area, ctx))?;
-                }
-            }
-            Ok(())
-        })
+                Ok(())
+            },
+            ctx,
+        )
     }
 
     pub fn on_event(&mut self, mut event: UiEvent, ctx: &mut Ctx) -> Result<()> {
@@ -786,17 +807,21 @@ impl<'ui> Ui<'ui> {
             UiEvent::ConfigChanged => {
                 // Call on_hide for all panes in the current tab and current layout because they
                 // might not be visible after the change
-                self.layout.for_each_pane(self.area, &mut |pane, _, _, _| {
-                    match self.panes.get_mut(&pane.pane, ctx)? {
-                        Panes::TabContent => {
-                            active_tab_call!(self, ctx, on_hide(ctx))?;
+                self.layout.for_each_pane(
+                    self.area,
+                    &mut |pane, _, _, _| {
+                        match self.panes.get_mut(&pane.pane, ctx)? {
+                            Panes::TabContent => {
+                                active_tab_call!(self, ctx, on_hide(ctx))?;
+                            }
+                            mut pane_instance => {
+                                pane_call!(pane_instance, on_hide(ctx))?;
+                            }
                         }
-                        mut pane_instance => {
-                            pane_call!(pane_instance, on_hide(ctx))?;
-                        }
-                    }
-                    Ok(())
-                })?;
+                        Ok(())
+                    },
+                    ctx,
+                )?;
 
                 self.layout = ctx.config.theme.layout.clone();
                 let new_active_tab = ctx

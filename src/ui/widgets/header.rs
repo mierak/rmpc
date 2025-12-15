@@ -55,9 +55,18 @@ impl Widget for Header<'_> {
     }
 }
 
-struct PropertyTemplates<'a>(&'a [Property<PropertyKind>]);
+pub struct PropertyTemplates<'a>(&'a [Property<PropertyKind>]);
 impl<'a> PropertyTemplates<'a> {
-    fn format(&'a self, song: Option<&'a Song>, ctx: &'a Ctx, config: &Config) -> Line<'a> {
+    pub fn new(templates: &'a [Property<PropertyKind>]) -> Self {
+        Self(templates)
+    }
+
+    pub fn format<'song: 'a>(
+        &'a self,
+        song: Option<&'song Song>,
+        ctx: &'song Ctx,
+        config: &Config,
+    ) -> Line<'a> {
         Line::from(self.0.iter().fold(Vec::new(), |mut acc, val| {
             match val.as_span(
                 song,

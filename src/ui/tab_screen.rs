@@ -93,6 +93,7 @@ impl TabScreen {
                 frame.render_widget(block.border_style(ctx.config.as_border_style()), block_area);
                 Ok(())
             },
+            ctx,
         )?;
         Ok(())
     }
@@ -250,16 +251,22 @@ impl TabScreen {
         area: Rect,
         ctx: &Ctx,
     ) -> Result<()> {
-        self.panes.for_each_pane(area, &mut |pane, pane_area, _, block_area| {
-            let pane_data =
-                self.pane_data.entry(pane.id).or_insert_with(|| PaneData::new(pane.is_focusable()));
-            pane_data.area = pane_area;
-            pane_data.block_area = block_area;
-            let mut pane_instance = pane_container.get_mut(&pane.pane, ctx)?;
-            pane_call!(pane_instance, calculate_areas(pane_area, ctx))?;
-            pane_call!(pane_instance, before_show(ctx))?;
-            Ok(())
-        })?;
+        self.panes.for_each_pane(
+            area,
+            &mut |pane, pane_area, _, block_area| {
+                let pane_data = self
+                    .pane_data
+                    .entry(pane.id)
+                    .or_insert_with(|| PaneData::new(pane.is_focusable()));
+                pane_data.area = pane_area;
+                pane_data.block_area = block_area;
+                let mut pane_instance = pane_container.get_mut(&pane.pane, ctx)?;
+                pane_call!(pane_instance, calculate_areas(pane_area, ctx))?;
+                pane_call!(pane_instance, before_show(ctx))?;
+                Ok(())
+            },
+            ctx,
+        )?;
         if !self.initialized {
             let pane_to_focus = self
                 .pane_data
@@ -286,16 +293,22 @@ impl TabScreen {
         area: Rect,
         ctx: &Ctx,
     ) -> Result<()> {
-        self.panes.for_each_pane(area, &mut |pane, pane_area, _, block_area| {
-            let pane_data =
-                self.pane_data.entry(pane.id).or_insert_with(|| PaneData::new(pane.is_focusable()));
-            pane_data.area = area;
-            pane_data.block_area = block_area;
-            let mut pane_instance = pane_container.get_mut(&pane.pane, ctx)?;
-            pane_call!(pane_instance, calculate_areas(pane_area, ctx))?;
-            pane_call!(pane_instance, resize(pane_area, ctx))?;
-            Ok(())
-        })
+        self.panes.for_each_pane(
+            area,
+            &mut |pane, pane_area, _, block_area| {
+                let pane_data = self
+                    .pane_data
+                    .entry(pane.id)
+                    .or_insert_with(|| PaneData::new(pane.is_focusable()));
+                pane_data.area = area;
+                pane_data.block_area = block_area;
+                let mut pane_instance = pane_container.get_mut(&pane.pane, ctx)?;
+                pane_call!(pane_instance, calculate_areas(pane_area, ctx))?;
+                pane_call!(pane_instance, resize(pane_area, ctx))?;
+                Ok(())
+            },
+            ctx,
+        )
     }
 
     fn panes_directly_above(&self, focused_area: Rect) -> impl Iterator<Item = (&Id, &PaneData)> {

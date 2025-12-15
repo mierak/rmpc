@@ -6,7 +6,6 @@ use derive_more::{Deref, Display, Into};
 use itertools::Itertools;
 use ratatui::{
     layout::Direction,
-    style::Style,
     widgets::{Borders, block::Position},
 };
 use serde::{Deserialize, Serialize};
@@ -20,7 +19,7 @@ use super::theme::{
     volume_slider::{VolumeSliderConfig, VolumeSliderConfigFile},
 };
 use crate::{
-    config::theme::{StyleFile, properties::Alignment, style::ToConfigOr},
+    config::theme::properties::Alignment,
     shared::id::{self, Id},
 };
 
@@ -313,8 +312,7 @@ impl Default for PaneOrSplitFile {
                 SubPaneFile {
                     size: "2".to_string(),
                     borders: BordersFile::NONE,
-                    border_title: None,
-                    border_title_style: StyleFile::default(),
+                    border_title: Vec::new(),
                     border_title_position: BorderTitlePosition::Top,
                     border_title_alignment: Alignment::Left,
                     pane: PaneOrSplitFile::Pane(PaneTypeFile::Header),
@@ -322,8 +320,7 @@ impl Default for PaneOrSplitFile {
                 SubPaneFile {
                     size: "3".to_string(),
                     borders: BordersFile::NONE,
-                    border_title: None,
-                    border_title_style: StyleFile::default(),
+                    border_title: Vec::new(),
                     border_title_position: BorderTitlePosition::Top,
                     border_title_alignment: Alignment::Left,
                     pane: PaneOrSplitFile::Pane(PaneTypeFile::Tabs),
@@ -331,8 +328,7 @@ impl Default for PaneOrSplitFile {
                 SubPaneFile {
                     size: "100%".to_string(),
                     borders: BordersFile::NONE,
-                    border_title: None,
-                    border_title_style: StyleFile::default(),
+                    border_title: Vec::new(),
                     border_title_position: BorderTitlePosition::Top,
                     border_title_alignment: Alignment::Left,
                     pane: PaneOrSplitFile::Pane(PaneTypeFile::TabContent),
@@ -340,8 +336,7 @@ impl Default for PaneOrSplitFile {
                 SubPaneFile {
                     size: "1".to_string(),
                     borders: BordersFile::NONE,
-                    border_title: None,
-                    border_title_style: StyleFile::default(),
+                    border_title: Vec::new(),
                     border_title_position: BorderTitlePosition::Top,
                     border_title_alignment: Alignment::Left,
                     pane: PaneOrSplitFile::Pane(PaneTypeFile::ProgressBar),
@@ -383,9 +378,7 @@ pub struct SubPaneFile {
     #[serde(default)]
     pub borders: BordersFile,
     #[serde(default)]
-    pub border_title: Option<String>,
-    #[serde(default)]
-    pub border_title_style: StyleFile,
+    pub border_title: Vec<PropertyFile<PropertyKindFile>>,
     #[serde(default)]
     pub border_title_position: BorderTitlePosition,
     #[serde(default)]
@@ -397,8 +390,7 @@ pub struct SubPaneFile {
 pub struct Pane {
     pub pane: PaneType,
     pub borders: Borders,
-    pub border_title: Option<String>,
-    pub border_title_style: Style,
+    pub border_title: Vec<Property<PropertyKind>>,
     pub border_title_position: Position,
     pub border_title_alignment: ratatui::layout::Alignment,
     pub id: Id,
@@ -409,8 +401,7 @@ pub enum SizedPaneOrSplit {
     Pane(Pane),
     Split {
         borders: Borders,
-        border_title: Option<String>,
-        border_title_style: Style,
+        border_title: Vec<Property<PropertyKind>>,
         border_title_position: Position,
         border_title_alignment: ratatui::layout::Alignment,
         direction: Direction,
@@ -424,8 +415,7 @@ impl Default for SizedPaneOrSplit {
             direction: Direction::Horizontal,
             panes: Vec::new(),
             borders: Borders::NONE,
-            border_title: None,
-            border_title_style: Style::default(),
+            border_title: Vec::new(),
             border_title_position: Position::Top,
             border_title_alignment: ratatui::layout::Alignment::Left,
         }
@@ -452,8 +442,7 @@ impl PaneOrSplitFile {
     pub fn convert_recursive(
         &self,
         b: Borders,
-        b_title: Option<String>,
-        b_style: Style,
+        b_title: Vec<Property<PropertyKind>>,
         b_pos: Position,
         b_alignment: ratatui::layout::Alignment,
         library: &HashMap<String, SizedPaneOrSplit>,
@@ -463,7 +452,6 @@ impl PaneOrSplitFile {
                 pane: pane_type_file.clone().try_into()?,
                 borders: b,
                 border_title: b_title,
-                border_title_style: b_style,
                 border_title_position: b_pos,
                 border_title_alignment: b_alignment,
                 id: id::new(),
@@ -480,13 +468,11 @@ impl PaneOrSplitFile {
                     direction,
                     panes,
                     border_title,
-                    border_title_style,
                     border_title_position,
                     border_title_alignment,
                 }) => SizedPaneOrSplit::Split {
                     borders: *borders | b,
                     border_title: border_title.clone(),
-                    border_title_style: *border_title_style,
                     border_title_position: *border_title_position,
                     border_title_alignment: *border_title_alignment,
                     direction: *direction,
@@ -498,7 +484,6 @@ impl PaneOrSplitFile {
                 direction: direction.into(),
                 borders: Into::<Borders>::into(*borders) | b,
                 border_title: b_title,
-                border_title_style: b_style,
                 border_title_position: b_pos,
                 border_title_alignment: b_alignment,
                 panes: panes
@@ -506,8 +491,13 @@ impl PaneOrSplitFile {
                     .map(|sub_pane| -> Result<SizedSubPane, PaneConversionError> {
                         let size: PercentOrLength = sub_pane.size.parse()?;
                         let borders: Borders = sub_pane.borders.into();
-                        let b_title = sub_pane.border_title.clone();
-                        let b_style = sub_pane.border_title_style.to_config_or(None, None)?;
+                        let b_title = sub_pane
+                            .border_title
+                            .iter()
+                            .cloned()
+                            .map(Property::try_from)
+                            .try_collect()?;
+
                         let b_pos = match sub_pane.border_title_position {
                             BorderTitlePosition::Top => Position::Top,
                             BorderTitlePosition::Bottom => Position::Bottom,
@@ -516,7 +506,6 @@ impl PaneOrSplitFile {
                         let pane = sub_pane.pane.convert_recursive(
                             borders,
                             b_title,
-                            b_style,
                             b_pos,
                             b_alignment,
                             library,
@@ -535,8 +524,7 @@ impl PaneOrSplitFile {
     ) -> Result<SizedPaneOrSplit, PaneConversionError> {
         self.convert_recursive(
             Borders::NONE,
-            None,
-            Style::default(),
+            Vec::new(),
             Position::default(),
             ratatui::layout::Alignment::default(),
             library,
@@ -589,8 +577,7 @@ impl Default for TabsFile {
                         SubPaneFile {
                             size: "40%".to_string(),
                             borders: BordersFile::NONE,
-                            border_title: None,
-                            border_title_style: StyleFile::default(),
+                            border_title: Vec::new(),
                             border_title_position: BorderTitlePosition::Top,
                             border_title_alignment: Alignment::Left,
                             pane: PaneOrSplitFile::Split {
@@ -600,8 +587,7 @@ impl Default for TabsFile {
                                     SubPaneFile {
                                         pane: PaneOrSplitFile::Pane(PaneTypeFile::Lyrics),
                                         size: "3".to_string(),
-                                        border_title: None,
-                                        border_title_style: StyleFile::default(),
+                                        border_title: Vec::new(),
                                         border_title_position: BorderTitlePosition::Top,
                                         border_title_alignment: Alignment::Left,
                                         borders: BordersFile::NONE,
@@ -610,10 +596,9 @@ impl Default for TabsFile {
                                         pane: PaneOrSplitFile::Pane(PaneTypeFile::AlbumArt),
                                         size: "100%".to_string(),
                                         borders: BordersFile::NONE,
-                                        border_title_style: StyleFile::default(),
                                         border_title_position: BorderTitlePosition::Top,
                                         border_title_alignment: Alignment::Left,
-                                        border_title: None,
+                                        border_title: Vec::new(),
                                     },
                                 ],
                             },
@@ -622,8 +607,7 @@ impl Default for TabsFile {
                             pane: PaneOrSplitFile::Pane(PaneTypeFile::Queue),
                             size: "60%".to_string(),
                             borders: BordersFile::NONE,
-                            border_title: None,
-                            border_title_style: StyleFile::default(),
+                            border_title: Vec::new(),
                             border_title_position: BorderTitlePosition::Top,
                             border_title_alignment: Alignment::Left,
                         },

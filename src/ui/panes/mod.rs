@@ -64,7 +64,7 @@ use crate::{
         key_event::KeyEvent,
         mouse_event::MouseEvent,
     },
-    ui::input::InputResultEvent,
+    ui::{input::InputResultEvent, widgets::header::PropertyTemplates},
 };
 
 pub mod album_art;
@@ -848,7 +848,7 @@ impl Property<SongProperty> {
 }
 
 impl Property<PropertyKind> {
-    fn default_as_span<'song: 's, 'stickers: 'song, 's>(
+    fn default_as_span<'song: 's, 's>(
         &'s self,
         song: Option<&'song Song>,
         ctx: &'song Ctx,
@@ -858,7 +858,7 @@ impl Property<PropertyKind> {
         self.default.as_ref().and_then(|p| p.as_span(song, ctx, tag_separator, strategy))
     }
 
-    pub fn as_span<'song: 's, 'stickers: 'song, 's>(
+    pub fn as_span<'song: 's, 's>(
         &'s self,
         song: Option<&'song Song>,
         ctx: &'song Ctx,
@@ -1139,6 +1139,7 @@ impl SizedPaneOrSplit {
         &self,
         area: Rect,
         pane_callback: &mut impl FnMut(&ConfigPane, Rect, Block, Rect) -> Result<()>,
+        ctx: &Ctx,
     ) -> Result<()> {
         self.for_each_pane_custom_data(
             area,
@@ -1148,6 +1149,7 @@ impl SizedPaneOrSplit {
                 Ok(())
             },
             &mut |_, _, ()| Ok(()),
+            ctx,
         )
     }
 
@@ -1157,30 +1159,36 @@ impl SizedPaneOrSplit {
         mut custom_data: T,
         pane_callback: &mut impl FnMut(&ConfigPane, Rect, Block, Rect, &mut T) -> Result<()>,
         split_callback: &mut impl FnMut(Block, Rect, &mut T) -> Result<()>,
+        ctx: &Ctx,
     ) -> Result<()> {
         let mut stack = vec![(self, area)];
 
+        let song = ctx.find_current_song_in_queue().map(|(_, song)| song);
         while let Some((configured_panes, area)) = stack.pop() {
             match configured_panes {
                 SizedPaneOrSplit::Pane(pane) => {
                     let mut block = Block::default().borders(pane.borders);
-                    if let Some(title) = &pane.border_title {
+                    if pane.border_title.is_empty() {
+                        let pane_area = block.inner(area);
+                        pane_callback(pane, pane_area, block, area, &mut custom_data)?;
+                    } else {
+                        let templs = PropertyTemplates::new(&pane.border_title);
+                        let title = templs.format(song, ctx, &ctx.config);
+
                         block = block
-                            .title(title.as_str())
-                            .title_style(pane.border_title_style)
+                            .title(title)
                             .title_position(pane.border_title_position)
                             .title_alignment(pane.border_title_alignment);
-                    }
-                    let pane_area = block.inner(area);
 
-                    pane_callback(pane, pane_area, block, area, &mut custom_data)?;
+                        let pane_area = block.inner(area);
+                        pane_callback(pane, pane_area, block, area, &mut custom_data)?;
+                    }
                 }
                 SizedPaneOrSplit::Split {
                     direction,
                     panes,
                     borders,
                     border_title,
-                    border_title_style,
                     border_title_position,
                     border_title_alignment,
                 } => {
@@ -1191,21 +1199,28 @@ impl SizedPaneOrSplit {
                     let constraints =
                         panes.iter().map(|pane| pane.size.into_constraint(parent_other_size));
                     let mut block = Block::default().borders(*borders);
-                    if let Some(title) = border_title {
+                    if border_title.is_empty() {
+                        let pane_areas = block.inner(area);
+                        let areas = Layout::new(*direction, constraints).split(pane_areas);
+                        split_callback(block, area, &mut custom_data)?;
+                        stack.extend(
+                            areas.iter().enumerate().map(|(idx, area)| (&panes[idx].pane, *area)),
+                        );
+                    } else {
+                        let templs = PropertyTemplates::new(border_title);
+                        let title = templs.format(song, ctx, &ctx.config);
                         block = block
-                            .title(title.as_str())
-                            .title_style(*border_title_style)
+                            .title(title)
                             .title_position(*border_title_position)
                             .title_alignment(*border_title_alignment);
+
+                        let pane_areas = block.inner(area);
+                        let areas = Layout::new(*direction, constraints).split(pane_areas);
+                        split_callback(block, area, &mut custom_data)?;
+                        stack.extend(
+                            areas.iter().enumerate().map(|(idx, area)| (&panes[idx].pane, *area)),
+                        );
                     }
-                    let pane_areas = block.inner(area);
-                    let areas = Layout::new(*direction, constraints).split(pane_areas);
-
-                    split_callback(block, area, &mut custom_data)?;
-
-                    stack.extend(
-                        areas.iter().enumerate().map(|(idx, area)| (&panes[idx].pane, *area)),
-                    );
                 }
             }
         }
