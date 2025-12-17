@@ -10,7 +10,7 @@ use super::Pane;
 use crate::{
     config::theme::properties::{Property, PropertyKind},
     ctx::Ctx,
-    shared::key_event::KeyEvent,
+    shared::keys::ActionEvent,
     ui::widgets::scrolling_line::ScrollingLine,
 };
 
@@ -61,7 +61,7 @@ impl Pane for PropertyPane<'_> {
         Ok(())
     }
 
-    fn handle_action(&mut self, _event: &mut KeyEvent, _ctx: &mut Ctx) -> Result<()> {
+    fn handle_action(&mut self, _event: &mut ActionEvent, _ctx: &mut Ctx) -> Result<()> {
         Ok(())
     }
 }

@@ -38,7 +38,6 @@ use super::{
 use crate::{
     MpdQueryResult,
     config::{
-        keys::CommonAction,
         tabs::{Pane as ConfigPane, PaneType, SizedPaneOrSplit},
         theme::{
             SymbolsConfig,
@@ -61,7 +60,7 @@ use crate::{
     },
     shared::{
         ext::{duration::DurationExt, num::NumExt, span::SpanExt},
-        key_event::KeyEvent,
+        keys::ActionEvent,
         mouse_event::MouseEvent,
     },
     ui::{input::InputResultEvent, widgets::header::PropertyTemplates},
@@ -279,7 +278,7 @@ pub(crate) trait Pane {
         Ok(())
     }
 
-    fn handle_action(&mut self, event: &mut KeyEvent, ctx: &mut Ctx) -> Result<()>;
+    fn handle_action(&mut self, event: &mut ActionEvent, ctx: &mut Ctx) -> Result<()>;
 
     fn handle_mouse_event(&mut self, event: MouseEvent, ctx: &Ctx) -> Result<()> {
         Ok(())
@@ -1020,6 +1019,9 @@ impl Property<PropertyKind> {
                 }
                 StatusProperty::ActiveTab => {
                     Some(Either::Left(Span::styled(ctx.active_tab.0.as_ref(), style)))
+                }
+                StatusProperty::InputBuffer() => {
+                    Some(Either::Left(Span::styled(ctx.key_resolver.buffer_to_string(), style)))
                 }
             },
             PropertyKindOrText::Property(PropertyKind::Widget(w)) => match w {

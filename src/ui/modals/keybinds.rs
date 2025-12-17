@@ -19,7 +19,7 @@ use crate::{
     shared::{
         ext::iter::IntoZipLongest2,
         id::{self, Id},
-        key_event::KeyEvent,
+        keys::ActionEvent,
         mouse_event::{MouseEvent, MouseEventKind},
     },
     status_warn,
@@ -354,8 +354,8 @@ impl Modal for KeybindsModal {
         Ok(())
     }
 
-    fn handle_key(&mut self, key: &mut KeyEvent, ctx: &mut Ctx) -> Result<()> {
-        if let Some(action) = key.as_common_action(ctx) {
+    fn handle_key(&mut self, key: &mut ActionEvent, ctx: &mut Ctx) -> Result<()> {
+        if let Some(action) = key.claim_common() {
             match action {
                 CommonAction::DownHalf => {
                     self.scrolling_state.next_half_viewport(ctx.config.scrolloff);

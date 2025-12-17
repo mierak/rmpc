@@ -129,6 +129,7 @@ pub enum StatusPropertyFile {
         separator: Option<String>,
     },
     ActiveTab,
+    InputBuffer(),
 }
 
 #[derive(Debug, Clone, Display, Hash, Eq, PartialEq)]
@@ -185,6 +186,7 @@ pub enum StatusProperty {
         separator: Option<String>,
     },
     ActiveTab,
+    InputBuffer(),
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
@@ -488,6 +490,7 @@ impl TryFrom<StatusPropertyFile> for StatusProperty {
                 StatusProperty::QueueTimeRemaining { separator }
             }
             StatusPropertyFile::ActiveTab => StatusProperty::ActiveTab,
+            StatusPropertyFile::InputBuffer() => StatusProperty::InputBuffer(),
         })
     }
 }

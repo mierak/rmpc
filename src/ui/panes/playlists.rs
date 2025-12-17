@@ -18,7 +18,7 @@ use crate::{
     shared::{
         cmp::StringCompare,
         ext::btreeset_ranges::BTreeSetRanges,
-        key_event::KeyEvent,
+        keys::ActionEvent,
         macros::{modal, status_info},
         mouse_event::MouseEvent,
         mpd_client_ext::MpdDelete,
@@ -128,7 +128,7 @@ impl Pane for PlaylistsPane {
         Ok(())
     }
 
-    fn handle_action(&mut self, event: &mut KeyEvent, ctx: &mut Ctx) -> Result<()> {
+    fn handle_action(&mut self, event: &mut ActionEvent, ctx: &mut Ctx) -> Result<()> {
         self.handle_common_action(event, ctx)?;
         self.handle_global_action(event, ctx)?;
         Ok(())

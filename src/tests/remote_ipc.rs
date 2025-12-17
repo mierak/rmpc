@@ -107,15 +107,6 @@ mod remote_ipc_tests {
     }
 
     #[test]
-    fn test_invalid_keybind() {
-        let (event_tx, _event_rx, work_tx, config) = setup_test();
-        let keybind_cmd = KeybindCommand { key: "invalid_key_format".to_string() };
-
-        let result = keybind_cmd.execute(&event_tx, &work_tx, ipc_stream(), &config);
-        assert!(result.is_err());
-    }
-
-    #[test]
     fn test_remote_cmd_to_socket_command_conversion() {
         let keybind_cmd = RemoteCmd::Keybind { key: "p".to_string() };
         let socket_cmd =

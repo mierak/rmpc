@@ -12,7 +12,7 @@ use crate::{
     config::keys::{CommonAction, LogsActions},
     ctx::Ctx,
     shared::{
-        key_event::KeyEvent,
+        keys::ActionEvent,
         mouse_event::{MouseEvent, MouseEventKind},
         ring_vec::RingVec,
     },
@@ -139,9 +139,9 @@ impl Pane for LogsPane {
         Ok(())
     }
 
-    fn handle_action(&mut self, event: &mut KeyEvent, ctx: &mut Ctx) -> Result<()> {
+    fn handle_action(&mut self, event: &mut ActionEvent, ctx: &mut Ctx) -> Result<()> {
         let config = &ctx.config;
-        if let Some(action) = event.as_logs_action(ctx) {
+        if let Some(action) = event.claim_logs() {
             match action {
                 LogsActions::Clear => {
                     self.logs.clear();
@@ -152,7 +152,7 @@ impl Pane for LogsPane {
                     self.scroll_enabled ^= true;
                 }
             }
-        } else if let Some(action) = event.as_common_action(ctx) {
+        } else if let Some(action) = event.claim_common() {
             match action {
                 CommonAction::DownHalf => {
                     self.scrolling_state.next_half_viewport(ctx.config.scrolloff);

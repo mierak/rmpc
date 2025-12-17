@@ -11,7 +11,7 @@ use crate::{
     shared::{
         ext::{rect::RectExt, vec::VecExt},
         id::Id,
-        key_event::KeyEvent,
+        keys::ActionEvent,
         mouse_event::{MouseEvent, MouseEventKind},
     },
     ui::input::InputResultEvent,
@@ -120,7 +120,7 @@ impl TabScreen {
     pub(in crate::ui) fn handle_action(
         &mut self,
         panes: &mut PaneContainer,
-        event: &mut KeyEvent,
+        event: &mut ActionEvent,
         ctx: &mut Ctx,
     ) -> Result<()> {
         let Some(focused_pane_data) = self.pane_data.get(&self.focused) else {
@@ -129,7 +129,7 @@ impl TabScreen {
         };
         let focused_area = focused_pane_data.area;
 
-        match event.as_common_action(ctx) {
+        match event.claim_common() {
             Some(CommonAction::PaneUp) => {
                 let pane_to_focus = self
                     .panes_directly_above(focused_area)

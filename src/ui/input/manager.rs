@@ -7,7 +7,7 @@ use ratatui::{style::Style, text::Span};
 
 use crate::ui::input::{BufferId, InputEvent, InputResultEvent, buffer::InputBuffer};
 
-#[derive(Debug, Default, Clone, Copy)]
+#[derive(Debug, Default, Clone, Copy, strum::EnumDiscriminants)]
 pub enum InputMode {
     #[default]
     Normal,
@@ -82,6 +82,10 @@ impl InputManager {
         self.buffers.borrow_mut().clear();
     }
 
+    pub fn mode(&self) -> InputMode {
+        self.mode.get()
+    }
+
     pub fn is_insert_mode(&self) -> bool {
         matches!(self.mode.get(), InputMode::Insert(_))
     }
@@ -103,10 +107,6 @@ impl InputManager {
             return None;
         };
 
-        match ev {
-            Some(InputEvent::Cancel) => Some(InputResultEvent::Cancel),
-            Some(InputEvent::Confirm) => Some(InputResultEvent::Confirm),
-            _ => Some(buffer!(self, id).handle_input(ev)),
-        }
+        Some(buffer!(self, id).handle_input(ev))
     }
 }

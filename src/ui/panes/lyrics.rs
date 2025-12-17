@@ -11,7 +11,7 @@ use crate::{
     ctx::Ctx,
     shared::{
         ext::duration::DurationExt,
-        key_event::KeyEvent,
+        keys::ActionEvent,
         lrc::Lrc,
         macros::status_error,
         mpd_query::run_status_update,
@@ -179,7 +179,7 @@ impl Pane for LyricsPane {
         Ok(())
     }
 
-    fn handle_action(&mut self, _event: &mut KeyEvent, _ctx: &mut Ctx) -> Result<()> {
+    fn handle_action(&mut self, _event: &mut ActionEvent, _ctx: &mut Ctx) -> Result<()> {
         Ok(())
     }
 }

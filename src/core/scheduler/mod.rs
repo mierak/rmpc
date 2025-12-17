@@ -160,6 +160,13 @@ where
         );
     }
 
+    /// Cancel a scheduled job.
+    pub(crate) fn cancel(&self, id: Id) {
+        // Skip errors as this should never really happen, but still want to log it in
+        // case it does
+        try_skip!(self.add_job_tx.send(SchedulerCommand::CancelJob(id)), "Failed to cancel job");
+    }
+
     /// Schedules a job to run after the specified duration.
     /// A job must guarantee that it will not block the scheduler.
     pub(crate) fn schedule(

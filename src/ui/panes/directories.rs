@@ -13,7 +13,7 @@ use crate::{
         commands::Song,
         mpd_client::{Filter, FilterKind, MpdClient, Tag},
     },
-    shared::{key_event::KeyEvent, mouse_event::MouseEvent, mpd_client_ext::Enqueue},
+    shared::{keys::ActionEvent, mouse_event::MouseEvent, mpd_client_ext::Enqueue},
     ui::{
         UiEvent,
         browser::BrowserPane,
@@ -105,7 +105,7 @@ impl Pane for DirectoriesPane {
         Ok(())
     }
 
-    fn handle_action(&mut self, event: &mut KeyEvent, ctx: &mut Ctx) -> Result<()> {
+    fn handle_action(&mut self, event: &mut ActionEvent, ctx: &mut Ctx) -> Result<()> {
         self.handle_common_action(event, ctx)?;
         self.handle_global_action(event, ctx)?;
         Ok(())

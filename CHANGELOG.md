@@ -16,6 +16,8 @@ word, ctrl+f/b to move forward/backwards etc.
 - `clear` options to keybinds, keep the default keybinds and only override the specified keybinds
 if false
 - Triggering `JumpToCurrent` twice will now center the currently playing song
+- Keybinds now support sequences of keys instead of a single key chord. Existing keybinds should work
+the same.
 
 ### Changed
 

@@ -25,7 +25,7 @@ use crate::{
     mpd::commands::State,
     shared::{
         dependencies::CAVA,
-        key_event::KeyEvent,
+        keys::ActionEvent,
         terminal::{TERMINAL, TtyWriter},
     },
     status_warn,
@@ -393,7 +393,7 @@ impl Pane for CavaPane {
         Ok(())
     }
 
-    fn handle_action(&mut self, _ev: &mut KeyEvent, _ctx: &mut Ctx) -> anyhow::Result<()> {
+    fn handle_action(&mut self, _ev: &mut ActionEvent, _ctx: &mut Ctx) -> anyhow::Result<()> {
         Ok(())
     }
 

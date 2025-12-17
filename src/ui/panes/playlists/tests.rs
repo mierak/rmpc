@@ -161,19 +161,20 @@ mod on_idle_event {
 
         use super::*;
         use crate::{
-            shared::events::{ClientRequest, WorkRequest},
-            tests::fixtures::{client_request_channel, work_request_channel},
+            shared::events::{AppEvent, ClientRequest, WorkRequest},
+            tests::fixtures::{app_event_channel, client_request_channel, work_request_channel},
             ui::panes::playlists::FETCH_DATA,
         };
 
         #[rstest]
         fn selects_the_same_playlist_and_song(
             mut screen: PlaylistsPane,
+            app_event_channel: (Sender<AppEvent>, Receiver<AppEvent>),
             work_request_channel: (Sender<WorkRequest>, Receiver<WorkRequest>),
             client_request_channel: (Sender<ClientRequest>, Receiver<ClientRequest>),
         ) {
             let rx = client_request_channel.1.clone();
-            let ctx = ctx(work_request_channel, client_request_channel);
+            let ctx = ctx(app_event_channel, work_request_channel, client_request_channel);
             let initial_songs = [song("s1"), song("s2"), song("s3"), song("s4")];
             // init playlists
             screen
@@ -243,11 +244,12 @@ mod on_idle_event {
         #[rstest]
         fn selects_the_same_playlist_and_last_song(
             mut screen: PlaylistsPane,
+            app_event_channel: (Sender<AppEvent>, Receiver<AppEvent>),
             work_request_channel: (Sender<WorkRequest>, Receiver<WorkRequest>),
             client_request_channel: (Sender<ClientRequest>, Receiver<ClientRequest>),
         ) {
             let rx = client_request_channel.1.clone();
-            let ctx = ctx(work_request_channel, client_request_channel);
+            let ctx = ctx(app_event_channel, work_request_channel, client_request_channel);
             let initial_songs = [song("s1"), song("s2"), song("s3"), song("s4")];
             screen
                 .on_query_finished(
@@ -312,11 +314,12 @@ mod on_idle_event {
         #[rstest]
         fn selects_the_same_playlist_and_first_song(
             mut screen: PlaylistsPane,
+            app_event_channel: (Sender<AppEvent>, Receiver<AppEvent>),
             work_request_channel: (Sender<WorkRequest>, Receiver<WorkRequest>),
             client_request_channel: (Sender<ClientRequest>, Receiver<ClientRequest>),
         ) {
             let rx = client_request_channel.1.clone();
-            let ctx = ctx(work_request_channel, client_request_channel);
+            let ctx = ctx(app_event_channel, work_request_channel, client_request_channel);
             let initial_songs = [song("s1"), song("s2"), song("s3"), song("s4")];
             screen
                 .on_query_finished(
@@ -380,11 +383,12 @@ mod on_idle_event {
         #[rstest]
         fn selects_the_same_playlist_and_song_idx(
             mut screen: PlaylistsPane,
+            app_event_channel: (Sender<AppEvent>, Receiver<AppEvent>),
             work_request_channel: (Sender<WorkRequest>, Receiver<WorkRequest>),
             client_request_channel: (Sender<ClientRequest>, Receiver<ClientRequest>),
         ) {
             let rx = client_request_channel.1.clone();
-            let ctx = ctx(work_request_channel, client_request_channel);
+            let ctx = ctx(app_event_channel, work_request_channel, client_request_channel);
             let initial_songs = [song("s1"), song("s2"), song("s3"), song("s4")];
             screen
                 .on_query_finished(
@@ -448,11 +452,12 @@ mod on_idle_event {
         #[rstest]
         fn selects_the_same_playlist_idx_and_last_song(
             mut screen: PlaylistsPane,
+            app_event_channel: (Sender<AppEvent>, Receiver<AppEvent>),
             work_request_channel: (Sender<WorkRequest>, Receiver<WorkRequest>),
             client_request_channel: (Sender<ClientRequest>, Receiver<ClientRequest>),
         ) {
             let rx = client_request_channel.1.clone();
-            let ctx = ctx(work_request_channel, client_request_channel);
+            let ctx = ctx(app_event_channel, work_request_channel, client_request_channel);
             let initial_songs = [song("s1"), song("s2"), song("s3"), song("s4")];
             let initial_playlists = vec![dir("pl1"), dir("pl2"), dir("pl3"), dir("pl4")];
             screen

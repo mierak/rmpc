@@ -27,7 +27,7 @@ use crate::{
     config::{
         Config,
         cli::{Args, Command},
-        keys::{CommonAction, GlobalAction, actions::RateKind},
+        keys::{CommonAction, GlobalAction, Key, actions::RateKind},
         tabs::{PaneType, SizedPaneOrSplit, TabName},
         theme::level_styles::LevelStyles,
     },
@@ -46,7 +46,7 @@ use crate::{
     shared::{
         events::{Level, WorkRequest},
         id::Id,
-        key_event::KeyEvent,
+        keys::ActionEvent,
         macros::{modal, status_error, status_info, status_warn},
         mouse_event::MouseEvent,
         mpd_client_ext::{Enqueue, MpdClientExt},
@@ -223,46 +223,19 @@ impl<'ui> Ui<'ui> {
         )
     }
 
-    pub fn handle_key(&mut self, key: &mut KeyEvent, ctx: &mut Ctx) -> Result<KeyHandleResult> {
-        // Send input to modal if any
+    pub fn handle_action(
+        &mut self,
+        key: &mut ActionEvent,
+        ctx: &mut Ctx,
+    ) -> Result<KeyHandleResult> {
         if let Some(ref mut modal) = self.modals.last_mut() {
-            // Handle insert mode for modal
-            if let Some(kind) = ctx.input.handle_input(InputEvent::from_key_event(key, ctx)) {
-                let should_exit_insert =
-                    matches!(kind, InputResultEvent::Confirm | InputResultEvent::Cancel);
-
-                modal.handle_insert_mode(kind, ctx)?;
-                if should_exit_insert {
-                    ctx.input.normal_mode();
-                }
-
-                ctx.render()?;
-                return Ok(KeyHandleResult::None);
-            }
-
-            // else handle normal mode
             modal.handle_key(key, ctx)?;
-            return Ok(KeyHandleResult::None);
-        }
-
-        // Handle insert mode for panes
-        if let Some(kind) = ctx.input.handle_input(InputEvent::from_key_event(key, ctx)) {
-            let should_exit_insert =
-                matches!(kind, InputResultEvent::Confirm | InputResultEvent::Cancel);
-
-            active_tab_call!(self, ctx, handle_insert_mode(kind, ctx))?;
-
-            if should_exit_insert {
-                ctx.input.normal_mode();
-            }
-
-            ctx.render()?;
             return Ok(KeyHandleResult::None);
         }
 
         active_tab_call!(self, ctx, handle_action(key, ctx))?;
 
-        if let Some(action) = key.as_global_action(ctx) {
+        if let Some(action) = key.claim_global() {
             match action {
                 GlobalAction::Partition { name: Some(name), autocreate } => {
                     let name = name.clone();
@@ -639,7 +612,7 @@ impl<'ui> Ui<'ui> {
                     modal!(ctx, AddRandomModal::new(ctx));
                 }
             }
-        } else if let Some(action) = key.as_common_action(ctx) {
+        } else if let Some(action) = key.claim_common() {
             #[allow(
                 clippy::collapsible_match,
                 reason = "Future expansion, remove when adding other actions"
@@ -702,6 +675,48 @@ impl<'ui> Ui<'ui> {
         }
 
         Ok(KeyHandleResult::None)
+    }
+
+    pub fn handle_insert_mode(
+        &mut self,
+        action: Option<&mut ActionEvent>,
+        buf: &[Key],
+        ctx: &mut Ctx,
+    ) -> Result<()> {
+        if let Some(action) = action {
+            // We got some resolved keybind in insert mode. Currently only Confirm and Close
+            // are possible to be bound there so this is fine.
+            let kind = match action.claim_common() {
+                Some(CommonAction::Confirm) => InputResultEvent::Confirm,
+                Some(CommonAction::Close) => InputResultEvent::Cancel,
+                other => {
+                    log::error!(other:?; "Expected Confirm or Close action in insert mode");
+                    return Ok(());
+                }
+            };
+
+            if let Some(ref mut modal) = self.modals.last_mut() {
+                modal.handle_insert_mode(kind, ctx)?;
+            } else {
+                active_tab_call!(self, ctx, handle_insert_mode(kind, ctx))?;
+            }
+
+            ctx.input.normal_mode();
+        } else {
+            // Resolve each buffered key individually
+            for key in buf {
+                if let Some(kind) = ctx.input.handle_input(InputEvent::from_key_event(*key)) {
+                    if let Some(ref mut modal) = self.modals.last_mut() {
+                        modal.handle_insert_mode(kind, ctx)?;
+                    } else {
+                        active_tab_call!(self, ctx, handle_insert_mode(kind, ctx))?;
+                    }
+                }
+            }
+        }
+
+        ctx.render()?;
+        Ok(())
     }
 
     pub fn before_show(&mut self, area: Rect, ctx: &mut Ctx) -> Result<()> {

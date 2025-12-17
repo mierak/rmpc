@@ -2,7 +2,7 @@ use anyhow::Result;
 use ratatui::{Frame, prelude::Rect, style::Stylize, text::Text};
 
 use super::Pane;
-use crate::{ctx::Ctx, shared::key_event::KeyEvent};
+use crate::{ctx::Ctx, shared::keys::ActionEvent};
 
 #[derive(Debug)]
 pub struct FrameCountPane {
@@ -31,7 +31,7 @@ impl Pane for FrameCountPane {
         Ok(())
     }
 
-    fn handle_action(&mut self, _event: &mut KeyEvent, _ctx: &mut Ctx) -> Result<()> {
+    fn handle_action(&mut self, _event: &mut ActionEvent, _ctx: &mut Ctx) -> Result<()> {
         Ok(())
     }
 }

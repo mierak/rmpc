@@ -6,7 +6,7 @@ use crate::{
     ctx::Ctx,
     mpd::mpd_client::{MpdClient, ValueChange},
     shared::{
-        key_event::KeyEvent,
+        keys::ActionEvent,
         mouse_event::{MouseEvent, MouseEventKind},
     },
     ui::{UiEvent, widgets::header::Header},
@@ -70,7 +70,7 @@ impl Pane for HeaderPane {
         Ok(())
     }
 
-    fn handle_action(&mut self, _event: &mut KeyEvent, _ctx: &mut Ctx) -> Result<()> {
+    fn handle_action(&mut self, _event: &mut ActionEvent, _ctx: &mut Ctx) -> Result<()> {
         Ok(())
     }
 }

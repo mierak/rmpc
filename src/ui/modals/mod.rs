@@ -11,7 +11,7 @@ use super::UiEvent;
 use crate::{
     MpdQueryResult,
     ctx::Ctx,
-    shared::{id::Id, key_event::KeyEvent, mouse_event::MouseEvent},
+    shared::{id::Id, keys::ActionEvent, mouse_event::MouseEvent},
     ui::input::InputResultEvent,
 };
 
@@ -36,7 +36,7 @@ pub(crate) trait Modal: std::fmt::Debug {
         Ok(())
     }
 
-    fn handle_key(&mut self, key: &mut KeyEvent, ctx: &mut Ctx) -> Result<()>;
+    fn handle_key(&mut self, key: &mut ActionEvent, ctx: &mut Ctx) -> Result<()>;
 
     fn handle_mouse_event(&mut self, event: MouseEvent, ctx: &mut Ctx) -> Result<()>;
 

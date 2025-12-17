@@ -13,7 +13,7 @@ use crate::{
         commands::Song,
         mpd_client::{Filter, MpdClient, Tag},
     },
-    shared::{cmp::StringCompare, key_event::KeyEvent, mouse_event::MouseEvent},
+    shared::{cmp::StringCompare, keys::ActionEvent, mouse_event::MouseEvent},
     ui::{
         UiEvent,
         browser::BrowserPane,
@@ -88,7 +88,7 @@ impl Pane for AlbumsPane {
         Ok(())
     }
 
-    fn handle_action(&mut self, event: &mut KeyEvent, ctx: &mut Ctx) -> Result<()> {
+    fn handle_action(&mut self, event: &mut ActionEvent, ctx: &mut Ctx) -> Result<()> {
         self.handle_common_action(event, ctx)?;
         self.handle_global_action(event, ctx)?;
         Ok(())
