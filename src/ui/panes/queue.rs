@@ -12,11 +12,12 @@ use ratatui::{
     widgets::{Block, Borders, Row, Table, TableState},
 };
 
-use super::{CommonAction, Pane};
+use super::Pane;
 use crate::{
     MpdQueryResult,
     config::{
         keys::{
+            CommonAction,
             GlobalAction,
             QueueActions,
             actions::{AddKind, AutoplayKind, DeleteKind, RateKind, SaveKind},
@@ -37,7 +38,7 @@ use crate::{
     },
     shared::{
         ext::{btreeset_ranges::BTreeSetRanges, rect::RectExt},
-        key_event::KeyEvent,
+        keys::ActionEvent,
         macros::{modal, status_error, status_info, status_warn},
         mouse_event::{MouseEvent, MouseEventKind, calculate_scrollbar_position},
         mpd_client_ext::{Enqueue, MpdClientExt},
@@ -713,8 +714,8 @@ impl Pane for QueuePane {
         Ok(())
     }
 
-    fn handle_action(&mut self, event: &mut KeyEvent, ctx: &mut Ctx) -> Result<()> {
-        if let Some(action) = event.as_queue_action(ctx) {
+    fn handle_action(&mut self, event: &mut ActionEvent, ctx: &mut Ctx) -> Result<()> {
+        if let Some(action) = event.claim_queue() {
             match action {
                 QueueActions::Delete if !self.queue.marked().is_empty() => {
                     for range in self.queue.marked().ranges().rev() {
@@ -877,7 +878,7 @@ impl Pane for QueuePane {
                 }
                 QueueActions::Unused => {}
             }
-        } else if let Some(action) = event.as_common_action(ctx).map(|v| v.to_owned()) {
+        } else if let Some(action) = event.claim_common().map(|v| v.to_owned()) {
             match action {
                 CommonAction::Up => {
                     if !self.queue.is_empty() {
@@ -1251,7 +1252,7 @@ impl Pane for QueuePane {
                     modal!(ctx, modal);
                 }
             }
-        } else if let Some(action) = event.as_global_action(ctx) {
+        } else if let Some(action) = event.claim_global() {
             match action {
                 GlobalAction::ExternalCommand { command, .. } => {
                     let songs =

@@ -8,7 +8,7 @@ pub mod geometry;
 pub mod id;
 pub mod image;
 pub mod ipc;
-pub mod key_event;
+pub mod keys;
 pub mod logging;
 pub mod lrc;
 pub mod macros;

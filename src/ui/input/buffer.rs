@@ -130,14 +130,6 @@ impl InputBuffer {
     pub fn handle_input(&mut self, ev: Option<InputEvent>) -> InputResultEvent {
         let old_cursor = self.cursor;
         let result = match ev {
-            Some(InputEvent::Cancel) => {
-                debug_assert!(false, "Handled in Input, should be unreachable");
-                InputResultEvent::NoChange
-            }
-            Some(InputEvent::Confirm) => {
-                debug_assert!(false, "Handled in Input, should be unreachable");
-                InputResultEvent::NoChange
-            }
             Some(InputEvent::Push(c)) => {
                 let g = self.current_grapheme();
                 if g.len > 0 && g.offset < self.cursor && self.cursor < g.offset + g.len {

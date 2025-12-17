@@ -10,11 +10,12 @@ use ratatui::{
     widgets::{Block, Borders, List, ListItem, ListState, Padding},
 };
 
-use super::{CommonAction, Pane};
+use super::Pane;
 use crate::{
     MpdQueryResult,
     config::{
         keys::{
+            CommonAction,
             GlobalAction,
             actions::{AddKind, AutoplayKind, DeleteKind, Position, RateKind, SaveKind},
         },
@@ -30,7 +31,7 @@ use crate::{
         version::Version,
     },
     shared::{
-        key_event::KeyEvent,
+        keys::ActionEvent,
         macros::{modal, status_error, status_info, status_warn},
         mouse_event::{MouseEvent, MouseEventKind, calculate_scrollbar_position},
         mpd_client_ext::{Enqueue, MpdClientExt},
@@ -311,16 +312,16 @@ impl SearchPane {
         }
     }
 
-    fn handle_search_phase_action(&mut self, event: &mut KeyEvent, ctx: &mut Ctx) -> Result<()> {
+    fn handle_search_phase_action(&mut self, event: &mut ActionEvent, ctx: &mut Ctx) -> Result<()> {
         let config = &ctx.config;
-        if let Some(action) = event.as_global_action(ctx) {
+        if let Some(action) = event.claim_global() {
             if let GlobalAction::ExternalCommand { command, .. } = action {
                 let songs = self.songs_dir.items.iter().map(|song| song.file.as_str());
                 run_external(command.clone(), create_env(ctx, songs));
             } else {
                 event.abandon();
             }
-        } else if let Some(action) = event.as_common_action(ctx) {
+        } else if let Some(action) = event.claim_common() {
             match action.to_owned() {
                 CommonAction::Down => {
                     if config.wrap_navigation {
@@ -483,11 +484,11 @@ impl SearchPane {
         Ok(())
     }
 
-    fn handle_result_phase_action(&mut self, event: &mut KeyEvent, ctx: &mut Ctx) -> Result<()> {
+    fn handle_result_phase_action(&mut self, event: &mut ActionEvent, ctx: &mut Ctx) -> Result<()> {
         let Phase::BrowseResults = &mut self.phase else {
             return Ok(());
         };
-        if let Some(action) = event.as_global_action(ctx) {
+        if let Some(action) = event.claim_global() {
             match action {
                 GlobalAction::ExternalCommand { command, .. }
                     if !self.songs_dir.marked().is_empty() =>
@@ -503,7 +504,7 @@ impl SearchPane {
                     event.abandon();
                 }
             }
-        } else if let Some(action) = event.as_common_action(ctx) {
+        } else if let Some(action) = event.claim_common() {
             match action.to_owned() {
                 CommonAction::Down => {
                     self.songs_dir.next(ctx.config.scrolloff, ctx.config.wrap_navigation);
@@ -1270,7 +1271,7 @@ impl Pane for SearchPane {
         Ok(())
     }
 
-    fn handle_action(&mut self, event: &mut KeyEvent, ctx: &mut Ctx) -> Result<()> {
+    fn handle_action(&mut self, event: &mut ActionEvent, ctx: &mut Ctx) -> Result<()> {
         match &mut self.phase {
             Phase::Search => {
                 self.handle_search_phase_action(event, ctx)?;

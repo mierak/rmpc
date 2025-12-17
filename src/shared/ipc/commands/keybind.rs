@@ -6,7 +6,7 @@ use serde::{Deserialize, Serialize};
 use crate::{
     AppEvent,
     WorkRequest,
-    config::{Config, keys::key::Key},
+    config::{Config, keys::key::KeySequence},
     shared::ipc::{IpcStream, SocketCommandExecute},
 };
 
@@ -23,10 +23,12 @@ impl SocketCommandExecute for KeybindCommand {
         stream: IpcStream,
         _config: &Config,
     ) -> Result<()> {
-        match self.key.parse::<Key>() {
-            Ok(key) => {
-                let crossterm_event = KeyEvent::new(key.key, key.modifiers);
-                event_tx.send(AppEvent::UserKeyInput(crossterm_event))?;
+        match self.key.parse::<KeySequence>() {
+            Ok(seq) => {
+                for key in seq {
+                    let crossterm_event = KeyEvent::new(key.key, key.modifiers);
+                    event_tx.send(AppEvent::UserKeyInput(crossterm_event))?;
+                }
             }
             Err(err) => {
                 let err = anyhow::anyhow!("Failed to parse key '{}': {}", self.key, err);

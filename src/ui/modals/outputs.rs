@@ -14,7 +14,7 @@ use crate::{
     mpd::mpd_client::MpdClient,
     shared::{
         id::{self, Id},
-        key_event::KeyEvent,
+        keys::ActionEvent,
         mouse_event::{MouseEvent, MouseEventKind},
         mpd_client_ext::{MpdClientExt, PartitionedOutput, PartitionedOutputKind},
     },
@@ -174,8 +174,8 @@ impl Modal for OutputsModal {
         Ok(())
     }
 
-    fn handle_key(&mut self, key: &mut KeyEvent, ctx: &mut Ctx) -> Result<()> {
-        if let Some(action) = key.as_common_action(ctx) {
+    fn handle_key(&mut self, key: &mut ActionEvent, ctx: &mut Ctx) -> Result<()> {
+        if let Some(action) = key.claim_common() {
             match action {
                 CommonAction::DownHalf => {
                     self.scrolling_state.next_half_viewport(ctx.config.scrolloff);

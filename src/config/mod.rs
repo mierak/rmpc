@@ -63,6 +63,8 @@ pub struct Config {
     pub scrolloff: usize,
     pub wrap_navigation: bool,
     pub keybinds: KeyConfig,
+    pub normal_timeout_ms: u64,
+    pub insert_timeout_ms: u64,
     pub enable_mouse: bool,
     pub enable_config_hot_reload: bool,
     pub status_update_interval_ms: Option<u64>,
@@ -149,6 +151,10 @@ pub struct ConfigFile {
     pub enable_config_hot_reload: bool,
     #[serde(default)]
     keybinds: KeyConfigFile,
+    #[serde(default = "defaults::u64::<1000>")]
+    pub normal_timeout_ms: u64,
+    #[serde(default = "defaults::u64::<1000>")]
+    pub insert_timeout_ms: u64,
     // Deprecated
     #[serde(default)]
     image_method: Option<ImageMethodFile>,
@@ -203,6 +209,8 @@ impl Default for ConfigFile {
         Self {
             address: String::from("127.0.0.1:6600"),
             keybinds: KeyConfigFile::default(),
+            normal_timeout_ms: 1000,
+            insert_timeout_ms: 1000,
             volume_step: 5,
             scrolloff: 0,
             status_update_interval_ms: Some(1000),
@@ -420,6 +428,8 @@ impl ConfigFile {
             mpd_idle_read_timeout_ms: self.mpd_idle_read_timeout_ms.map(Duration::from_millis),
             enable_mouse: self.enable_mouse,
             enable_config_hot_reload: self.enable_config_hot_reload,
+            normal_timeout_ms: self.normal_timeout_ms,
+            insert_timeout_ms: self.insert_timeout_ms,
             keybinds: self.keybinds.try_into()?,
             select_current_song_on_change: self.select_current_song_on_change,
             center_current_song_on_change: self.center_current_song_on_change,

@@ -15,7 +15,7 @@ use crate::{
     ctx::{Ctx, LIKE_STICKER, RATING_STICKER},
     mpd::{client::Client, commands::Song, mpd_client::MpdClient},
     shared::{
-        key_event::KeyEvent,
+        keys::ActionEvent,
         macros::{modal, status_warn},
         mouse_event::{MouseEvent, MouseEventKind, calculate_scrollbar_position},
         mpd_client_ext::{Enqueue, MpdClientExt, MpdDelete},
@@ -207,8 +207,8 @@ where
         Ok(())
     }
 
-    fn handle_global_action(&mut self, event: &mut KeyEvent, ctx: &Ctx) -> Result<()> {
-        let Some(action) = event.as_global_action(ctx) else {
+    fn handle_global_action(&mut self, event: &mut ActionEvent, ctx: &Ctx) -> Result<()> {
+        let Some(action) = event.claim_global() else {
             return Ok(());
         };
 
@@ -386,8 +386,8 @@ where
         Ok(())
     }
 
-    fn handle_common_action(&mut self, event: &mut KeyEvent, ctx: &Ctx) -> Result<()> {
-        let Some(action) = event.as_common_action(ctx) else {
+    fn handle_common_action(&mut self, event: &mut ActionEvent, ctx: &Ctx) -> Result<()> {
+        let Some(action) = event.claim_common() else {
             return Ok(());
         };
         let config = &ctx.config;

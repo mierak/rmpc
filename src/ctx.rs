@@ -30,6 +30,7 @@ use crate::{
     },
     shared::{
         events::ClientRequest,
+        keys::KeyResolver,
         lrc::{Lrc, LrcIndex},
         macros::{status_error, status_warn},
         mpd_client_ext::MpdClientExt,
@@ -74,6 +75,7 @@ pub struct Ctx {
     pub(crate) song_played: Option<Duration>,
     pub(crate) stickers_supported: StickersSupport,
     pub(crate) input: InputManager,
+    pub(crate) key_resolver: KeyResolver,
 }
 
 #[bon]
@@ -104,6 +106,8 @@ impl Ctx {
 
         log::info!(config:? = config; "Resolved config");
 
+        let key_resolver = KeyResolver::new(&config);
+
         let active_tab = config.tabs.names.first().context("Expected at least one tab")?.clone();
         scheduler.start();
         Ok(Self {
@@ -128,6 +132,7 @@ impl Ctx {
             last_status_update: Instant::now(),
             stickers_supported,
             input: InputManager::default(),
+            key_resolver,
         })
     }
 

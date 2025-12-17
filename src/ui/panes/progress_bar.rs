@@ -11,7 +11,7 @@ use crate::{
         mpd_client::{MpdClient, ValueChange},
     },
     shared::{
-        key_event::KeyEvent,
+        keys::ActionEvent,
         mouse_event::{MouseEvent, MouseEventKind},
     },
     ui::widgets::progress_bar::ProgressBar,
@@ -99,7 +99,7 @@ impl Pane for ProgressBarPane {
         Ok(())
     }
 
-    fn handle_action(&mut self, _event: &mut KeyEvent, _ctx: &mut Ctx) -> Result<()> {
+    fn handle_action(&mut self, _event: &mut ActionEvent, _ctx: &mut Ctx) -> Result<()> {
         Ok(())
     }
 }

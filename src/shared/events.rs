@@ -16,11 +16,12 @@ use crate::{
         Config,
         Size,
         cli::{Command, RemoteCommandQuery},
+        keys::Key,
         tabs::PaneType,
         theme::UiConfig,
     },
     mpd::{QueuePosition, commands::IdleEvent},
-    shared::lrc::LrcMetadata,
+    shared::{keys::ActionEvent, lrc::LrcMetadata},
     ui::{UiAppEvent, image::facade::EncodeData},
 };
 
@@ -70,6 +71,9 @@ pub(crate) enum WorkDone {
 pub(crate) enum AppEvent {
     UserKeyInput(KeyEvent),
     UserMouseInput(MouseEvent),
+    KeyTimeout,
+    ActionResolved(ActionEvent),
+    InsertModeFlush((Option<ActionEvent>, Vec<Key>)),
     Status(String, Level, Duration),
     InfoModal {
         message: Vec<String>,

@@ -19,7 +19,7 @@ use crate::{
     ctx::Ctx,
     shared::{
         id::{self, Id},
-        key_event::KeyEvent,
+        keys::ActionEvent,
         mouse_event::{MouseEvent, MouseEventKind},
     },
     ui::widgets::button::{Button, ButtonGroup, ButtonGroupState},
@@ -136,8 +136,8 @@ impl Modal for InfoModal<'_> {
         Ok(())
     }
 
-    fn handle_key(&mut self, key: &mut KeyEvent, ctx: &mut Ctx) -> Result<()> {
-        if let Some(CommonAction::Close | CommonAction::Confirm) = key.as_common_action(ctx) {
+    fn handle_key(&mut self, key: &mut ActionEvent, ctx: &mut Ctx) -> Result<()> {
+        if let Some(CommonAction::Close | CommonAction::Confirm) = key.claim_common() {
             self.hide(ctx)?;
         }
 

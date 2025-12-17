@@ -19,7 +19,7 @@ use crate::{
     ctx::Ctx,
     shared::{
         id::{self, Id},
-        key_event::KeyEvent,
+        keys::ActionEvent,
         mouse_event::{MouseEvent, MouseEventKind},
     },
     ui::{
@@ -209,8 +209,8 @@ impl Modal for AddRandomModal<'_> {
         Ok(())
     }
 
-    fn handle_key(&mut self, key: &mut KeyEvent, ctx: &mut Ctx) -> Result<()> {
-        let action = key.as_common_action(ctx);
+    fn handle_key(&mut self, key: &mut ActionEvent, ctx: &mut Ctx) -> Result<()> {
+        let action = key.claim_common();
         match self.active_input {
             InputType::Tag => {
                 let Some(action) = action else {

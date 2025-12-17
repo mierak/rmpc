@@ -51,6 +51,7 @@ ansi_colours = "1"
 thiserror = "2.0.12"
 parking_lot = { version = "0.12.4", features = [] }
 unicode-segmentation = "1.12.0"
+winnow = "^0.7.13"
 
 [build-dependencies]
 clap = { workspace = true }

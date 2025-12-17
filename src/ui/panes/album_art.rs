@@ -7,7 +7,7 @@ use crate::{
     config::{album_art::ImageMethod, tabs::PaneType},
     ctx::Ctx,
     mpd::mpd_client::MpdClient,
-    shared::key_event::KeyEvent,
+    shared::keys::ActionEvent,
     ui::{UiEvent, image::facade::AlbumArtFacade},
 };
 
@@ -66,7 +66,7 @@ impl Pane for AlbumArtPane {
         Ok(())
     }
 
-    fn handle_action(&mut self, _event: &mut KeyEvent, _ctx: &mut Ctx) -> Result<()> {
+    fn handle_action(&mut self, _event: &mut ActionEvent, _ctx: &mut Ctx) -> Result<()> {
         Ok(())
     }
 
@@ -173,10 +173,10 @@ mod tests {
         config::{Config, album_art::ImageMethod, tabs::PaneType},
         mpd::commands::{Song, State},
         shared::{
-            events::{ClientRequest, WorkRequest},
+            events::{AppEvent, ClientRequest, WorkRequest},
             mpd_query::MpdQuery,
         },
-        tests::fixtures::{client_request_channel, ctx, work_request_channel},
+        tests::fixtures::{app_event_channel, client_request_channel, ctx, work_request_channel},
         ui::{
             UiEvent,
             panes::{Pane, album_art::ALBUM_ART},
@@ -189,11 +189,12 @@ mod tests {
     fn searches_for_album_art_before_show(
         #[case] method: ImageMethod,
         #[case] should_search: bool,
+        app_event_channel: (Sender<AppEvent>, Receiver<AppEvent>),
         work_request_channel: (Sender<WorkRequest>, Receiver<WorkRequest>),
         client_request_channel: (Sender<ClientRequest>, Receiver<ClientRequest>),
     ) {
         let rx = client_request_channel.1.clone();
-        let mut ctx = ctx(work_request_channel, client_request_channel);
+        let mut ctx = ctx(app_event_channel, work_request_channel, client_request_channel);
         let selected_song_id = 333;
         let mut config = Config::default();
         config.album_art.method = method;
@@ -229,11 +230,12 @@ mod tests {
     fn searches_for_album_art_on_event(
         #[case] method: ImageMethod,
         #[case] should_search: bool,
+        app_event_channel: (Sender<AppEvent>, Receiver<AppEvent>),
         work_request_channel: (Sender<WorkRequest>, Receiver<WorkRequest>),
         client_request_channel: (Sender<ClientRequest>, Receiver<ClientRequest>),
     ) {
         let rx = client_request_channel.1.clone();
-        let mut ctx = ctx(work_request_channel, client_request_channel);
+        let mut ctx = ctx(app_event_channel, work_request_channel, client_request_channel);
         let selected_song_id = 333;
         let mut config = Config::default();
         config.album_art.method = method;

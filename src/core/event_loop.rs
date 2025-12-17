@@ -25,6 +25,7 @@ use crate::{
         events::{AppEvent, WorkDone},
         ext::error::ErrorExt,
         id::{self, Id},
+        keys::KeyResolver,
         macros::{status_error, status_warn},
         mpd_client_ext::MpdClientExt,
         mpd_query::{
@@ -181,6 +182,9 @@ fn main_task<B: Backend + std::io::Write>(
                         })();
                     }
 
+                    // Update keybinds
+                    ctx.key_resolver = KeyResolver::new(&ctx.config);
+
                     if let Err(err) = ui.on_event(UiEvent::ConfigChanged, &mut ctx) {
                         log::error!(error:? = err; "UI failed to handle config changed event");
                         continue;
@@ -218,19 +222,10 @@ fn main_task<B: Backend + std::io::Write>(
                     }
                     render_wanted = true;
                 }
-                AppEvent::UserKeyInput(key) => match ui.handle_key(&mut key.into(), &mut ctx) {
-                    Ok(KeyHandleResult::None) => continue,
-                    Ok(KeyHandleResult::Quit) => {
-                        if let Err(err) = ui.on_event(UiEvent::Exit, &mut ctx) {
-                            log::error!(error:? = err, event:?; "UI failed to handle quit event");
-                        }
-                        break;
-                    }
-                    Err(err) => {
-                        status_error!(err:?; "Error: {}", err.to_status());
-                        render_wanted = true;
-                    }
-                },
+                AppEvent::UserKeyInput(key) => {
+                    ctx.key_resolver.handle_key_event(key.into(), &ctx);
+                    render_wanted = true;
+                }
                 AppEvent::UserMouseInput(ev) => match ui.handle_mouse_event(ev, &mut ctx) {
                     Ok(()) => {}
                     Err(err) => {
@@ -238,6 +233,32 @@ fn main_task<B: Backend + std::io::Write>(
                         render_wanted = true;
                     }
                 },
+                AppEvent::ActionResolved(mut action) => {
+                    match ui.handle_action(&mut action, &mut ctx) {
+                        Ok(KeyHandleResult::None) => continue,
+                        Ok(KeyHandleResult::Quit) => {
+                            if let Err(err) = ui.on_event(UiEvent::Exit, &mut ctx) {
+                                log::error!(error:? = err; "UI failed to handle quit event");
+                            }
+                            break;
+                        }
+                        Err(err) => {
+                            status_error!(err:?; "Error: {}", err.to_status());
+                            render_wanted = true;
+                        }
+                    }
+                }
+                AppEvent::InsertModeFlush((mut action, buf)) => {
+                    if let Err(err) = ui.handle_insert_mode(action.as_mut(), &buf, &mut ctx) {
+                        log::error!(error:? = err, action:?, buf:?; "UI failed to handle insert mode flush");
+                    }
+                    render_wanted = true;
+                }
+                AppEvent::KeyTimeout => {
+                    log::debug!("Key timeout reached, handling queued keys");
+                    ctx.key_resolver.handle_timeout(&ctx);
+                    render_wanted = true;
+                }
                 AppEvent::Status(mut message, level, timeout) => {
                     ctx.messages.push(StatusMessage {
                         level,

@@ -14,7 +14,7 @@ use crate::{
     ctx::Ctx,
     shared::{
         id::{self, Id},
-        key_event::KeyEvent,
+        keys::ActionEvent,
         mouse_event::{MouseEvent, MouseEventKind},
     },
     ui::{
@@ -179,8 +179,8 @@ impl<'a, C: FnOnce(&Ctx, &str) -> Result<()> + 'a> Modal for InputModal<'a, C> {
         Ok(())
     }
 
-    fn handle_key(&mut self, key: &mut KeyEvent, ctx: &mut Ctx) -> Result<()> {
-        if let Some(action) = key.as_common_action(ctx) {
+    fn handle_key(&mut self, key: &mut ActionEvent, ctx: &mut Ctx) -> Result<()> {
+        if let Some(action) = key.claim_common() {
             match action {
                 CommonAction::Down => {
                     self.button_group_state.next();

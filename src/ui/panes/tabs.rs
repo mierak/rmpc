@@ -7,7 +7,7 @@ use crate::{
     ctx::Ctx,
     shared::{
         events::AppEvent,
-        key_event::KeyEvent,
+        keys::ActionEvent,
         mouse_event::{MouseEvent, MouseEventKind},
     },
     ui::{UiAppEvent, UiEvent, widgets::tabs::Tabs},
@@ -128,7 +128,7 @@ impl Pane for TabsPane<'_> {
         Ok(())
     }
 
-    fn handle_action(&mut self, _event: &mut KeyEvent, _ctx: &mut Ctx) -> Result<()> {
+    fn handle_action(&mut self, _event: &mut ActionEvent, _ctx: &mut Ctx) -> Result<()> {
         Ok(())
     }
 }

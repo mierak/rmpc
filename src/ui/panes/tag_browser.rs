@@ -20,7 +20,7 @@ use crate::{
     },
     shared::{
         cmp::StringCompare,
-        key_event::KeyEvent,
+        keys::ActionEvent,
         mouse_event::MouseEvent,
         string_util::StringExt,
     },
@@ -214,7 +214,7 @@ impl Pane for TagBrowserPane {
         Ok(())
     }
 
-    fn handle_action(&mut self, event: &mut KeyEvent, ctx: &mut Ctx) -> Result<()> {
+    fn handle_action(&mut self, event: &mut ActionEvent, ctx: &mut Ctx) -> Result<()> {
         self.handle_common_action(event, ctx)?;
         self.handle_global_action(event, ctx)?;
         Ok(())

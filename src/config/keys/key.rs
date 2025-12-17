@@ -1,13 +1,87 @@
 use std::{fmt::Display, str::FromStr};
 
-use crossterm::event::{KeyCode, KeyModifiers};
-use itertools::Itertools;
+use crossterm::event::{KeyCode, KeyEvent as CKeyEvent, KeyModifiers};
 use serde_with::{DeserializeFromStr, SerializeDisplay};
+use winnow::{
+    Parser,
+    Result,
+    combinator::{alt, dispatch, empty, fail, opt, permutation, repeat, seq, trace},
+    token::{any, literal},
+};
 
-#[derive(Debug, SerializeDisplay, DeserializeFromStr, PartialEq, Eq, Hash, Clone)]
+#[derive(Debug, PartialEq, Eq, Hash, Clone, Copy)]
 pub struct Key {
     pub key: KeyCode,
     pub modifiers: KeyModifiers,
+}
+
+impl From<CKeyEvent> for Key {
+    fn from(value: CKeyEvent) -> Self {
+        let should_insert_shift = matches!(value.code, KeyCode::Char(c) if c.is_uppercase());
+
+        let mut modifiers = value.modifiers;
+        if should_insert_shift {
+            modifiers.insert(KeyModifiers::SHIFT);
+        }
+
+        let key = if modifiers.contains(KeyModifiers::SHIFT) {
+            if let KeyCode::Char(c) = value.code {
+                KeyCode::Char(c.to_ascii_uppercase())
+            } else {
+                value.code
+            }
+        } else {
+            value.code
+        };
+
+        Self { key, modifiers }
+    }
+}
+
+#[derive(
+    Debug,
+    SerializeDisplay,
+    DeserializeFromStr,
+    PartialEq,
+    Eq,
+    Hash,
+    Clone,
+    derive_more::IntoIterator,
+)]
+pub struct KeySequence(pub Vec<Key>);
+
+impl KeySequence {
+    pub fn iter(&self) -> impl Iterator<Item = &Key> {
+        let mut iter = self.0.iter();
+        std::iter::from_fn(move || iter.next())
+    }
+}
+
+impl From<Key> for KeySequence {
+    fn from(key: Key) -> Self {
+        Self(vec![key])
+    }
+}
+
+impl From<Vec<Key>> for KeySequence {
+    fn from(keys: Vec<Key>) -> Self {
+        Self(keys)
+    }
+}
+
+impl Display for KeySequence {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        self.iter().try_for_each(|key| write!(f, "{key}"))
+    }
+}
+
+impl FromStr for KeySequence {
+    type Err = anyhow::Error;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        let keys = parse_sequence.parse(s).map_err(|e| anyhow::format_err!("{e}"))?;
+        Ok(Self(keys))
+    }
 }
 
 impl Display for Key {
@@ -92,104 +166,134 @@ impl Display for Key {
     }
 }
 
-impl FromStr for Key {
-    type Err = String;
+fn parse_sequence(input: &mut &str) -> winnow::error::Result<Vec<Key>> {
+    repeat(1.., parse_key).parse_next(input)
+}
 
-    fn from_str(s: &str) -> Result<Self, Self::Err> {
-        let chars = s.chars().collect_vec();
-        let mut modifiers = KeyModifiers::NONE;
-        let mut i = 0;
+fn parse_key(input: &mut &str) -> winnow::error::Result<Key> {
+    let ((modifiers, key),) = alt((
+        trace("with modifiers or special key", seq! {
+            _: '<',
+            |input: &mut &str| {
+                let mut mods = parse_modifier.parse_next(input)?;
+                match alt((parse_special_key, trace("char", parse_char_key))).parse_next(input) {
+                    Ok((mods2, mut key)) => {
+                        mods |= mods2;
 
-        let mut key_part_range = 0..chars.len();
-        loop {
-            let Some(c) = chars.get(i) else {
-                break;
-            };
-            let next = chars.get(i + 1);
+                        if mods.contains(KeyModifiers::SHIFT) && matches!(key, KeyCode::Tab){
+                            key = KeyCode::BackTab;
+                        }
 
-            match c {
-                'C' if next.is_some_and(|v| v == &'-') => {
-                    modifiers |= KeyModifiers::CONTROL;
-                    i += 1;
+                        Ok((mods, key))
+                    },
+                    Err(err) => {
+                        return Err(err);
+                    },
                 }
-                'A' if next.is_some_and(|v| v == &'-') => {
-                    modifiers |= KeyModifiers::ALT;
-                    i += 1;
-                }
-                'S' if next.is_some_and(|v| v == &'-') => {
-                    modifiers |= KeyModifiers::SHIFT;
-                    i += 1;
-                }
-                '<' if next.is_some_and(|v| v != &'>') => {} // skip, is prefix
-                '>' if next.is_none() && chars.len() > 1 => {
-                    // is suffix, end
-                    key_part_range.end = i;
-                    break;
-                }
-                _ if key_part_range.start == 0 => {
-                    key_part_range.start = i;
-                }
-                _ => {}
-            }
-            i += 1;
+            },
+            _: '>'
+        }),
+        trace("single char key", parse_char_key.map(|v| (v,))),
+    ))
+    .parse_next(input)?;
+
+    Ok(Key { key, modifiers })
+}
+
+fn parse_modifier(input: &mut &str) -> winnow::error::Result<KeyModifiers> {
+    let mods = permutation((
+        opt(literal("C-").value(KeyModifiers::CONTROL)),
+        opt(literal("A-").value(KeyModifiers::ALT)),
+        opt(literal("S-").value(KeyModifiers::SHIFT)),
+    ))
+    .parse_next(input)?;
+
+    let mut modifiers = KeyModifiers::NONE;
+    for modifier in [mods.0, mods.1, mods.2] {
+        match modifier {
+            Some(KeyModifiers::CONTROL) => modifiers |= KeyModifiers::CONTROL,
+            Some(KeyModifiers::ALT) => modifiers |= KeyModifiers::ALT,
+            Some(KeyModifiers::SHIFT) => modifiers |= KeyModifiers::SHIFT,
+            _ => {}
         }
+    }
 
-        let key_part = &chars[key_part_range];
-        let key = match key_part.iter().collect::<String>().as_str() {
-            "BS" => KeyCode::Backspace,
-            "Backspace" => KeyCode::Backspace,
-            "CR" => KeyCode::Enter,
-            "Enter" => KeyCode::Enter,
-            "Left" => KeyCode::Left,
-            "Right" => KeyCode::Right,
-            "Up" => KeyCode::Up,
-            "Down" => KeyCode::Down,
-            "Home" => KeyCode::Home,
-            "End" => KeyCode::End,
-            "PageUp" => KeyCode::PageUp,
-            "PageDown" => KeyCode::PageDown,
-            "Tab" if modifiers.contains(KeyModifiers::SHIFT) => KeyCode::BackTab,
-            "Tab" => KeyCode::Tab,
-            "Del" => KeyCode::Delete,
-            "Insert" => KeyCode::Insert,
-            "Esc" => KeyCode::Esc,
-            "Space" => KeyCode::Char(' '),
-            "F1" => KeyCode::F(1),
-            "F2" => KeyCode::F(2),
-            "F3" => KeyCode::F(3),
-            "F4" => KeyCode::F(4),
-            "F5" => KeyCode::F(5),
-            "F6" => KeyCode::F(6),
-            "F7" => KeyCode::F(7),
-            "F8" => KeyCode::F(8),
-            "F9" => KeyCode::F(9),
-            "F10" => KeyCode::F(10),
-            "F11" => KeyCode::F(11),
-            "F12" => KeyCode::F(12),
-            "" => KeyCode::Null,
-            c => {
-                if key_part.len() != 1 {
-                    return Err(format!("Invalid key: '{c}' from input '{s}'"));
-                }
+    Ok(modifiers)
+}
 
-                if key_part[0].is_uppercase() {
-                    modifiers |= KeyModifiers::SHIFT;
-                }
-
-                KeyCode::Char(if modifiers.contains(KeyModifiers::SHIFT) {
-                    key_part[0].to_ascii_uppercase()
-                } else {
-                    key_part[0]
-                })
-            }
-        };
-
-        Ok(Self { key, modifiers })
+fn parse_char_key(input: &mut &str) -> Result<(KeyModifiers, KeyCode)> {
+    let c = any.parse_next(input)?;
+    if c.is_uppercase() {
+        Ok((KeyModifiers::SHIFT, KeyCode::Char(c.to_ascii_uppercase())))
+    } else {
+        Ok((KeyModifiers::NONE, KeyCode::Char(c)))
     }
 }
+
+fn parse_special_key(input: &mut &str) -> winnow::error::Result<(KeyModifiers, KeyCode)> {
+    let mut parser = alt((
+        alt((
+            "BS",
+            "Backspace",
+            "CR",
+            "Enter",
+            "Left",
+            "Right",
+            "Up",
+            "Down",
+            "Home",
+            "End",
+            "PageUp",
+            "PageDown",
+            "Tab",
+        )),
+        alt((
+            "Del", "Insert", "Esc", "Space", "F10", "F11", "F12", "F1", "F2", "F3", "F4", "F5",
+            "F6", "F7", "F8", "F9",
+        )),
+    ));
+
+    let mut parser = dispatch! {parser;
+        "BS" => empty.value(KeyCode::Backspace),
+        "Backspace" => empty.value(KeyCode::Backspace),
+        "CR" => empty.value(KeyCode::Enter),
+        "Enter" => empty.value(KeyCode::Enter),
+        "Left" => empty.value(KeyCode::Left),
+        "Right" => empty.value(KeyCode::Right),
+        "Up" => empty.value(KeyCode::Up),
+        "Down" => empty.value(KeyCode::Down),
+        "Home" => empty.value(KeyCode::Home),
+        "End" => empty.value(KeyCode::End),
+        "PageUp" => empty.value(KeyCode::PageUp),
+        "PageDown" => empty.value(KeyCode::PageDown),
+        "Tab" => empty.value(KeyCode::Tab),
+        "Del" => empty.value(KeyCode::Delete),
+        "Insert" => empty.value(KeyCode::Insert),
+        "Esc" => empty.value(KeyCode::Esc),
+        "Space" => empty.value(KeyCode::Char(' ')),
+        "F10" => empty.value(KeyCode::F(10)),
+        "F11" => empty.value(KeyCode::F(11)),
+        "F12" => empty.value(KeyCode::F(12)),
+        "F1" => empty.value(KeyCode::F(1)),
+        "F2" => empty.value(KeyCode::F(2)),
+        "F3" => empty.value(KeyCode::F(3)),
+        "F4" => empty.value(KeyCode::F(4)),
+        "F5" => empty.value(KeyCode::F(5)),
+        "F6" => empty.value(KeyCode::F(6)),
+        "F7" => empty.value(KeyCode::F(7)),
+        "F8" => empty.value(KeyCode::F(8)),
+        "F9" => empty.value(KeyCode::F(9)),
+        "" => empty.value(KeyCode::Null),
+        _ => fail,
+    };
+
+    parser.parse_next(input).map(|key| (KeyModifiers::NONE, key))
+}
+
 #[cfg(test)]
 #[allow(clippy::unwrap_used)]
 mod tests {
+    use itertools::Itertools;
     use rstest::rstest;
 
     use super::*;
@@ -244,20 +348,106 @@ mod tests {
     #[case("<C-S-->",      Key { key: KeyCode::Char('-'), modifiers: KeyModifiers::CONTROL | KeyModifiers::SHIFT })]
     #[case("5",            Key { key: KeyCode::Char('5'), modifiers: KeyModifiers::NONE })]
     #[case("%",            Key { key: KeyCode::Char('%'), modifiers: KeyModifiers::NONE })]
-    #[case("",             Key { key: KeyCode::Null,      modifiers: KeyModifiers::NONE })]
     fn serialization_round_trip(#[case] expected_str: &str, #[case] input: Key) {
         let serialized = input.to_string();
         assert_eq!(expected_str, serialized);
 
-        let deserialized: Key = serialized.parse().unwrap();
+        let deserialized: KeySequence = serialized.parse().unwrap();
+        assert_eq!(deserialized.0[0], input);
+    }
+
+    #[rstest]
+    #[case("acd",                  vec![Key { key: KeyCode::Char('a'), modifiers: KeyModifiers::NONE }, Key { key: KeyCode::Char('c'), modifiers: KeyModifiers::NONE }, Key { key: KeyCode::Char('d'), modifiers: KeyModifiers::NONE }].into())]
+    #[case("d<C-A>f",              vec![Key { key: KeyCode::Char('d'), modifiers: KeyModifiers::NONE }, Key { key: KeyCode::Char('A'), modifiers: KeyModifiers::CONTROL | KeyModifiers::SHIFT }, Key { key: KeyCode::Char('f'), modifiers: KeyModifiers::NONE } ].into())]
+    #[case("<C-<><C-a><C->>",      vec![Key { key: KeyCode::Char('<'), modifiers: KeyModifiers::CONTROL }, Key { key: KeyCode::Char('a'), modifiers: KeyModifiers::CONTROL }, Key { key: KeyCode::Char('>'), modifiers: KeyModifiers::CONTROL } ].into())]
+    #[case("d<C-<>a<C-a>f<C->>t",  vec![Key { key: KeyCode::Char('d'), modifiers: KeyModifiers::NONE }, Key { key: KeyCode::Char('<'), modifiers: KeyModifiers::CONTROL }, Key { key: KeyCode::Char('a'), modifiers: KeyModifiers::NONE }, Key { key: KeyCode::Char('a'), modifiers: KeyModifiers::CONTROL }, Key { key: KeyCode::Char('f'), modifiers: KeyModifiers::NONE }, Key { key: KeyCode::Char('>'), modifiers: KeyModifiers::CONTROL }, Key { key: KeyCode::Char('t'), modifiers: KeyModifiers::NONE } ].into())]
+    fn sequence_round_trip(#[case] expected_str: &str, #[case] input: KeySequence) {
+        let serialized = input.iter().join("");
+        assert_eq!(expected_str, serialized);
+
+        let deserialized: KeySequence = serialized.parse().unwrap();
         assert_eq!(deserialized, input);
     }
 
     #[rstest]
-    #[case("<Enter>",          Key { key: KeyCode::Enter,       modifiers: KeyModifiers::NONE })]
-    #[case("<Backspace>",      Key { key: KeyCode::Backspace,   modifiers: KeyModifiers::NONE })]
-    fn deserialization_extras(#[case] input: &str, #[case] expected: Key) {
-        let deserialized: Key = input.parse().unwrap();
-        assert_eq!(deserialized, expected);
+    #[case("BS")]
+    #[case("Backspace")]
+    #[case("CR")]
+    #[case("Enter")]
+    #[case("Left")]
+    #[case("Right")]
+    #[case("Up")]
+    #[case("Down")]
+    #[case("Home")]
+    #[case("End")]
+    #[case("PageUp")]
+    #[case("PageDown")]
+    #[case("Tab")]
+    #[case("Del")]
+    #[case("Insert")]
+    #[case("Esc")]
+    #[case("Space")]
+    #[case("F10")]
+    #[case("F11")]
+    #[case("F12")]
+    #[case("F1")]
+    #[case("F2")]
+    #[case("F3")]
+    #[case("F4")]
+    #[case("F5")]
+    #[case("F6")]
+    #[case("F7")]
+    #[case("F8")]
+    #[case("F9")]
+    fn lone_special_keys_without_brackets_should_deser_as_sequence(#[case] mut input: &str) {
+        let input_len = input.chars().count();
+        let deserialized = parse_sequence(&mut input).unwrap();
+        assert_eq!(deserialized.len(), input_len);
+
+        for (i, mut c) in input.chars().enumerate() {
+            let mut modifiers = KeyModifiers::NONE;
+            if c.is_uppercase() {
+                modifiers |= KeyModifiers::SHIFT;
+                c = c.to_ascii_uppercase();
+            }
+
+            let key = Key { key: KeyCode::Char(c), modifiers };
+            assert_eq!(deserialized[i], key);
+        }
+    }
+
+    #[rstest]
+    #[case("<BS>",        Key { key: KeyCode::Backspace, modifiers: KeyModifiers::NONE })]
+    #[case("<Backspace>", Key { key: KeyCode::Backspace, modifiers: KeyModifiers::NONE })]
+    #[case("<CR>",        Key { key: KeyCode::Enter,     modifiers: KeyModifiers::NONE })]
+    #[case("<Enter>",     Key { key: KeyCode::Enter,     modifiers: KeyModifiers::NONE })]
+    #[case("<Left>",      Key { key: KeyCode::Left,      modifiers: KeyModifiers::NONE })]
+    #[case("<Right>",     Key { key: KeyCode::Right,     modifiers: KeyModifiers::NONE })]
+    #[case("<Up>",        Key { key: KeyCode::Up,        modifiers: KeyModifiers::NONE })]
+    #[case("<Down>",      Key { key: KeyCode::Down,      modifiers: KeyModifiers::NONE })]
+    #[case("<Home>",      Key { key: KeyCode::Home,      modifiers: KeyModifiers::NONE })]
+    #[case("<End>",       Key { key: KeyCode::End,       modifiers: KeyModifiers::NONE })]
+    #[case("<PageUp>",    Key { key: KeyCode::PageUp,    modifiers: KeyModifiers::NONE })]
+    #[case("<PageDown>",  Key { key: KeyCode::PageDown,  modifiers: KeyModifiers::NONE })]
+    #[case("<Tab>",       Key { key: KeyCode::Tab,       modifiers: KeyModifiers::NONE })]
+    #[case("<Del>",       Key { key: KeyCode::Delete,    modifiers: KeyModifiers::NONE })]
+    #[case("<Insert>",    Key { key: KeyCode::Insert,    modifiers: KeyModifiers::NONE })]
+    #[case("<Esc>",       Key { key: KeyCode::Esc,       modifiers: KeyModifiers::NONE })]
+    #[case("<Space>",     Key { key: KeyCode::Char(' '), modifiers: KeyModifiers::NONE })]
+    #[case("<F10>",       Key { key: KeyCode::F(10),     modifiers: KeyModifiers::NONE })]
+    #[case("<F11>",       Key { key: KeyCode::F(11),     modifiers: KeyModifiers::NONE })]
+    #[case("<F12>",       Key { key: KeyCode::F(12),     modifiers: KeyModifiers::NONE })]
+    #[case("<F1>",        Key { key: KeyCode::F(1),      modifiers: KeyModifiers::NONE })]
+    #[case("<F2>",        Key { key: KeyCode::F(2),      modifiers: KeyModifiers::NONE })]
+    #[case("<F3>",        Key { key: KeyCode::F(3),      modifiers: KeyModifiers::NONE })]
+    #[case("<F4>",        Key { key: KeyCode::F(4),      modifiers: KeyModifiers::NONE })]
+    #[case("<F5>",        Key { key: KeyCode::F(5),      modifiers: KeyModifiers::NONE })]
+    #[case("<F6>",        Key { key: KeyCode::F(6),      modifiers: KeyModifiers::NONE })]
+    #[case("<F7>",        Key { key: KeyCode::F(7),      modifiers: KeyModifiers::NONE })]
+    #[case("<F8>",        Key { key: KeyCode::F(8),      modifiers: KeyModifiers::NONE })]
+    #[case("<F9>",        Key { key: KeyCode::F(9),      modifiers: KeyModifiers::NONE })]
+    fn lone_special(#[case] mut expected_str: &str, #[case] input: Key) {
+        let deserialized = parse_sequence(&mut expected_str).unwrap();
+        assert_eq!(deserialized[0], input);
     }
 }
