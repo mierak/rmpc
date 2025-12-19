@@ -17,7 +17,7 @@ pub struct ListSection {
     pub areas: EnumMap<ListSectionArea, Rect>,
     pub current_item_style: Style,
     max_height: Option<usize>,
-    state: DirState<ListState>,
+    pub state: DirState<ListState>,
 }
 
 #[derive(Copy, Clone, Debug, Enum, Eq, PartialEq, Hash)]

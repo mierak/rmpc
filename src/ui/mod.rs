@@ -220,7 +220,11 @@ impl<'ui> Ui<'ui> {
                 Ok(())
             },
             ctx,
-        )
+        )?;
+
+        ctx.render()?;
+
+        Ok(())
     }
 
     pub fn handle_action(

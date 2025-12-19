@@ -19,7 +19,7 @@ pub struct SelectSection {
     #[debug(skip)]
     pub on_confirm: Option<Box<dyn FnOnce(&Ctx, String) -> Result<()> + Send + Sync + 'static>>,
     max_height: Option<usize>,
-    state: DirState<ListState>,
+    pub state: DirState<ListState>,
 }
 
 #[derive(Copy, Clone, Debug, Enum, Eq, PartialEq, Hash)]

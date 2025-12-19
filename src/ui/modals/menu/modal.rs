@@ -395,7 +395,8 @@ impl<'a> MenuModal<'a> {
     ) -> Self {
         let section = ListSection::new(ctx.config.theme.current_item_style);
         let section = cb(section);
-        if let Some(section) = section {
+        if let Some(mut section) = section {
+            section.state.set_content_len(Some(section.items.len()));
             self.sections.push(SectionType::Menu(section));
             self.areas.push(Rect::default());
         }
@@ -439,7 +440,8 @@ impl<'a> MenuModal<'a> {
     ) -> Self {
         let section = SelectSection::new(ctx.config.theme.current_item_style);
         let section = cb(section);
-        if let Some(section) = section {
+        if let Some(mut section) = section {
+            section.state.set_content_len(Some(section.items.len()));
             self.sections.push(SectionType::Select(section));
             self.areas.push(Rect::default());
         }
