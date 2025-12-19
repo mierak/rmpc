@@ -1,14 +1,13 @@
 #[cfg(target_os = "linux")]
 use std::os::linux::net::SocketAddrExt;
+#[cfg(target_os = "linux")]
+use std::os::unix::net::SocketAddr;
 use std::{
     collections::HashSet,
     io::{BufRead, BufReader, Write},
     net::{Shutdown, TcpStream},
     os::unix::net::UnixStream,
 };
-
-#[cfg(target_os = "linux")]
-use std::os::unix::net::SocketAddr;
 
 use anyhow::Result;
 use log::debug;
@@ -133,13 +132,13 @@ impl<'name> Client<'name> {
         let mut stream = match addr {
             MpdAddress::IpAndPort(ref addr) => TcpOrUnixStream::Tcp(TcpStream::connect(addr)?),
             MpdAddress::SocketPath(ref addr) => TcpOrUnixStream::Unix(UnixStream::connect(addr)?),
+            #[cfg(target_os = "linux")]
+            MpdAddress::AbstractSocket(ref addr) => {
+                let addr = SocketAddr::from_abstract_name(addr)?;
+                TcpOrUnixStream::Unix(UnixStream::connect_addr(&addr)?)
+            }
+            #[cfg(not(target_os = "linux"))]
             MpdAddress::AbstractSocket(ref _addr) => {
-                #[cfg(target_os = "linux")]
-                {
-                    let addr = SocketAddr::from_abstract_name(_addr)?;
-                    TcpOrUnixStream::Unix(UnixStream::connect_addr(&addr)?)
-                }
-                #[cfg(not(target_os = "linux"))]
                 return Err(MpdError::Generic(
                     "Abstract socket only supported on Linux".to_string(),
                 ));
@@ -215,13 +214,13 @@ impl<'name> Client<'name> {
         let mut stream = match &self.addr {
             MpdAddress::IpAndPort(addr) => TcpOrUnixStream::Tcp(TcpStream::connect(addr)?),
             MpdAddress::SocketPath(addr) => TcpOrUnixStream::Unix(UnixStream::connect(addr)?),
-            MpdAddress::AbstractSocket(_addr) => {
-                #[cfg(target_os = "linux")]
-                {
-                    let addr = SocketAddr::from_abstract_name(_addr)?;
-                    TcpOrUnixStream::Unix(UnixStream::connect_addr(&addr)?)
-                }
-                #[cfg(not(target_os = "linux"))]
+            #[cfg(target_os = "linux")]
+            MpdAddress::AbstractSocket(addr) => {
+                let addr = SocketAddr::from_abstract_name(addr)?;
+                TcpOrUnixStream::Unix(UnixStream::connect_addr(&addr)?)
+            }
+            #[cfg(not(target_os = "linux"))]
+            MpdAddress::AbstractSocket(addr) => {
                 return Err(MpdError::Generic(
                     "Abstract socket only supported on Linux".to_string(),
                 ));
