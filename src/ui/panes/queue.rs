@@ -1,4 +1,7 @@
-use std::collections::HashSet;
+use std::{
+    cmp::Ordering,
+    collections::{HashMap, HashSet},
+};
 
 use anyhow::Result;
 use enum_map::{Enum, EnumMap, enum_map};
@@ -25,7 +28,7 @@ use crate::{
         tabs::PaneType,
         theme::{
             AlbumSeparator,
-            properties::{Property, SongProperty},
+            properties::{Property, PropertyKindOrText, SongProperty},
         },
     },
     core::command::{create_env, run_external},
@@ -34,9 +37,11 @@ use crate::{
         QueuePosition,
         client::Client,
         commands::Song,
-        mpd_client::{MpdClient, SingleOrRange},
+        mpd_client::{MpdClient, MpdCommand, SingleOrRange},
+        proto_client::ProtoClient,
     },
     shared::{
+        cmp::StringCompare,
         ext::{btreeset_ranges::BTreeSetRanges, rect::RectExt},
         keys::ActionEvent,
         macros::{modal, status_error, status_info, status_warn},
@@ -250,6 +255,117 @@ impl QueuePane {
             .build();
 
         modal!(ctx, modal);
+    }
+
+    fn calculate_swaps<T: AsRef<str>>(
+        &self,
+        mut desired: Vec<(u32, T)>,
+    ) -> Result<Vec<(usize, usize)>> {
+        let cmp = StringCompare::builder().fold_case(true).build();
+        let is_non_decreasing = desired.is_sorted_by(|(_, a), (_, b)| {
+            matches!(cmp.compare(a.as_ref(), b.as_ref()), Ordering::Less | Ordering::Equal)
+        });
+
+        if is_non_decreasing {
+            desired.sort_by(|(_, a), (_, b)| cmp.compare(a.as_ref(), b.as_ref()).reverse());
+        } else {
+            desired.sort_by(|(_, a), (_, b)| cmp.compare(a.as_ref(), b.as_ref()));
+        }
+
+        let mut current: Vec<u32> = self.queue.items.iter().map(|s| s.id).collect();
+        let mut index: HashMap<u32, usize> =
+            current.iter().enumerate().map(|(i, id)| (*id, i)).collect();
+        let mut swaps = Vec::new();
+
+        for i in 0..current.len() {
+            let target_id = desired[i].0;
+            if current[i] == target_id {
+                continue; // already at the correct position
+            }
+
+            let j = *index
+                .get(&target_id)
+                .ok_or_else(|| anyhow::anyhow!("desired contains an ID not present in current"))?;
+
+            swaps.push((i, j));
+
+            let ai = current[i];
+            current.swap(i, j);
+
+            index.insert(ai, j);
+            index.insert(target_id, i);
+        }
+
+        Ok(swaps)
+    }
+
+    fn sort_by_column(&mut self, idx: usize, ctx: &Ctx) -> Result<()> {
+        let swaps = match &self.column_formats.get(idx).as_ref().map(|v| &v.kind) {
+            Some(PropertyKindOrText::Text(_)) => {
+                // Do nothing, everything is a constant text
+                Vec::new()
+            }
+            Some(PropertyKindOrText::Sticker(sticker_name)) => {
+                let evald = self
+                    .queue
+                    .items
+                    .iter()
+                    .map(|song| {
+                        (
+                            song.id,
+                            ctx.song_stickers(&song.file)
+                                .and_then(|s| s.get(sticker_name))
+                                .map(|s| s.as_str())
+                                .unwrap_or_default(),
+                        )
+                    })
+                    .collect_vec();
+
+                self.calculate_swaps(evald)?
+            }
+            Some(PropertyKindOrText::Property(_))
+            | Some(PropertyKindOrText::Group(_))
+            | Some(PropertyKindOrText::Transform(_)) => {
+                let evald = self
+                    .queue
+                    .items
+                    .iter()
+                    .map(|song| {
+                        (
+                            song.id,
+                            self.column_formats[idx]
+                                .as_string(
+                                    Some(song),
+                                    "",
+                                    ctx.config.theme.multiple_tag_resolution_strategy,
+                                    ctx,
+                                )
+                                .unwrap_or_default(),
+                        )
+                    })
+                    .collect_vec();
+
+                self.calculate_swaps(evald)?
+            }
+            None => {
+                // Should not really ever happen. But no reason to handle this ars a
+                // hard error.
+                log::warn!("Tried to sort by non-existing column index {idx}");
+                Vec::new()
+            }
+        };
+
+        ctx.command(move |client| {
+            client.send_start_cmd_list()?;
+            for swap in swaps {
+                client.send_swap_position(swap.0, swap.1)?;
+            }
+            client.send_execute_cmd_list()?;
+            client.read_ok()?;
+            Ok(())
+        });
+
+        Ok(())
     }
 }
 
@@ -552,12 +668,26 @@ impl Pane for QueuePane {
             return Ok(());
         }
 
-        if !self.areas[Areas::Table].contains(position) {
+        if !self.areas[Areas::Table].contains(position)
+            && !self.areas[Areas::TableHeader].contains(position)
+        {
             return Ok(());
         }
 
         match event.kind {
-            MouseEventKind::LeftClick => {
+            MouseEventKind::LeftClick | MouseEventKind::DoubleClick
+                if self.areas[Areas::TableHeader].contains(event.into()) =>
+            {
+                let widths = Layout::horizontal(self.column_widths.as_slice())
+                    .flex(Flex::Start)
+                    .spacing(1)
+                    .split(self.areas[Areas::TableHeader]);
+                if let Some(header_idx) = widths.iter().position(|w| w.contains(position)) {
+                    self.sort_by_column(header_idx, ctx)?;
+                }
+                ctx.render()?;
+            }
+            MouseEventKind::LeftClick if self.areas[Areas::Table].contains(event.into()) => {
                 let clicked_row: usize = event.y.saturating_sub(self.areas[Areas::Table].y).into();
                 if let Some(idx) = self.queue.state.get_at_rendered_row(clicked_row) {
                     self.queue.select_idx(idx, ctx.config.scrolloff);
@@ -565,7 +695,8 @@ impl Pane for QueuePane {
                     ctx.render()?;
                 }
             }
-            MouseEventKind::DoubleClick => {
+            MouseEventKind::LeftClick => {}
+            MouseEventKind::DoubleClick if self.areas[Areas::Table].contains(event.into()) => {
                 let clicked_row: usize = event.y.saturating_sub(self.areas[Areas::Table].y).into();
 
                 if let Some(song) = self
@@ -581,7 +712,8 @@ impl Pane for QueuePane {
                     });
                 }
             }
-            MouseEventKind::MiddleClick => {
+            MouseEventKind::DoubleClick => {}
+            MouseEventKind::MiddleClick if self.areas[Areas::Table].contains(event.into()) => {
                 let clicked_row: usize = event.y.saturating_sub(self.areas[Areas::Table].y).into();
 
                 if let Some(selected_song) = self
@@ -597,15 +729,18 @@ impl Pane for QueuePane {
                     });
                 }
             }
-            MouseEventKind::ScrollDown => {
+            MouseEventKind::MiddleClick => {}
+            MouseEventKind::ScrollDown if self.areas[Areas::Table].contains(event.into()) => {
                 self.queue.scroll_down(1, ctx.config.scrolloff);
                 ctx.render()?;
             }
-            MouseEventKind::ScrollUp => {
+            MouseEventKind::ScrollDown => {}
+            MouseEventKind::ScrollUp if self.areas[Areas::Table].contains(event.into()) => {
                 self.queue.scroll_up(1, ctx.config.scrolloff);
                 ctx.render()?;
             }
-            MouseEventKind::RightClick => {
+            MouseEventKind::ScrollUp => {}
+            MouseEventKind::RightClick if self.areas[Areas::Table].contains(event.into()) => {
                 let clicked_row: usize = event.y.saturating_sub(self.areas[Areas::Table].y).into();
                 if let Some(idx) = self.queue.state.get_at_rendered_row(clicked_row) {
                     self.queue.select_idx(idx, ctx.config.scrolloff);
@@ -614,6 +749,7 @@ impl Pane for QueuePane {
                 }
                 self.open_context_menu(ctx);
             }
+            MouseEventKind::RightClick => {}
             MouseEventKind::Drag { .. } => {}
         }
 
@@ -875,6 +1011,10 @@ impl Pane for QueuePane {
                         Ok(())
                     });
                     status_info!("Shuffled the queue");
+                }
+                QueueActions::SortByColumn(idx) => {
+                    self.sort_by_column(*idx, ctx)?;
+                    ctx.render()?;
                 }
                 QueueActions::Unused => {}
             }

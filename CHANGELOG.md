@@ -18,6 +18,8 @@ if false
 - Triggering `JumpToCurrent` twice will now center the currently playing song
 - Keybinds now support sequences of keys instead of a single key chord. Existing keybinds should work
 the same.
+- Added `SortByColumn(_)` to sort the queue by the given column. Clicking the table header also sorts
+the queue by the given column.
 
 ### Changed
 
