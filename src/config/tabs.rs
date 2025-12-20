@@ -242,7 +242,7 @@ pub enum BorderTypeFile {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
-pub(super) struct TabsFile(Vec<TabFile>);
+pub struct TabsFile(Vec<TabFile>);
 
 #[derive(Debug, Default, Clone)]
 pub struct Tabs {

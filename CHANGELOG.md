@@ -37,6 +37,7 @@ configured with the new `album_art.order` option
 - `highlighted_item_style` having unstyled spaces between columns in the queue table
 - rmpc not correctly removing keyboard enhancement flags
 - Unfocusable panes being unable to receive mouse events when put inside a tab
+- Tabs now respect changes in `components` when they change via remote ipc
 
 ## [0.10.0] - 2025-11-11
 

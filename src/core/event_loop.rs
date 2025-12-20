@@ -206,6 +206,19 @@ fn main_task<B: Backend + std::io::Write>(
                         status_error!(error:? = err; "Cannot change theme, invalid config: '{err}'");
                         continue;
                     }
+
+                    config.tabs = match config
+                        .original_tabs_definition
+                        .clone()
+                        .convert(&config.theme.components)
+                    {
+                        Ok(v) => v,
+                        Err(err) => {
+                            status_error!(error:? = err; "Cannot change theme, failed to convert tabs: '{err}'");
+                            continue;
+                        }
+                    };
+
                     config.active_panes =
                         Config::calc_active_panes(&config.tabs.tabs, &config.theme.layout);
                     ctx.config = Arc::new(config);
