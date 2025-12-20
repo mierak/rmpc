@@ -85,6 +85,7 @@ pub struct Config {
     pub search: Search,
     pub artists: Artists,
     pub tabs: Tabs,
+    pub original_tabs_definition: TabsFile,
     pub active_panes: Vec<PaneType>,
     pub browser_song_sort: Arc<SortOptions>,
     pub show_playlists_in_browser: ShowPlaylistsMode,
@@ -398,6 +399,7 @@ impl ConfigFile {
 
         let theme = UiConfig::try_from(theme)?;
 
+        let original_tabs_definition = self.tabs.clone();
         let tabs: Tabs = self.tabs.convert(&theme.components)?;
         let active_panes = Config::calc_active_panes(&tabs.tabs, &theme.layout);
 
@@ -415,6 +417,7 @@ impl ConfigFile {
             enable_lyrics_index: self.enable_lyrics_index,
             enable_lyrics_hot_reload: self.enable_lyrics_hot_reload,
             tabs,
+            original_tabs_definition,
             active_panes,
             address,
             password,
