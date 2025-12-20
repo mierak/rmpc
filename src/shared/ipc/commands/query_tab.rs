@@ -24,7 +24,7 @@ impl SocketCommandExecute for QueryCommand {
     ) -> Result<()> {
         event_tx
             .send(AppEvent::IpcQuery { stream, targets: self.targets })
-            .map_err(|err| anyhow::anyhow!("Failed to send QueryTab event: {}", err))?;
+            .map_err(|err| anyhow::anyhow!("Failed to send QueryTab event: {err}"))?;
         Ok(())
     }
 }

@@ -462,7 +462,7 @@ where
     E: IntoIterator<Item = (&'a str, &'a str)> + std::fmt::Debug,
 {
     let [cmd, args @ ..] = command else {
-        bail!("Invalid command: {:?}", command);
+        bail!("Invalid command: {command:?}");
     };
 
     let mut cmd = std::process::Command::new(cmd);
@@ -478,7 +478,7 @@ where
     let out = match cmd.output() {
         Ok(out) => out,
         Err(err) => {
-            bail!("Unexpected error when executing external command: {:?}", err);
+            bail!("Unexpected error when executing external command: {err:?}");
         }
     };
 

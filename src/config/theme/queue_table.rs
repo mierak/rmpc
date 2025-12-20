@@ -205,11 +205,7 @@ impl TryFrom<QueueTableColumnsFile> for QueueTableColumns {
                                         }
                                         Ok(val) => Ok(Some(val)),
                                         Err(err) => {
-                                            bail!(
-                                                "Invalid width format: '{}'. Error: {}",
-                                                width,
-                                                err
-                                            )
+                                            bail!("Invalid width format: '{width}'. Error: {err}")
                                         }
                                     }
                                 },

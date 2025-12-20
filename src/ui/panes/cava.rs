@@ -363,7 +363,7 @@ impl CavaPane {
         self.command_channel
             .0
             .send_timeout(cmd, Duration::from_secs(3))
-            .map_err(|err| anyhow!("Failed to send command to cava thread: {}", err))
+            .map_err(|err| anyhow!("Failed to send command to cava thread: {err}"))
     }
 }
 

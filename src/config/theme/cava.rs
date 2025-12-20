@@ -184,8 +184,7 @@ impl CavaThemeFile {
                                     Ok((k, (r, g, b)))
                                 }
                                 result => Err(anyhow::anyhow!(
-                                    "Gradient colors must be hex or RGB colors, got {:?}",
-                                    result
+                                    "Gradient colors must be hex or RGB colors, got {result:?}"
                                 )),
                             }
                         })

@@ -319,7 +319,7 @@ impl FromStr for YtDlpPlaylistOrHost {
         let url = url::Url::parse(s)?;
 
         let Some(host) = url.host_str() else {
-            bail!("Invalid yt-dlp url: '{}'. No hostname found.", s);
+            bail!("Invalid yt-dlp url: '{s}'. No hostname found.");
         };
 
         match host.strip_prefix("www.").unwrap_or(host) {
@@ -353,7 +353,7 @@ impl FromStr for YtDlpPlaylistOrHost {
                         .ok_or_else(|| anyhow!("No video id found in url"))
                         .map(YtDlpPlaylistOrHost::Single)
                 } else {
-                    bail!("Invalid youtube video url: '{}'", s);
+                    bail!("Invalid youtube video url: '{s}'");
                 }
             }
             "youtu.be" => url
@@ -370,13 +370,13 @@ impl FromStr for YtDlpPlaylistOrHost {
             "soundcloud.com" | "api.soundcloud.com" => {
                 let mut path_segments = url.path_segments().context("cannot-be-a-base URL")?;
                 let Some(first) = path_segments.next() else {
-                    bail!("Invalid soundcloud url: '{}'", s);
+                    bail!("Invalid soundcloud url: '{s}'");
                 };
 
                 if first == "tracks" {
                     // API form: https://api.soundcloud.com/tracks/<id>
                     let Some(track_id) = path_segments.next() else {
-                        bail!("Invalid soundcloud api url, no track id: '{}'", s);
+                        bail!("Invalid soundcloud api url, no track id: '{s}'");
                     };
                     Ok(YtDlpPlaylistOrHost::Single(YtDlpHost {
                         id: track_id.to_string(),
@@ -387,7 +387,7 @@ impl FromStr for YtDlpPlaylistOrHost {
                     // Web form: https://soundcloud.com/<user>/<track>
                     let username = first;
                     let Some(track_name) = path_segments.next() else {
-                        bail!("Invalid soundcloud url, no track name: '{}'", s);
+                        bail!("Invalid soundcloud url, no track name: '{s}'");
                     };
                     Ok(YtDlpPlaylistOrHost::Single(YtDlpHost {
                         id: format!("{username}/{track_name}"),
@@ -399,10 +399,10 @@ impl FromStr for YtDlpPlaylistOrHost {
             "nicovideo.jp" => {
                 let mut path_segments = url.path_segments().context("cannot-be-a-base URL")?;
                 let Some(_watch_segment) = path_segments.next() else {
-                    bail!("Invalid nicovideo url, no watch segment: '{}'", s);
+                    bail!("Invalid nicovideo url, no watch segment: '{s}'");
                 };
                 let Some(id) = path_segments.next() else {
-                    bail!("Invalid nicovideo url, no video id: '{}'", s);
+                    bail!("Invalid nicovideo url, no video id: '{s}'");
                 };
                 Ok(YtDlpPlaylistOrHost::Single(YtDlpHost {
                     id: id.to_string(),
@@ -410,7 +410,7 @@ impl FromStr for YtDlpPlaylistOrHost {
                     kind: YtDlpHostKind::NicoVideo,
                 }))
             }
-            _ => bail!("Invalid yt-dlp url: '{}'. Received hostname: '{}'", s, host),
+            _ => bail!("Invalid yt-dlp url: '{s}'. Received hostname: '{host}'"),
         }
     }
 }

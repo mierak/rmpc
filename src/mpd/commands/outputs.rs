@@ -24,9 +24,7 @@ impl FromMpd for Outputs {
         self.0
             .last_mut()
             .context(anyhow!(
-                "No element in accumulator while parsing Outputs. Key '{}' Value :'{}'",
-                key,
-                value
+                "No element in accumulator while parsing Outputs. Key '{key}' Value :'{value}'"
             ))?
             .next_internal(key, value)
     }
