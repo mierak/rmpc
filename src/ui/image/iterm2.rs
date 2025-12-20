@@ -83,7 +83,7 @@ impl Backend for Iterm2 {
                 match resize_image(image_data, area, max_size, halign, valign) {
                     Ok(v) => v,
                     Err(err) => {
-                        bail!("Failed to resize image, err: {}", err);
+                        bail!("Failed to resize image, err: {err}");
                     }
                 };
             let Ok(jpg) = jpg_encode(&image) else { bail!("Failed to encode image as jpg") };

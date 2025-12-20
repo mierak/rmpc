@@ -155,7 +155,7 @@ impl std::str::FromStr for OnOffOneshot {
             "0" => Ok(OnOffOneshot::Off),
             "1" => Ok(OnOffOneshot::On),
             "oneshot" => Ok(OnOffOneshot::Oneshot),
-            val => Err(anyhow!("Received unknown value for OnOffOneshot '{}'", val)),
+            val => Err(anyhow!("Received unknown value for OnOffOneshot '{val}'")),
         }
     }
 }
@@ -177,7 +177,7 @@ impl std::str::FromStr for State {
             "play" => Ok(Self::Play),
             "stop" => Ok(Self::Stop),
             "pause" => Ok(Self::Pause),
-            _ => Err(anyhow!("Invalid State: '{}'", s)),
+            _ => Err(anyhow!("Invalid State: '{s}'")),
         }
     }
 }

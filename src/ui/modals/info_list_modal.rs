@@ -38,7 +38,7 @@ pub struct InfoListModal {
 }
 
 #[derive(Debug)]
-struct KeyValues(Vec<KeyValue>);
+pub struct KeyValues(Vec<KeyValue>);
 #[derive(Debug)]
 struct KeyValue {
     key: String,

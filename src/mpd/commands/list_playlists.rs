@@ -29,9 +29,7 @@ impl FromMpd for Vec<Playlist> {
 
         self.last_mut()
             .context(anyhow!(
-                "No element in accumulator while parsing Playlists. Key '{}' Value :'{}'",
-                key,
-                value
+                "No element in accumulator while parsing Playlists. Key '{key}' Value :'{value}'"
             ))?
             .next_internal(key, value)
     }

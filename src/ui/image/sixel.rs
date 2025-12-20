@@ -89,7 +89,7 @@ impl Backend for Sixel {
         let (image, resized_area) = match resize_image(image_data, area, max_size, halign, valign) {
             Ok(v) => v,
             Err(err) => {
-                bail!("Failed to resize image, err: {}", err);
+                bail!("Failed to resize image, err: {err}");
             }
         };
 

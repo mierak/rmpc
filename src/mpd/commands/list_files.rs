@@ -32,9 +32,7 @@ impl FromMpd for ListFiles {
         self.0
             .last_mut()
             .context(anyhow!(
-                "No element in accumulator while parsing ListFiles. Key '{}' Value :'{}'",
-                key,
-                value
+                "No element in accumulator while parsing ListFiles. Key '{key}' Value :'{value}'"
             ))?
             .next_internal(key, value)
     }

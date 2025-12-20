@@ -50,11 +50,7 @@ impl FromMpd for Dir {
                 value
                     .split('/')
                     .next_back()
-                    .context(anyhow!(
-                        "Failed to parse dir name. Key: '{}' Value: '{}'",
-                        key,
-                        value
-                    ))?
+                    .context(anyhow!("Failed to parse dir name. Key: '{key}' Value: '{value}'"))?
                     .clone_into(&mut self.name);
                 self.full_path = value;
             }
@@ -76,9 +72,7 @@ impl FromMpd for Playlist {
                     .split('/')
                     .next_back()
                     .context(anyhow!(
-                        "Failed to parse playlist name. Key: '{}' Value: '{}'",
-                        key,
-                        value
+                        "Failed to parse playlist name. Key: '{key}' Value: '{value}'"
                     ))?
                     .clone_into(&mut self.name);
                 self.full_path = value;
@@ -106,9 +100,7 @@ impl FromMpd for LsInfo {
         }
 
         match self.0.last_mut().context(anyhow!(
-            "No element in accumulator while parsing LsInfo. Key '{}' Value :'{}'",
-            key,
-            value
+            "No element in accumulator while parsing LsInfo. Key '{key}' Value :'{value}'"
         ))? {
             LsInfoEntry::Dir(dir) => dir.next_internal(key, value),
             LsInfoEntry::File(song) => song.next_internal(key, value),

@@ -13,9 +13,9 @@ impl FromStr for Percent {
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         Ok(Self(
             s.strip_suffix("%")
-                .context(anyhow!("Invalid percent format '{}'", s))?
+                .context(anyhow!("Invalid percent format '{s}'"))?
                 .parse()
-                .context(anyhow!("Invalid percent format '{}'", s))?,
+                .context(anyhow!("Invalid percent format '{s}'"))?,
         ))
     }
 }
