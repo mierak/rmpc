@@ -328,6 +328,7 @@ pub enum QueueActionsFile {
     ShowInfo,
     JumpToCurrent,
     Shuffle,
+    SortByColumn(usize),
 }
 
 #[derive(Debug, Display, Clone, Copy, EnumDiscriminants, PartialEq, Eq)]
@@ -342,19 +343,30 @@ pub enum QueueActions {
     JumpToCurrent,
     Shuffle,
     Unused,
+    SortByColumn(usize),
 }
 
-impl From<QueueActionsFile> for QueueActions {
-    fn from(value: QueueActionsFile) -> Self {
+impl TryFrom<QueueActionsFile> for QueueActions {
+    type Error = anyhow::Error;
+
+    fn try_from(value: QueueActionsFile) -> Result<Self, Self::Error> {
         match value {
-            QueueActionsFile::Delete => QueueActions::Delete,
-            QueueActionsFile::DeleteAll => QueueActions::DeleteAll,
-            QueueActionsFile::Play => QueueActions::Play,
-            QueueActionsFile::Save => QueueActions::Save,
-            QueueActionsFile::AddToPlaylist => QueueActions::AddToPlaylist,
-            QueueActionsFile::ShowInfo => QueueActions::Unused,
-            QueueActionsFile::JumpToCurrent => QueueActions::JumpToCurrent,
-            QueueActionsFile::Shuffle => QueueActions::Shuffle,
+            QueueActionsFile::Delete => Ok(QueueActions::Delete),
+            QueueActionsFile::DeleteAll => Ok(QueueActions::DeleteAll),
+            QueueActionsFile::Play => Ok(QueueActions::Play),
+            QueueActionsFile::Save => Ok(QueueActions::Save),
+            QueueActionsFile::AddToPlaylist => Ok(QueueActions::AddToPlaylist),
+            QueueActionsFile::ShowInfo => Ok(QueueActions::Unused),
+            QueueActionsFile::JumpToCurrent => Ok(QueueActions::JumpToCurrent),
+            QueueActionsFile::Shuffle => Ok(QueueActions::Shuffle),
+            QueueActionsFile::SortByColumn(idx) => {
+                let idx = idx.checked_sub(1);
+                let idx = idx.ok_or_else(|| {
+                    anyhow::anyhow!("Column index for SortByColumn must be 1 or higher")
+                })?;
+
+                Ok(QueueActions::SortByColumn(idx))
+            }
         }
     }
 }
@@ -362,18 +374,20 @@ impl From<QueueActionsFile> for QueueActions {
 impl ToDescription for QueueActions {
     fn to_description(&self) -> Cow<'static, str> {
         match self {
-            QueueActions::Delete => "Remove song under curor from the queue",
-            QueueActions::DeleteAll => "Clear current queue",
-            QueueActions::Play => "Play song under cursor",
-            QueueActions::Save => "Save current queue as a new playlist",
-            QueueActions::AddToPlaylist => "Add song under cursor to an existing playlist",
-            QueueActions::Unused => "unused",
+            QueueActions::Delete => "Remove song under curor from the queue".into(),
+            QueueActions::DeleteAll => "Clear current queue".into(),
+            QueueActions::Play => "Play song under cursor".into(),
+            QueueActions::Save => "Save current queue as a new playlist".into(),
+            QueueActions::AddToPlaylist => "Add song under cursor to an existing playlist".into(),
+            QueueActions::Unused => "unused".into(),
             QueueActions::JumpToCurrent => {
-                "Moves the cursor in Queue table to the currently playing song"
+                "Moves the cursor in Queue table to the currently playing song".into()
             }
-            QueueActions::Shuffle => "Shuffles the current queue",
+            QueueActions::Shuffle => "Shuffles the current queue".into(),
+            QueueActions::SortByColumn(idx) => {
+                format!("Sort the queue by the {idx}. column").into()
+            }
         }
-        .into()
     }
 }
 

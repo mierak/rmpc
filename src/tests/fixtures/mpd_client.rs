@@ -309,6 +309,14 @@ impl MpdClient for TestMpdClient {
         Ok(())
     }
 
+    fn swap_position(&mut self, _song1: usize, _song2: usize) -> MpdResult<()> {
+        todo!("Not yet implemented")
+    }
+
+    fn swap_id(&mut self, _id1: u32, _id2: u32) -> MpdResult<()> {
+        todo!("Not yet implemented")
+    }
+
     fn delete_id(&mut self, _id: u32) -> MpdResult<()> {
         todo!("Not yet implemented")
     }

@@ -186,7 +186,11 @@ impl TryFrom<KeyConfigFile> for KeyConfig {
                 search: HashMap::new(),
                 #[cfg(debug_assertions)]
                 logs: value.logs.into_iter().map(|(k, v)| (k, v.into())).collect(),
-                queue: value.queue.into_iter().map(|(k, v)| (k, v.into())).collect(),
+                queue: value
+                    .queue
+                    .into_iter()
+                    .map(|(k, v)| -> anyhow::Result<_> { Ok((k, v.try_into()?)) })
+                    .collect::<anyhow::Result<_>>()?,
             })
         } else {
             let global: HashMap<KeySequence, GlobalAction> =
@@ -196,8 +200,11 @@ impl TryFrom<KeyConfigFile> for KeyConfig {
                 .into_iter()
                 .map(|(k, v)| -> anyhow::Result<_> { Ok((k, v.try_into()?)) })
                 .collect::<anyhow::Result<_>>()?;
-            let queue: HashMap<KeySequence, QueueActions> =
-                value.queue.into_iter().map(|(k, v)| (k, v.into())).collect();
+            let queue: HashMap<KeySequence, QueueActions> = value
+                .queue
+                .into_iter()
+                .map(|(k, v)| -> anyhow::Result<_> { Ok((k, v.try_into()?)) })
+                .collect::<anyhow::Result<_>>()?;
             #[cfg(debug_assertions)]
             let logs: HashMap<KeySequence, LogsActions> =
                 value.logs.into_iter().map(|(k, v)| (k, v.into())).collect();

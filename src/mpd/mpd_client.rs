@@ -133,6 +133,8 @@ pub trait MpdCommand {
     fn send_list_mounts(&mut self) -> MpdResult<()>;
     fn send_add(&mut self, path: &str, position: Option<QueuePosition>) -> MpdResult<()>;
     fn send_clear(&mut self) -> MpdResult<()>;
+    fn send_swap_position(&mut self, song1: usize, song2: usize) -> MpdResult<()>;
+    fn send_swap_id(&mut self, id1: u32, id2: u32) -> MpdResult<()>;
     fn send_delete_id(&mut self, id: u32) -> MpdResult<()>;
     fn send_delete_from_queue(&mut self, songs: SingleOrRange) -> MpdResult<()>;
     fn send_playlist_info(&mut self) -> MpdResult<()>;
@@ -263,6 +265,10 @@ pub trait MpdClient: Sized {
     // Current queue
     fn add(&mut self, path: &str, position: Option<QueuePosition>) -> MpdResult<()>;
     fn clear(&mut self) -> MpdResult<()>;
+    // Swaps the songs at position SONG1 and SONG2 in the current playlist. Zero
+    // based index.
+    fn swap_position(&mut self, song1: usize, song2: usize) -> MpdResult<()>;
+    fn swap_id(&mut self, id1: u32, id2: u32) -> MpdResult<()>;
     fn delete_id(&mut self, id: u32) -> MpdResult<()>;
     fn delete_from_queue(&mut self, songs: SingleOrRange) -> MpdResult<()>;
     fn playlist_info(&mut self) -> MpdResult<Option<Vec<Song>>>;
@@ -527,6 +533,14 @@ impl MpdClient for Client<'_> {
 
     fn clear(&mut self) -> MpdResult<()> {
         self.send_clear().and_then(|()| self.read_ok())
+    }
+
+    fn swap_position(&mut self, song1: usize, song2: usize) -> MpdResult<()> {
+        self.send_swap_position(song1, song2).and_then(|()| self.read_ok())
+    }
+
+    fn swap_id(&mut self, id1: u32, id2: u32) -> MpdResult<()> {
+        self.send_swap_id(id1, id2).and_then(|()| self.read_ok())
     }
 
     fn delete_id(&mut self, id: u32) -> MpdResult<()> {
@@ -1093,6 +1107,14 @@ impl<T: SocketClient> MpdCommand for T {
 
     fn send_clear(&mut self) -> MpdResult<()> {
         self.execute("clear")
+    }
+
+    fn send_swap_position(&mut self, song1: usize, song2: usize) -> MpdResult<()> {
+        self.execute(&format!("swap {song1} {song2}"))
+    }
+
+    fn send_swap_id(&mut self, id1: u32, id2: u32) -> MpdResult<()> {
+        self.execute(&format!("swapid {id1} {id2}"))
     }
 
     fn send_delete_id(&mut self, id: u32) -> MpdResult<()> {
