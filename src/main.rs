@@ -233,6 +233,8 @@ fn main() -> Result<()> {
             println!("{:<20} {term}", "$TERM");
             println!("{:<20} {term_program}", "$TERM_PROGRAM");
             println!("{:<20} {}", "Emulator", TERMINAL.emulator());
+            println!("{:<20} {}", "Kitty Keyboard", TERMINAL.keyboard_protocol_kitty());
+            println!("{:<20} {}", "ZELLIJ", TERMINAL.zellij());
 
             println!("\nVisualizer:");
             println!("{}", CAVA.display());

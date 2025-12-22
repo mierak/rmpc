@@ -40,6 +40,8 @@ configured with the new `album_art.order` option
 - rmpc not correctly removing keyboard enhancement flags
 - Unfocusable panes being unable to receive mouse events when put inside a tab
 - Tabs now respect changes in `components` when they change via remote ipc
+- Album art will now be completely disabled when zellij is detected and image method is set to `Auto`.
+You can still force other image backend via config.
 
 ## [0.10.0] - 2025-11-11
 

@@ -16,6 +16,7 @@ use crossterm::{
 use crate::{
     config::album_art::{ImageMethod, ImageMethodFile},
     shared::{
+        env::ENV,
         terminal::{crossterm_backend::CrosstermLockingBackend, tty::Tty},
         tmux::IS_TMUX,
     },
@@ -38,6 +39,7 @@ pub struct Terminal {
     sixel: LazyLock<bool>,
     ueberzug_x11: LazyLock<bool>,
     ueberzug_wayland: LazyLock<bool>,
+    zellij: bool,
 }
 
 pub static TERMINAL: LazyLock<Terminal> = LazyLock::new(Terminal::init);
@@ -45,6 +47,7 @@ pub static TERMINAL: LazyLock<Terminal> = LazyLock::new(Terminal::init);
 #[allow(dead_code)]
 impl Terminal {
     pub fn init() -> Self {
+        let zellij = ENV.var("ZELLIJ").is_ok_and(|v| !v.is_empty());
         let kitty_keyboard_protocol = features::detect_kitty_keyboard()
             .inspect_err(
                 |err| log::error!(err:?; "Failed to determine kitty keyboard protocol support"),
@@ -75,6 +78,7 @@ impl Terminal {
             sixel,
             ueberzug_x11,
             ueberzug_wayland,
+            zellij,
         }
     }
 
@@ -98,6 +102,14 @@ impl Terminal {
         *self.ueberzug_wayland
     }
 
+    pub fn keyboard_protocol_kitty(&self) -> bool {
+        self.kitty_keyboard_protocol
+    }
+
+    pub fn zellij(&self) -> bool {
+        self.zellij
+    }
+
     pub fn resolve_image_backend(&self, requested_backend: ImageMethodFile) -> ImageMethod {
         let result = match requested_backend {
             ImageMethodFile::UeberzugWayland if self.ueberzug_wayland() => {
@@ -117,6 +129,10 @@ impl Terminal {
             ImageMethodFile::Sixel => ImageMethod::Sixel,
             ImageMethodFile::Block => ImageMethod::Block,
             ImageMethodFile::None => ImageMethod::None,
+            ImageMethodFile::Auto if self.zellij => {
+                log::debug!(requested_backend:?; "Zellij detected, disabling image backend");
+                ImageMethod::None
+            }
             ImageMethodFile::Auto => self.autodetect_image_backend().into(),
         };
 
