@@ -306,6 +306,19 @@ impl Command {
                     Ok(())
                 }))
             }
+            Command::Save { name } => Ok(Box::new(move |client| {
+                client.save_queue_as_playlist(&name, None)?;
+                Ok(())
+            })),
+            Command::Load { names } => Ok(Box::new(|client| {
+                client.send_start_cmd_list()?;
+                for name in names {
+                    client.send_load_playlist(&name, None)?;
+                }
+                client.send_execute_cmd_list()?;
+                client.read_ok()?;
+                Ok(())
+            })),
             Command::Decoders => Ok(Box::new(|client| {
                 println!("{}", serde_json::ser::to_string(&client.decoders()?)?);
                 Ok(())

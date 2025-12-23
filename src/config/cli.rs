@@ -256,6 +256,14 @@ pub enum Command {
         #[arg(short, long, allow_negative_numbers = true)]
         position: Option<QueuePosition>,
     },
+    Save {
+        #[arg(required = true)]
+        name: String,
+    },
+    Load {
+        #[arg(required = true)]
+        names: Vec<String>,
+    },
     /// List MPD outputs
     Outputs,
     /// Toggle MPD output on or off
