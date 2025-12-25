@@ -1,5 +1,6 @@
-use std::{collections::HashMap, sync::Arc};
+use std::{collections::HashMap, path::PathBuf, sync::Arc};
 
+use anyhow::Context;
 use itertools::Itertools;
 
 use crate::{
@@ -7,7 +8,7 @@ use crate::{
     ctx::Ctx,
     mpd::{
         QueuePosition,
-        commands::{State, outputs::Outputs, stickers::Stickers},
+        commands::{IdleEvent, State, Status, outputs::Outputs, stickers::Stickers},
         errors::{ErrorCode, MpdError, MpdFailureResponse},
         mpd_client::{Filter, FilterKind, MpdClient, MpdCommand, SingleOrRange, Tag},
         proto_client::ProtoClient,
@@ -75,6 +76,12 @@ pub trait MpdClientExt {
         items: Vec<Enqueue>,
     ) -> Result<(), MpdError>;
     fn delete_sticker_multiple(&mut self, key: &str, items: Vec<Enqueue>) -> Result<(), MpdError>;
+    fn add_downloaded_files_to_queue(
+        &mut self,
+        paths: Vec<String>,
+        cache_dir: Option<PathBuf>,
+        position: Option<QueuePosition>,
+    ) -> Result<(), MpdError>;
 }
 
 #[derive(Debug, Clone)]
@@ -458,6 +465,82 @@ impl<T: MpdClient + MpdCommand + ProtoClient> MpdClientExt for T {
                 Err(MpdError::Mpd(MpdFailureResponse { code: ErrorCode::NoExist, .. })) => {}
                 err @ Err(_) => err?,
             }
+        }
+
+        Ok(())
+    }
+
+    fn add_downloaded_files_to_queue(
+        &mut self,
+        paths: Vec<String>,
+        cache_dir: Option<PathBuf>,
+        position: Option<QueuePosition>,
+    ) -> Result<(), MpdError> {
+        self.send_start_cmd_list()?;
+        for file in &paths {
+            self.send_add(file, position)?;
+        }
+        self.send_execute_cmd_list()?;
+        match self.read_ok() {
+            Ok(()) => {}
+            Err(MpdError::Mpd(err)) if err.is_no_exist() => {
+                let Some(cache_dir) = cache_dir else {
+                    // This should not happen, the download should only happen when
+                    // cache_dir is defined in the first place.
+                    log::error!(err:?; "MPD reported error when adding files from yt-dlp cache dir, but cache_dir is not configured");
+                    return Err(MpdError::Mpd(err))?;
+                };
+                let Some(cfg) = &self.config() else {
+                    // This should not happen either, music_directory is required for
+                    // MPD to work and rmpc needs socket connection to use yt-dpl so it
+                    // should always have permission to access the config.
+                    log::error!(err:?; "MPD reported error when adding files from yt-dlp cache dir, but cannot get music_directory from MPD");
+                    return Err(MpdError::Mpd(err))?;
+                };
+                let music_directory = &cfg.music_directory;
+
+                log::warn!(cache_dir:?, music_directory:?; "MPD reported noexist error when adding files from yt-dlp cache dir. Will try again after issuing database update.");
+
+                let Ok(update_dir) = cache_dir.strip_prefix(music_directory) else {
+                    // Rethrow the original error. The cache_dir is not inside the
+                    // music_directory so there is no reason to try to issue update to
+                    // mpd.
+                    return Err(MpdError::Mpd(err))?;
+                };
+
+                log::trace!("Issuing database update");
+                let job_id = self
+                    .update(Some(
+                        update_dir
+                            .to_str() // MPD protocol is always utf-8, this should be safe
+                            .context("update dir is not valid utf-8")?,
+                    ))?
+                    .job_id;
+
+                // Wait for update to finish
+                loop {
+                    log::trace!("Entering idle, waiting for update event");
+                    self.idle(Some(IdleEvent::Update))?;
+                    let Status { updating_db, .. } = self.get_status()?;
+                    log::trace!("Update event received");
+                    match updating_db {
+                        Some(current_id) if current_id > job_id => {
+                            break;
+                        }
+                        Some(_id) => {}
+                        None => break,
+                    }
+                }
+
+                log::debug!("Trying to add the downloaded files again");
+                self.send_start_cmd_list()?;
+                for file in &paths {
+                    self.send_add(file, position)?;
+                }
+                self.send_execute_cmd_list()?;
+                self.read_ok()?;
+            }
+            original @ Err(_) => original?,
         }
 
         Ok(())

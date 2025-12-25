@@ -5,11 +5,12 @@ use crossbeam::channel::{Receiver, Sender};
 
 use crate::{
     config::{Config, cli_config::CliConfig},
-    mpd::{mpd_client::MpdCommand, proto_client::ProtoClient},
+    mpd::client::Client,
     shared::{
         events::{AppEvent, ClientRequest, WorkDone, WorkRequest},
         lrc::LrcIndex,
         macros::try_skip,
+        mpd_client_ext::MpdClientExt,
         mpd_query::MpdCommand as QueryCmd,
         ytdlp::YtDlp,
     },
@@ -46,15 +47,12 @@ fn handle_work_request(
             } else {
                 let url = YtDlp::search_single(kind, &query)?;
                 let files = YtDlp::init_and_download(config, &url)?;
-                let cb = move |client: &mut crate::mpd::client::Client<'_>| -> anyhow::Result<()> {
-                    client.send_start_cmd_list()?;
-                    for f in &files {
-                        client.send_add(f, position)?;
-                    }
-                    client.send_execute_cmd_list()?;
-                    client.read_ok()?;
+                let cache_dir = config.cache_dir.clone();
+
+                let cb = Box::new(move |client: &mut Client<'_>| {
+                    client.add_downloaded_files_to_queue(files, cache_dir, position)?;
                     Ok(())
-                };
+                });
                 try_skip!(
                     client_tx.send(ClientRequest::Command(QueryCmd { callback: Box::new(cb) })),
                     "Failed to send client request for SearchYt"

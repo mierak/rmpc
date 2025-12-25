@@ -12,7 +12,7 @@ use walkdir::WalkDir;
 
 use super::dependencies;
 use crate::{
-    config::{cli_config::CliConfig, utils::tilde_expand},
+    config::cli_config::CliConfig,
     shared::macros::{status_error, status_info, status_warn},
 };
 
@@ -276,9 +276,7 @@ impl YtDlpHost {
     }
 
     pub fn get_cached(&self, cache_dir: &Path) -> Option<PathBuf> {
-        let raw_path = cache_dir.as_str();
-        let expanded_dir = tilde_expand(raw_path.ok()?);
-        WalkDir::new(self.cache_subdir(Path::new(&expanded_dir.as_ref())))
+        WalkDir::new(self.cache_subdir(cache_dir))
             .into_iter()
             .filter_map(Result::ok)
             .filter(|e| e.file_type().is_file())
@@ -287,9 +285,7 @@ impl YtDlpHost {
     }
 
     pub fn delete_cached(&self, cache_dir: &Path) -> Result<()> {
-        let raw_path = cache_dir.as_str();
-        let expanded_dir = tilde_expand(raw_path?);
-        let files = WalkDir::new(self.cache_subdir(Path::new(&expanded_dir.as_ref())))
+        let files = WalkDir::new(self.cache_subdir(cache_dir))
             .into_iter()
             .filter_map(Result::ok)
             .filter(|e| e.file_type().is_file())

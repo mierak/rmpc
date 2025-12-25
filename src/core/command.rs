@@ -278,13 +278,9 @@ impl Command {
             })),
             Command::AddYt { url, position } => {
                 let file_paths = YtDlp::init_and_download(config, &url)?;
+                let cache_dir = config.cache_dir.clone();
                 Ok(Box::new(move |client| {
-                    client.send_start_cmd_list()?;
-                    for file in file_paths {
-                        client.send_add(&file, position)?;
-                    }
-                    client.send_execute_cmd_list()?;
-                    client.read_ok()?;
+                    client.add_downloaded_files_to_queue(file_paths, cache_dir, position)?;
                     Ok(())
                 }))
             }
@@ -296,13 +292,10 @@ impl Command {
                     YtDlp::search_single(kind, query.trim())?
                 };
                 let file_paths = YtDlp::init_and_download(config, &chosen_url)?;
+                let cache_dir = config.cache_dir.clone();
+
                 Ok(Box::new(move |client| {
-                    client.send_start_cmd_list()?;
-                    for file in &file_paths {
-                        client.send_add(file, position)?;
-                    }
-                    client.send_execute_cmd_list()?;
-                    client.read_ok()?;
+                    client.add_downloaded_files_to_queue(file_paths, cache_dir, position)?;
                     Ok(())
                 }))
             }

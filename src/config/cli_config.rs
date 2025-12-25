@@ -4,6 +4,7 @@ use anyhow::Result;
 use serde::{Deserialize, Serialize};
 
 use super::{Config, ConfigFile, MpdAddress, address::MpdPassword, utils::tilde_expand};
+use crate::config::utils::tilde_expand_path;
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct CliConfigFile {
@@ -76,7 +77,7 @@ impl CliConfigFile {
             MpdAddress::resolve(address_cli, password_cli, self.address, self.password);
 
         CliConfig {
-            cache_dir: self.cache_dir,
+            cache_dir: self.cache_dir.map(|v| tilde_expand_path(&v)),
             lyrics_dir: self.lyrics_dir.map(|v| {
                 let v = tilde_expand(&v);
                 if v.ends_with('/') { v.into_owned() } else { format!("{v}/") }
