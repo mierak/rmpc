@@ -141,6 +141,12 @@ pub struct MpdFailureResponse {
     pub message: String,
 }
 
+impl MpdFailureResponse {
+    pub fn is_no_exist(&self) -> bool {
+        self.code == ErrorCode::NoExist
+    }
+}
+
 impl Display for MpdFailureResponse {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(

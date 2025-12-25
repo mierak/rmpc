@@ -43,6 +43,8 @@ configured with the new `album_art.order` option
 - Tabs now respect changes in `components` when they change via remote ipc
 - Album art will now be completely disabled when zellij is detected and image method is set to `Auto`.
 You can still force other image backend via config.
+- yt-dlp integration will now try to issue a database update if the downloaded file cannot be found,
+should fix cases with `cache_dir` being set inside MPD's music directory
 
 ## [0.10.0] - 2025-11-11
 

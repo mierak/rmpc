@@ -43,7 +43,10 @@ use self::{
     theme::{ConfigColor, UiConfig, UiConfigFile},
 };
 use crate::{
-    config::tabs::{SizedPaneOrSplit, Tab, TabName},
+    config::{
+        tabs::{SizedPaneOrSplit, Tab, TabName},
+        utils::tilde_expand_path,
+    },
     shared::{lrc::LrcOffset, terminal::TERMINAL},
     tmux,
 };
@@ -408,7 +411,7 @@ impl ConfigFile {
         let album_art_method = self.album_art.method;
         let mut config = Config {
             theme_name: self.theme,
-            cache_dir: self.cache_dir,
+            cache_dir: self.cache_dir.map(|v| tilde_expand_path(&v)),
             lyrics_dir: self.lyrics_dir.map(|v| {
                 let v = tilde_expand(&v);
                 if v.ends_with('/') { v.into_owned() } else { format!("{v}/") }
@@ -539,18 +542,39 @@ impl From<OnOffOneshot> for crate::mpd::commands::status::OnOffOneshot {
 }
 
 pub mod utils {
-    use std::{borrow::Cow, path::MAIN_SEPARATOR};
+    use std::{
+        borrow::Cow,
+        path::{MAIN_SEPARATOR, Path, PathBuf},
+    };
 
     use crate::shared::env::ENV;
+
+    pub fn tilde_expand_path(inp: &Path) -> PathBuf {
+        let Ok(home) = ENV.var("HOME") else {
+            return inp.to_owned();
+        };
+        let home = home.strip_suffix(MAIN_SEPARATOR).unwrap_or(home.as_ref());
+
+        if let Ok(inp) = inp.strip_prefix("~") {
+            if inp.as_os_str().is_empty() {
+                return home.into();
+            }
+
+            return PathBuf::from(home.to_owned()).join(inp);
+        }
+
+        inp.to_path_buf()
+    }
 
     pub fn tilde_expand(inp: &str) -> Cow<'_, str> {
         let Ok(home) = ENV.var("HOME") else {
             return Cow::Borrowed(inp);
         };
+        let home = home.strip_suffix("/").unwrap_or(home.as_ref());
 
         if let Some(inp) = inp.strip_prefix('~') {
             if inp.is_empty() {
-                return Cow::Owned(home);
+                return Cow::Owned(home.to_owned());
             }
 
             if inp.starts_with(MAIN_SEPARATOR) {
@@ -564,12 +588,15 @@ pub mod utils {
     #[cfg(test)]
     #[allow(clippy::unwrap_used)]
     mod tests {
-        use std::sync::{LazyLock, Mutex};
+        use std::{
+            path::PathBuf,
+            sync::{LazyLock, Mutex},
+        };
 
         use test_case::test_case;
 
         use super::tilde_expand;
-        use crate::shared::env::ENV;
+        use crate::{config::utils::tilde_expand_path, shared::env::ENV};
 
         static TEST_LOCK: LazyLock<Mutex<()>> = LazyLock::new(|| Mutex::new(()));
 
@@ -583,7 +610,7 @@ pub mod utils {
             let _guard = TEST_LOCK.lock().unwrap();
 
             ENV.clear();
-            ENV.set("HOME".to_string(), "/home/some_user".to_string());
+            ENV.set("HOME".to_string(), "/home/some_user/".to_string());
             assert_eq!(tilde_expand(input), expected);
         }
 
@@ -599,6 +626,38 @@ pub mod utils {
             ENV.clear();
             ENV.remove("HOME");
             assert_eq!(tilde_expand(input), expected);
+        }
+
+        #[test_case("~", "/home/some_user")]
+        #[test_case("~enene", "~enene")]
+        #[test_case("~nope/", "~nope/")]
+        #[test_case("~/yes", "/home/some_user/yes")]
+        #[test_case("no/~/no", "no/~/no")]
+        #[test_case("basic/path", "basic/path")]
+        fn home_dir_present_path(input: &str, expected: &str) {
+            let _guard = TEST_LOCK.lock().unwrap();
+
+            ENV.clear();
+            ENV.set("HOME".to_string(), "/home/some_user/".to_string());
+
+            let got = tilde_expand_path(&PathBuf::from(input));
+            assert_eq!(got, PathBuf::from(expected));
+        }
+
+        #[test_case("~", "~")]
+        #[test_case("~enene", "~enene")]
+        #[test_case("~nope/", "~nope/")]
+        #[test_case("~/yes", "~/yes")]
+        #[test_case("no/~/no", "no/~/no")]
+        #[test_case("basic/path", "basic/path")]
+        fn home_dir_not_present_path(input: &str, expected: &str) {
+            let _guard = TEST_LOCK.lock().unwrap();
+
+            ENV.clear();
+            ENV.remove("HOME");
+
+            let got = tilde_expand_path(&PathBuf::from(input));
+            assert_eq!(got, PathBuf::from(expected));
         }
     }
 }
