@@ -16,7 +16,7 @@ use crate::{
     mpd::{client::Client, commands::Song, mpd_client::MpdClient},
     shared::{
         keys::ActionEvent,
-        macros::{modal, status_warn},
+        macros::{modal, status_info, status_warn},
         mouse_event::{MouseEvent, MouseEventKind, calculate_scrollbar_position},
         mpd_client_ext::{Enqueue, MpdClientExt, MpdDelete},
         mpd_query::EXTERNAL_COMMAND,
@@ -25,6 +25,7 @@ use crate::{
         dirstack::{DirStack, DirStackItem, WalkDirStackItem},
         input::InputResultEvent,
         modals::{
+            confirm_modal::{Action, ConfirmModal},
             input_modal::InputModal,
             menu::{
                 add_to_playlist_or_show_modal,
@@ -489,10 +490,30 @@ where
             CommonAction::Delete => {
                 let items = self.delete_items(false);
                 if !items.is_empty() {
-                    ctx.command(move |client| {
-                        client.delete_multiple(items)?;
-                        Ok(())
-                    });
+                    let len = items.len();
+                    modal!(
+                        ctx,
+                        ConfirmModal::builder()
+                            .ctx(ctx)
+                            .message(vec![
+                                format!("Are you sure you want to delete {} items?", len),
+                                "This action cannot be undone.".into()
+                            ])
+                            .action(Action::Single {
+                                confirm_label: Some("Delete"),
+                                cancel_label: None,
+                                on_confirm: Box::new(move |ctx| {
+                                    ctx.command(move |client| {
+                                        client.delete_multiple(items)?;
+                                        Ok(())
+                                    });
+                                    status_info!("Deleted {} items", len);
+                                    Ok(())
+                                }),
+                            })
+                            .size((45, 6))
+                            .build()
+                    );
                     self.stack_mut().current_mut().marked_mut().clear();
                 }
             }

@@ -45,6 +45,7 @@ configured with the new `album_art.order` option
 You can still force other image backend via config.
 - yt-dlp integration will now try to issue a database update if the downloaded file cannot be found,
 should fix cases with `cache_dir` being set inside MPD's music directory
+- Added missing confirmation when deleting playlist/songs from playlist
 
 ## [0.10.0] - 2025-11-11
 
