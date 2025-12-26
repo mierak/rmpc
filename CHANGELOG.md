@@ -21,6 +21,8 @@ the same.
 - Added `SortByColumn(_)` to sort the queue by the given column. Clicking the table header also sorts
 the queue by the given column.
 - Added `load` and `save` commands to the CLI
+- Added more config options to pane definitions, you can now define border titles, their style, position
+as well as fully custom border symbol sets
 
 ### Changed
 
