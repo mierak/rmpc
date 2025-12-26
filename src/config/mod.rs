@@ -403,7 +403,7 @@ impl ConfigFile {
         let theme = UiConfig::try_from(theme)?;
 
         let original_tabs_definition = self.tabs.clone();
-        let tabs: Tabs = self.tabs.convert(&theme.components)?;
+        let tabs: Tabs = self.tabs.convert(&theme.components, &theme.border_symbol_sets)?;
         let active_panes = Config::calc_active_panes(&tabs.tabs, &theme.layout);
 
         let (address, password) =

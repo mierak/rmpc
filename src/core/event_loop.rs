@@ -210,7 +210,7 @@ fn main_task<B: Backend + std::io::Write>(
                     config.tabs = match config
                         .original_tabs_definition
                         .clone()
-                        .convert(&config.theme.components)
+                        .convert(&config.theme.components, &config.theme.border_symbol_sets)
                     {
                         Ok(v) => v,
                         Err(err) => {

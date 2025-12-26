@@ -16,8 +16,12 @@ use self::{
     scrollbar::ScrollbarConfig,
     style::{StringColor, ToConfigOr},
 };
-use crate::mpd::commands::metadata_tag::MetadataTag;
+use crate::{
+    config::theme::borders::{BorderSetLib, BorderSetLibFile},
+    mpd::commands::metadata_tag::MetadataTag,
+};
 
+pub mod borders;
 pub mod cava;
 mod header;
 pub mod level_styles;
@@ -76,6 +80,7 @@ pub struct UiConfig {
     pub level_styles: LevelStyles,
     pub lyrics: LyricsConfig,
     pub cava: CavaTheme,
+    pub border_symbol_sets: BorderSetLib,
 }
 
 #[derive(Debug, Serialize, Deserialize, PartialEq, Eq)]
@@ -125,6 +130,8 @@ pub struct UiConfigFile {
     pub(super) lyrics: LyricsConfigFile,
     #[serde(default)]
     pub(super) cava: CavaThemeFile,
+    #[serde(default)]
+    pub border_symbol_sets: BorderSetLibFile,
 }
 
 impl Default for UiConfigFile {
@@ -201,6 +208,7 @@ impl Default for UiConfigFile {
             components: HashMap::default(),
             lyrics: LyricsConfigFile::default(),
             cava: CavaThemeFile::default(),
+            border_symbol_sets: BorderSetLibFile::default(),
         }
     }
 }
@@ -304,6 +312,7 @@ impl TagResolutionStrategy {
 // truly missing or a different kind of error occurs will the conversion fail.
 fn convert_components(
     value: HashMap<String, PaneOrSplitFile>,
+    border_set_lib: &BorderSetLib,
 ) -> Result<HashMap<String, SizedPaneOrSplit>> {
     let mut result = HashMap::new();
     let mut components = value.into_iter().collect_vec();
@@ -314,7 +323,7 @@ fn convert_components(
     loop {
         let current = components.get(i.checked_rem(components.len()).unwrap_or(0));
         match current {
-            Some((name, pane)) => match pane.convert(&result) {
+            Some((name, pane)) => match pane.convert(&result, border_set_lib) {
                 Ok(v) => {
                     result.insert(name.to_owned(), v);
                     components.remove(i % components.len());
@@ -361,10 +370,11 @@ impl TryFrom<UiConfigFile> for UiConfig {
         let bg_color = StringColor(value.background_color).to_color()?;
         let header_bg_color = StringColor(value.header_background_color).to_color()?.or(bg_color);
         let fallback_border_fg = Color::White;
-        let components = convert_components(value.components)?;
+        let border_set_lib: BorderSetLib = value.border_symbol_sets.try_into()?;
+        let components = convert_components(value.components, &border_set_lib)?;
 
         Ok(Self {
-            layout: value.layout.convert(&components)?,
+            layout: value.layout.convert(&components, &border_set_lib)?,
             components,
             cava: value.cava.into_config(bg_color)?,
             background_color: bg_color,
@@ -420,6 +430,7 @@ impl TryFrom<UiConfigFile> for UiConfig {
                 .to_config_or(None, None)?,
             level_styles: value.level_styles.try_into()?,
             lyrics: value.lyrics.into(),
+            border_symbol_sets: border_set_lib,
         })
     }
 }

@@ -19,7 +19,10 @@ use super::theme::{
     volume_slider::{VolumeSliderConfig, VolumeSliderConfigFile},
 };
 use crate::{
-    config::theme::properties::Alignment,
+    config::theme::{
+        borders::{BorderSetLib, BorderSymbols, BorderSymbolsFile},
+        properties::Alignment,
+    },
     shared::id::{self, Id},
 };
 
@@ -213,12 +216,19 @@ impl TryFrom<PaneTypeFile> for PaneType {
 }
 
 impl TabsFile {
-    pub fn convert(self, library: &HashMap<String, SizedPaneOrSplit>) -> Result<Tabs> {
+    pub fn convert(
+        self,
+        library: &HashMap<String, SizedPaneOrSplit>,
+        border_set_library: &BorderSetLib,
+    ) -> Result<Tabs> {
         let (names, tabs): (Vec<_>, HashMap<_, _>) = self
             .0
             .into_iter()
             .map(|tab| -> Result<_> {
-                Ok(Tab { name: tab.name.into(), panes: tab.pane.convert(library)? })
+                Ok(Tab {
+                    name: tab.name.into(),
+                    panes: tab.pane.convert(library, border_set_library)?,
+                })
             })
             .try_fold((Vec::new(), HashMap::new()), |(mut names, mut tabs), tab| -> Result<_> {
                 let tab = tab?;
@@ -315,6 +325,7 @@ impl Default for PaneOrSplitFile {
                     border_title: Vec::new(),
                     border_title_position: BorderTitlePosition::Top,
                     border_title_alignment: Alignment::Left,
+                    border_symbols: BorderSymbolsFile::default(),
                     pane: PaneOrSplitFile::Pane(PaneTypeFile::Header),
                 },
                 SubPaneFile {
@@ -323,6 +334,7 @@ impl Default for PaneOrSplitFile {
                     border_title: Vec::new(),
                     border_title_position: BorderTitlePosition::Top,
                     border_title_alignment: Alignment::Left,
+                    border_symbols: BorderSymbolsFile::default(),
                     pane: PaneOrSplitFile::Pane(PaneTypeFile::Tabs),
                 },
                 SubPaneFile {
@@ -331,6 +343,7 @@ impl Default for PaneOrSplitFile {
                     border_title: Vec::new(),
                     border_title_position: BorderTitlePosition::Top,
                     border_title_alignment: Alignment::Left,
+                    border_symbols: BorderSymbolsFile::default(),
                     pane: PaneOrSplitFile::Pane(PaneTypeFile::TabContent),
                 },
                 SubPaneFile {
@@ -339,6 +352,7 @@ impl Default for PaneOrSplitFile {
                     border_title: Vec::new(),
                     border_title_position: BorderTitlePosition::Top,
                     border_title_alignment: Alignment::Left,
+                    border_symbols: BorderSymbolsFile::default(),
                     pane: PaneOrSplitFile::Pane(PaneTypeFile::ProgressBar),
                 },
             ],
@@ -383,6 +397,8 @@ pub struct SubPaneFile {
     pub border_title_position: BorderTitlePosition,
     #[serde(default)]
     pub border_title_alignment: Alignment,
+    #[serde(default)]
+    pub border_symbols: BorderSymbolsFile,
     pub pane: PaneOrSplitFile,
 }
 
@@ -393,6 +409,7 @@ pub struct Pane {
     pub border_title: Vec<Property<PropertyKind>>,
     pub border_title_position: TitlePosition,
     pub border_title_alignment: ratatui::layout::Alignment,
+    pub border_symbols: BorderSymbols,
     pub id: Id,
 }
 
@@ -404,6 +421,7 @@ pub enum SizedPaneOrSplit {
         border_title: Vec<Property<PropertyKind>>,
         border_title_position: TitlePosition,
         border_title_alignment: ratatui::layout::Alignment,
+        border_symbols: BorderSymbols,
         direction: Direction,
         panes: Vec<SizedSubPane>,
     },
@@ -418,6 +436,7 @@ impl Default for SizedPaneOrSplit {
             border_title: Vec::new(),
             border_title_position: TitlePosition::Top,
             border_title_alignment: ratatui::layout::Alignment::Left,
+            border_symbols: BorderSymbols::default(),
         }
     }
 }
@@ -432,6 +451,8 @@ pub struct SizedSubPane {
 pub enum PaneConversionError {
     #[error("Missing component: {0}")]
     MissingComponent(String),
+    #[error("Missing border set: {0}")]
+    MissingBorderSet(String),
     #[error("Failed to parse pane size: {0}")]
     ParseError(#[from] ParseSizeError),
     #[error("Failed to parse pane: {0}")]
@@ -439,13 +460,19 @@ pub enum PaneConversionError {
 }
 
 impl PaneOrSplitFile {
+    #[allow(
+        clippy::too_many_arguments,
+        reason = "Recursive function, used only here. More trouble than it is worth to refactor at this point"
+    )]
     pub fn convert_recursive(
         &self,
         b: Borders,
         b_title: Vec<Property<PropertyKind>>,
         b_pos: TitlePosition,
         b_alignment: ratatui::layout::Alignment,
+        b_symbols: BorderSymbols,
         library: &HashMap<String, SizedPaneOrSplit>,
+        border_set_library: &BorderSetLib,
     ) -> Result<SizedPaneOrSplit, PaneConversionError> {
         Ok(match self {
             PaneOrSplitFile::Pane(pane_type_file) => SizedPaneOrSplit::Pane(Pane {
@@ -454,27 +481,35 @@ impl PaneOrSplitFile {
                 border_title: b_title,
                 border_title_position: b_pos,
                 border_title_alignment: b_alignment,
+                border_symbols: b_symbols,
                 id: id::new(),
             }),
+            // Components need to get border etc from the usage site and NOT the ones they are given
+            // during resolution because they are given default values initially.
             PaneOrSplitFile::Component(name) => match library.get(name) {
                 Some(SizedPaneOrSplit::Pane(pane)) => {
                     let mut v = pane.clone();
                     v.borders = b;
                     v.border_title.clone_from(&b_title);
+                    v.border_symbols = b_symbols;
+                    v.border_title_alignment = b_alignment;
+                    v.border_title_position = b_pos;
                     SizedPaneOrSplit::Pane(v)
                 }
                 Some(SizedPaneOrSplit::Split {
                     borders,
                     direction,
                     panes,
-                    border_title,
-                    border_title_position,
-                    border_title_alignment,
+                    border_title: _,
+                    border_title_position: _,
+                    border_title_alignment: _,
+                    border_symbols: _,
                 }) => SizedPaneOrSplit::Split {
                     borders: *borders | b,
-                    border_title: border_title.clone(),
-                    border_title_position: *border_title_position,
-                    border_title_alignment: *border_title_alignment,
+                    border_title: b_title,
+                    border_title_position: b_pos,
+                    border_title_alignment: b_alignment,
+                    border_symbols: b_symbols.clone(),
                     direction: *direction,
                     panes: panes.clone(),
                 },
@@ -486,6 +521,7 @@ impl PaneOrSplitFile {
                 border_title: b_title,
                 border_title_position: b_pos,
                 border_title_alignment: b_alignment,
+                border_symbols: b_symbols,
                 panes: panes
                     .iter()
                     .map(|sub_pane| -> Result<SizedSubPane, PaneConversionError> {
@@ -503,12 +539,16 @@ impl PaneOrSplitFile {
                             BorderTitlePosition::Bottom => TitlePosition::Bottom,
                         };
                         let b_alignment = sub_pane.border_title_alignment.into();
+                        let b_symbols =
+                            sub_pane.border_symbols.clone().into_symbols(border_set_library)?;
                         let pane = sub_pane.pane.convert_recursive(
                             borders,
                             b_title,
                             b_pos,
                             b_alignment,
+                            b_symbols,
                             library,
+                            border_set_library,
                         )?;
 
                         Ok(SizedSubPane { size, pane })
@@ -521,13 +561,16 @@ impl PaneOrSplitFile {
     pub fn convert(
         &self,
         library: &HashMap<String, SizedPaneOrSplit>,
+        border_set_library: &BorderSetLib,
     ) -> Result<SizedPaneOrSplit, PaneConversionError> {
         self.convert_recursive(
             Borders::NONE,
             Vec::new(),
             TitlePosition::default(),
             ratatui::layout::Alignment::default(),
+            BorderSymbols::default(),
             library,
+            border_set_library,
         )
     }
 }
@@ -580,6 +623,7 @@ impl Default for TabsFile {
                             border_title: Vec::new(),
                             border_title_position: BorderTitlePosition::Top,
                             border_title_alignment: Alignment::Left,
+                            border_symbols: BorderSymbolsFile::default(),
                             pane: PaneOrSplitFile::Split {
                                 direction: DirectionFile::Vertical,
                                 borders: BordersFile::NONE,
@@ -590,6 +634,7 @@ impl Default for TabsFile {
                                         border_title: Vec::new(),
                                         border_title_position: BorderTitlePosition::Top,
                                         border_title_alignment: Alignment::Left,
+                                        border_symbols: BorderSymbolsFile::default(),
                                         borders: BordersFile::NONE,
                                     },
                                     SubPaneFile {
@@ -598,6 +643,7 @@ impl Default for TabsFile {
                                         borders: BordersFile::NONE,
                                         border_title_position: BorderTitlePosition::Top,
                                         border_title_alignment: Alignment::Left,
+                                        border_symbols: BorderSymbolsFile::default(),
                                         border_title: Vec::new(),
                                     },
                                 ],
@@ -610,6 +656,7 @@ impl Default for TabsFile {
                             border_title: Vec::new(),
                             border_title_position: BorderTitlePosition::Top,
                             border_title_alignment: Alignment::Left,
+                            border_symbols: BorderSymbolsFile::default(),
                         },
                     ],
                 },
