@@ -6,7 +6,6 @@ use derive_more::{Deref, Display, Into};
 use itertools::Itertools;
 use ratatui::{
     layout::Direction,
-    symbols::{self, border::Set},
     widgets::{Borders, TitlePosition},
 };
 use serde::{Deserialize, Serialize};
@@ -20,7 +19,10 @@ use super::theme::{
     volume_slider::{VolumeSliderConfig, VolumeSliderConfigFile},
 };
 use crate::{
-    config::theme::properties::Alignment,
+    config::theme::{
+        borders::{BorderSetLib, BorderSymbols, BorderSymbolsFile},
+        properties::Alignment,
+    },
     shared::id::{self, Id},
 };
 
@@ -214,12 +216,19 @@ impl TryFrom<PaneTypeFile> for PaneType {
 }
 
 impl TabsFile {
-    pub fn convert(self, library: &HashMap<String, SizedPaneOrSplit>) -> Result<Tabs> {
+    pub fn convert(
+        self,
+        library: &HashMap<String, SizedPaneOrSplit>,
+        border_set_library: &BorderSetLib,
+    ) -> Result<Tabs> {
         let (names, tabs): (Vec<_>, HashMap<_, _>) = self
             .0
             .into_iter()
             .map(|tab| -> Result<_> {
-                Ok(Tab { name: tab.name.into(), panes: tab.pane.convert(library)? })
+                Ok(Tab {
+                    name: tab.name.into(),
+                    panes: tab.pane.convert(library, border_set_library)?,
+                })
             })
             .try_fold((Vec::new(), HashMap::new()), |(mut names, mut tabs), tab| -> Result<_> {
                 let tab = tab?;
@@ -377,164 +386,6 @@ pub enum BorderTitlePosition {
     Bottom,
 }
 
-#[derive(Debug, Default, Clone, Serialize, Deserialize, PartialEq, Eq)]
-pub enum BorderSymbolsFile {
-    #[default]
-    Plain,
-    Rounded,
-    Double,
-    Thick,
-    Empty,
-    Full,
-    ProportionalWide,
-    ProportionalTall,
-    OneEighthWide,
-    OneEighthTall,
-    Custom {
-        top_left: String,
-        top_right: String,
-        bottom_left: String,
-        bottom_right: String,
-        vertical_left: String,
-        vertical_right: String,
-        horizontal_top: String,
-        horizontal_bottom: String,
-    },
-    CustomExtended {
-        inherit: Box<BorderSymbolsFile>,
-        top_left: Option<String>,
-        top_right: Option<String>,
-        bottom_left: Option<String>,
-        bottom_right: Option<String>,
-        vertical_left: Option<String>,
-        vertical_right: Option<String>,
-        horizontal_top: Option<String>,
-        horizontal_bottom: Option<String>,
-    },
-}
-
-#[derive(Debug, Default, Clone, PartialEq, Eq)]
-pub enum BorderSymbols {
-    #[default]
-    Plain,
-    Rounded,
-    Double,
-    Thick,
-    Empty,
-    Full,
-    ProportionalWide,
-    ProportionalTall,
-    OneEighthWide,
-    OneEighthTall,
-    Custom {
-        top_left: String,
-        top_right: String,
-        bottom_left: String,
-        bottom_right: String,
-        vertical_left: String,
-        vertical_right: String,
-        horizontal_top: String,
-        horizontal_bottom: String,
-    },
-}
-
-impl<'a> From<&'a BorderSymbols> for Set<'a> {
-    fn from(value: &'a BorderSymbols) -> Self {
-        match value {
-            BorderSymbols::Plain => symbols::border::PLAIN,
-            BorderSymbols::Rounded => symbols::border::ROUNDED,
-            BorderSymbols::Double => symbols::border::DOUBLE,
-            BorderSymbols::Thick => symbols::border::THICK,
-            BorderSymbols::Empty => symbols::border::EMPTY,
-            BorderSymbols::Full => symbols::border::FULL,
-            BorderSymbols::ProportionalWide => symbols::border::PROPORTIONAL_WIDE,
-            BorderSymbols::ProportionalTall => symbols::border::PROPORTIONAL_TALL,
-            BorderSymbols::OneEighthWide => symbols::border::ONE_EIGHTH_WIDE,
-            BorderSymbols::OneEighthTall => symbols::border::ONE_EIGHTH_TALL,
-            BorderSymbols::Custom {
-                top_left,
-                top_right,
-                bottom_left,
-                bottom_right,
-                vertical_left,
-                vertical_right,
-                horizontal_top,
-                horizontal_bottom,
-            } => Set {
-                top_left,
-                top_right,
-                bottom_left,
-                bottom_right,
-                vertical_left,
-                vertical_right,
-                horizontal_top,
-                horizontal_bottom,
-            },
-        }
-    }
-}
-
-impl BorderSymbolsFile {
-    pub fn into_symbols(self) -> BorderSymbols {
-        match self {
-            BorderSymbolsFile::Plain => BorderSymbols::Plain,
-            BorderSymbolsFile::Rounded => BorderSymbols::Rounded,
-            BorderSymbolsFile::Double => BorderSymbols::Double,
-            BorderSymbolsFile::Thick => BorderSymbols::Thick,
-            BorderSymbolsFile::Empty => BorderSymbols::Empty,
-            BorderSymbolsFile::Full => BorderSymbols::Full,
-            BorderSymbolsFile::ProportionalWide => BorderSymbols::ProportionalWide,
-            BorderSymbolsFile::ProportionalTall => BorderSymbols::ProportionalTall,
-            BorderSymbolsFile::OneEighthWide => BorderSymbols::OneEighthWide,
-            BorderSymbolsFile::OneEighthTall => BorderSymbols::OneEighthTall,
-            BorderSymbolsFile::Custom {
-                top_left,
-                top_right,
-                bottom_left,
-                bottom_right,
-                vertical_left,
-                vertical_right,
-                horizontal_top,
-                horizontal_bottom,
-            } => BorderSymbols::Custom {
-                top_left,
-                top_right,
-                bottom_left,
-                bottom_right,
-                vertical_left,
-                vertical_right,
-                horizontal_top,
-                horizontal_bottom,
-            },
-            BorderSymbolsFile::CustomExtended {
-                inherit,
-                top_left,
-                top_right,
-                bottom_left,
-                bottom_right,
-                vertical_left,
-                vertical_right,
-                horizontal_top,
-                horizontal_bottom,
-            } => {
-                let symbols = inherit.into_symbols();
-                let set: Set = (&symbols).into();
-                BorderSymbols::Custom {
-                    top_left: top_left.unwrap_or_else(|| set.top_left.to_owned()),
-                    top_right: top_right.unwrap_or_else(|| set.top_right.to_owned()),
-                    bottom_left: bottom_left.unwrap_or_else(|| set.bottom_left.to_owned()),
-                    bottom_right: bottom_right.unwrap_or_else(|| set.bottom_right.to_owned()),
-                    vertical_left: vertical_left.unwrap_or_else(|| set.vertical_left.to_owned()),
-                    vertical_right: vertical_right.unwrap_or_else(|| set.vertical_right.to_owned()),
-                    horizontal_top: horizontal_top.unwrap_or_else(|| set.horizontal_top.to_owned()),
-                    horizontal_bottom: horizontal_bottom
-                        .unwrap_or_else(|| set.horizontal_bottom.to_owned()),
-                }
-            }
-        }
-    }
-}
-
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct SubPaneFile {
     pub size: String,
@@ -600,6 +451,8 @@ pub struct SizedSubPane {
 pub enum PaneConversionError {
     #[error("Missing component: {0}")]
     MissingComponent(String),
+    #[error("Missing border set: {0}")]
+    MissingBorderSet(String),
     #[error("Failed to parse pane size: {0}")]
     ParseError(#[from] ParseSizeError),
     #[error("Failed to parse pane: {0}")]
@@ -607,6 +460,10 @@ pub enum PaneConversionError {
 }
 
 impl PaneOrSplitFile {
+    #[allow(
+        clippy::too_many_arguments,
+        reason = "Recursive function, used only here. More trouble than it is worth to refactor at this point"
+    )]
     pub fn convert_recursive(
         &self,
         b: Borders,
@@ -615,6 +472,7 @@ impl PaneOrSplitFile {
         b_alignment: ratatui::layout::Alignment,
         b_symbols: BorderSymbols,
         library: &HashMap<String, SizedPaneOrSplit>,
+        border_set_library: &BorderSetLib,
     ) -> Result<SizedPaneOrSplit, PaneConversionError> {
         Ok(match self {
             PaneOrSplitFile::Pane(pane_type_file) => SizedPaneOrSplit::Pane(Pane {
@@ -681,7 +539,8 @@ impl PaneOrSplitFile {
                             BorderTitlePosition::Bottom => TitlePosition::Bottom,
                         };
                         let b_alignment = sub_pane.border_title_alignment.into();
-                        let b_symbols = sub_pane.border_symbols.clone().into_symbols();
+                        let b_symbols =
+                            sub_pane.border_symbols.clone().into_symbols(border_set_library)?;
                         let pane = sub_pane.pane.convert_recursive(
                             borders,
                             b_title,
@@ -689,6 +548,7 @@ impl PaneOrSplitFile {
                             b_alignment,
                             b_symbols,
                             library,
+                            border_set_library,
                         )?;
 
                         Ok(SizedSubPane { size, pane })
@@ -701,6 +561,7 @@ impl PaneOrSplitFile {
     pub fn convert(
         &self,
         library: &HashMap<String, SizedPaneOrSplit>,
+        border_set_library: &BorderSetLib,
     ) -> Result<SizedPaneOrSplit, PaneConversionError> {
         self.convert_recursive(
             Borders::NONE,
@@ -709,6 +570,7 @@ impl PaneOrSplitFile {
             ratatui::layout::Alignment::default(),
             BorderSymbols::default(),
             library,
+            border_set_library,
         )
     }
 }
