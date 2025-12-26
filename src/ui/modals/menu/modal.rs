@@ -5,6 +5,7 @@ use itertools::Itertools;
 use ratatui::{
     Frame,
     layout::{Constraint, Layout, Position, Rect},
+    macros::constraint,
     style::Style,
     symbols::border,
     widgets::{Block, Borders, Clear},
@@ -28,7 +29,7 @@ use crate::{
     ui::{
         FILTER_PREFIX,
         input::{BufferId, InputResultEvent},
-        modals::{Modal, RectExt as _, menu::select_section::SelectSection},
+        modals::{Modal, menu::select_section::SelectSection},
     },
 };
 
@@ -55,7 +56,8 @@ impl Modal for MenuModal<'_> {
                 + 1
                 + self.sections.len();
 
-        let popup_area = frame.area().centered_exact(self.width, needed_height as u16);
+        let popup_area =
+            frame.area().centered(constraint!(==self.width), constraint!(==needed_height as u16));
         frame.render_widget(Clear, popup_area);
         if let Some(bg_color) = ctx.config.theme.modal_background_color {
             frame.render_widget(Block::default().style(Style::default().bg(bg_color)), popup_area);

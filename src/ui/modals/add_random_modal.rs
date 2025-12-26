@@ -3,13 +3,14 @@ use enum_map::{Enum, EnumMap, enum_map};
 use ratatui::{
     Frame,
     layout::Rect,
+    macros::constraint,
     prelude::{Constraint, Layout},
-    style::{Style, Stylize},
+    style::Style,
     symbols::border,
     widgets::{Block, Borders, Clear},
 };
 
-use super::{BUTTON_GROUP_SYMBOLS, Modal, RectExt};
+use super::{BUTTON_GROUP_SYMBOLS, Modal};
 use crate::{
     WorkRequest,
     config::{
@@ -124,7 +125,7 @@ impl Modal for AddRandomModal<'_> {
             .border_style(ctx.config.as_border_style())
             .title_alignment(ratatui::prelude::Alignment::Center);
 
-        let popup_area = frame.area().centered_exact(50, 6);
+        let popup_area = frame.area().centered(constraint!(==50), constraint!(==6));
         frame.render_widget(Clear, popup_area);
         if let Some(bg_color) = ctx.config.theme.modal_background_color {
             frame.render_widget(Block::default().style(Style::default().bg(bg_color)), popup_area);

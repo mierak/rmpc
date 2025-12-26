@@ -5,6 +5,7 @@ use itertools::Itertools;
 use ratatui::{
     Frame,
     layout::{Constraint, Layout, Margin, Rect},
+    macros::constraint,
     style::Style,
     symbols::border,
     text::{Line, Text},
@@ -12,7 +13,7 @@ use ratatui::{
 };
 use strum::{IntoDiscriminant, VariantArray};
 
-use super::{Modal, RectExt};
+use super::Modal;
 use crate::{
     config::keys::{CommonAction, ToDescription},
     ctx::Ctx,
@@ -218,7 +219,7 @@ impl Modal for KeybindsModal {
     }
 
     fn render(&mut self, frame: &mut Frame, ctx: &mut Ctx) -> Result<()> {
-        let popup_area = frame.area().centered(90, 90);
+        let popup_area = frame.area().centered(constraint!(==90%), constraint!(==90%));
         frame.render_widget(Clear, popup_area);
         if let Some(bg_color) = ctx.config.theme.modal_background_color {
             frame.render_widget(Block::default().style(Style::default().bg(bg_color)), popup_area);

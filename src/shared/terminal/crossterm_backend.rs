@@ -1,6 +1,7 @@
 use std::{self, io::Write};
 
 use ratatui::{
+    backend::ClearType,
     buffer::Cell,
     layout::Position,
     prelude::{Backend, CrosstermBackend},
@@ -29,6 +30,8 @@ impl Write for CrosstermLockingBackend {
 }
 
 impl Backend for CrosstermLockingBackend {
+    type Error = std::io::Error;
+
     fn draw<'a, I>(&mut self, content: I) -> std::io::Result<()>
     where
         I: Iterator<Item = (u16, u16, &'a Cell)>,
@@ -73,5 +76,9 @@ impl Backend for CrosstermLockingBackend {
 
     fn append_lines(&mut self, n: u16) -> std::io::Result<()> {
         CrosstermBackend::new(self.writer.lock().by_ref()).append_lines(n)
+    }
+
+    fn clear_region(&mut self, clear_type: ClearType) -> Result<(), Self::Error> {
+        CrosstermBackend::new(self.writer.lock().by_ref()).clear_region(clear_type)
     }
 }

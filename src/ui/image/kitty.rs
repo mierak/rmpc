@@ -8,7 +8,7 @@ use crossterm::{
 };
 use flate2::Compression;
 use itertools::Itertools;
-use ratatui::prelude::Rect;
+use ratatui::prelude::{IntoCrossterm, Rect};
 
 use super::{Backend, csi_move};
 use crate::{
@@ -53,7 +53,7 @@ impl Backend for Kitty {
                 try_skip!(
                     create_unicode_placeholder_grid(
                         w,
-                        ctx.config.theme.background_color.map(Into::into),
+                        ctx.config.theme.background_color.map(|c| c.into_crossterm()),
                         data.aligned_area
                     ),
                     "Failed to create unicode placeholders"
@@ -65,7 +65,7 @@ impl Backend for Kitty {
                 try_skip!(
                     create_unicode_placeholder_grid(
                         w,
-                        ctx.config.theme.background_color.map(Into::into),
+                        ctx.config.theme.background_color.map(|c| c.into_crossterm()),
                         aligned_area
                     ),
                     "Failed to create unicode placeholders"

@@ -5,13 +5,14 @@ use bon::bon;
 use ratatui::{
     Frame,
     layout::Rect,
+    macros::constraint,
     prelude::{Constraint, Layout},
     style::{Style, Stylize},
     symbols,
     widgets::{Block, Borders, Clear, List, ListState},
 };
 
-use super::{BUTTON_GROUP_SYMBOLS, Modal, RectExt};
+use super::{BUTTON_GROUP_SYMBOLS, Modal};
 use crate::{
     config::keys::CommonAction,
     ctx::Ctx,
@@ -98,7 +99,7 @@ impl<V: Display + std::fmt::Debug, Callback: FnOnce(&Ctx, V, usize) -> Result<()
     }
 
     fn render(&mut self, frame: &mut Frame, ctx: &mut Ctx) -> Result<()> {
-        let popup_area = frame.area().centered_exact(80, 15);
+        let popup_area = frame.area().centered(constraint!(==80), constraint!(==15));
         frame.render_widget(Clear, popup_area);
         if let Some(bg_color) = ctx.config.theme.modal_background_color {
             frame.render_widget(Block::default().style(Style::default().bg(bg_color)), popup_area);

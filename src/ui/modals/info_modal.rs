@@ -6,6 +6,7 @@ use itertools::Itertools;
 use ratatui::{
     Frame,
     layout::Alignment,
+    macros::constraint,
     prelude::{Constraint, Layout},
     style::Style,
     symbols::border,
@@ -13,7 +14,7 @@ use ratatui::{
     widgets::{Block, Borders, Clear},
 };
 
-use super::{BUTTON_GROUP_SYMBOLS, Modal, RectExt};
+use super::{BUTTON_GROUP_SYMBOLS, Modal};
 use crate::{
     config::{Size, keys::CommonAction},
     ctx::Ctx,
@@ -93,9 +94,10 @@ impl Modal for InfoModal<'_> {
             .flat_map(|line| textwrap::wrap(line, (width as usize).saturating_sub(2)))
             .collect_vec();
 
-        let popup_area = frame
-            .area()
-            .centered_exact(width, self.size.map_or(u16::try_from(lines.len())? + 4, |v| v.height));
+        let popup_area = frame.area().centered(
+            constraint!(==width),
+            constraint!(==self.size.map_or(u16::try_from(lines.len())? + 4, |v| v.height)),
+        );
         frame.render_widget(Clear, popup_area);
 
         if let Some(bg_color) = ctx.config.theme.modal_background_color {

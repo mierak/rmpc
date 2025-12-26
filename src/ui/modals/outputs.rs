@@ -1,12 +1,13 @@
 use anyhow::Result;
 use ratatui::{
     layout::{Constraint, Margin, Rect},
+    macros::constraint,
     style::Style,
     symbols::border,
     widgets::{Block, Borders, Cell, Clear, Row, Table, TableState},
 };
 
-use super::{Modal, RectExt};
+use super::Modal;
 use crate::{
     MpdQueryResult,
     config::keys::CommonAction,
@@ -90,7 +91,7 @@ impl Modal for OutputsModal {
     }
 
     fn render(&mut self, frame: &mut ratatui::Frame, ctx: &mut Ctx) -> anyhow::Result<()> {
-        let popup_area = frame.area().centered_exact(70, 10);
+        let popup_area = frame.area().centered(constraint!(==70), constraint!(==10));
         frame.render_widget(Clear, popup_area);
         if let Some(bg_color) = ctx.config.theme.modal_background_color {
             frame.render_widget(Block::default().style(Style::default().bg(bg_color)), popup_area);

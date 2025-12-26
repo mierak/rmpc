@@ -13,7 +13,13 @@ use crossterm::{
     style::{PrintStyledContent, Stylize},
     terminal::{BeginSynchronizedUpdate, EndSynchronizedUpdate},
 };
-use ratatui::{Frame, layout::Rect, style::Style, widgets::Block};
+use ratatui::{
+    Frame,
+    layout::Rect,
+    prelude::FromCrossterm,
+    style::{Color, Style},
+    widgets::Block,
+};
 
 use super::Pane;
 use crate::{
@@ -371,7 +377,8 @@ impl Pane for CavaPane {
     fn render(&mut self, frame: &mut Frame, area: Rect, ctx: &Ctx) -> anyhow::Result<()> {
         self.area = area;
         frame.render_widget(
-            Block::default().style(Style::default().bg(ctx.config.theme.cava.bg_color.into())),
+            Block::default()
+                .style(Style::default().bg(Color::from_crossterm(ctx.config.theme.cava.bg_color))),
             area,
         );
 

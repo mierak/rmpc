@@ -6,7 +6,7 @@ use derive_more::{Deref, Display, Into};
 use itertools::Itertools;
 use ratatui::{
     layout::Direction,
-    widgets::{Borders, block::Position},
+    widgets::{Borders, TitlePosition},
 };
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
@@ -391,7 +391,7 @@ pub struct Pane {
     pub pane: PaneType,
     pub borders: Borders,
     pub border_title: Vec<Property<PropertyKind>>,
-    pub border_title_position: Position,
+    pub border_title_position: TitlePosition,
     pub border_title_alignment: ratatui::layout::Alignment,
     pub id: Id,
 }
@@ -402,7 +402,7 @@ pub enum SizedPaneOrSplit {
     Split {
         borders: Borders,
         border_title: Vec<Property<PropertyKind>>,
-        border_title_position: Position,
+        border_title_position: TitlePosition,
         border_title_alignment: ratatui::layout::Alignment,
         direction: Direction,
         panes: Vec<SizedSubPane>,
@@ -416,7 +416,7 @@ impl Default for SizedPaneOrSplit {
             panes: Vec::new(),
             borders: Borders::NONE,
             border_title: Vec::new(),
-            border_title_position: Position::Top,
+            border_title_position: TitlePosition::Top,
             border_title_alignment: ratatui::layout::Alignment::Left,
         }
     }
@@ -443,7 +443,7 @@ impl PaneOrSplitFile {
         &self,
         b: Borders,
         b_title: Vec<Property<PropertyKind>>,
-        b_pos: Position,
+        b_pos: TitlePosition,
         b_alignment: ratatui::layout::Alignment,
         library: &HashMap<String, SizedPaneOrSplit>,
     ) -> Result<SizedPaneOrSplit, PaneConversionError> {
@@ -499,8 +499,8 @@ impl PaneOrSplitFile {
                             .try_collect()?;
 
                         let b_pos = match sub_pane.border_title_position {
-                            BorderTitlePosition::Top => Position::Top,
-                            BorderTitlePosition::Bottom => Position::Bottom,
+                            BorderTitlePosition::Top => TitlePosition::Top,
+                            BorderTitlePosition::Bottom => TitlePosition::Bottom,
                         };
                         let b_alignment = sub_pane.border_title_alignment.into();
                         let pane = sub_pane.pane.convert_recursive(
@@ -525,7 +525,7 @@ impl PaneOrSplitFile {
         self.convert_recursive(
             Borders::NONE,
             Vec::new(),
-            Position::default(),
+            TitlePosition::default(),
             ratatui::layout::Alignment::default(),
             library,
         )
