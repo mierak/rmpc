@@ -6,6 +6,7 @@ use derive_more::{Deref, Display, Into};
 use itertools::Itertools;
 use ratatui::{
     layout::Direction,
+    symbols::{self, border::Set},
     widgets::{Borders, TitlePosition},
 };
 use serde::{Deserialize, Serialize};
@@ -315,6 +316,7 @@ impl Default for PaneOrSplitFile {
                     border_title: Vec::new(),
                     border_title_position: BorderTitlePosition::Top,
                     border_title_alignment: Alignment::Left,
+                    border_symbols: BorderSymbolsFile::default(),
                     pane: PaneOrSplitFile::Pane(PaneTypeFile::Header),
                 },
                 SubPaneFile {
@@ -323,6 +325,7 @@ impl Default for PaneOrSplitFile {
                     border_title: Vec::new(),
                     border_title_position: BorderTitlePosition::Top,
                     border_title_alignment: Alignment::Left,
+                    border_symbols: BorderSymbolsFile::default(),
                     pane: PaneOrSplitFile::Pane(PaneTypeFile::Tabs),
                 },
                 SubPaneFile {
@@ -331,6 +334,7 @@ impl Default for PaneOrSplitFile {
                     border_title: Vec::new(),
                     border_title_position: BorderTitlePosition::Top,
                     border_title_alignment: Alignment::Left,
+                    border_symbols: BorderSymbolsFile::default(),
                     pane: PaneOrSplitFile::Pane(PaneTypeFile::TabContent),
                 },
                 SubPaneFile {
@@ -339,6 +343,7 @@ impl Default for PaneOrSplitFile {
                     border_title: Vec::new(),
                     border_title_position: BorderTitlePosition::Top,
                     border_title_alignment: Alignment::Left,
+                    border_symbols: BorderSymbolsFile::default(),
                     pane: PaneOrSplitFile::Pane(PaneTypeFile::ProgressBar),
                 },
             ],
@@ -372,6 +377,164 @@ pub enum BorderTitlePosition {
     Bottom,
 }
 
+#[derive(Debug, Default, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub enum BorderSymbolsFile {
+    #[default]
+    Plain,
+    Rounded,
+    Double,
+    Thick,
+    Empty,
+    Full,
+    ProportionalWide,
+    ProportionalTall,
+    OneEighthWide,
+    OneEighthTall,
+    Custom {
+        top_left: String,
+        top_right: String,
+        bottom_left: String,
+        bottom_right: String,
+        vertical_left: String,
+        vertical_right: String,
+        horizontal_top: String,
+        horizontal_bottom: String,
+    },
+    CustomExtended {
+        inherit: Box<BorderSymbolsFile>,
+        top_left: Option<String>,
+        top_right: Option<String>,
+        bottom_left: Option<String>,
+        bottom_right: Option<String>,
+        vertical_left: Option<String>,
+        vertical_right: Option<String>,
+        horizontal_top: Option<String>,
+        horizontal_bottom: Option<String>,
+    },
+}
+
+#[derive(Debug, Default, Clone, PartialEq, Eq)]
+pub enum BorderSymbols {
+    #[default]
+    Plain,
+    Rounded,
+    Double,
+    Thick,
+    Empty,
+    Full,
+    ProportionalWide,
+    ProportionalTall,
+    OneEighthWide,
+    OneEighthTall,
+    Custom {
+        top_left: String,
+        top_right: String,
+        bottom_left: String,
+        bottom_right: String,
+        vertical_left: String,
+        vertical_right: String,
+        horizontal_top: String,
+        horizontal_bottom: String,
+    },
+}
+
+impl<'a> From<&'a BorderSymbols> for Set<'a> {
+    fn from(value: &'a BorderSymbols) -> Self {
+        match value {
+            BorderSymbols::Plain => symbols::border::PLAIN,
+            BorderSymbols::Rounded => symbols::border::ROUNDED,
+            BorderSymbols::Double => symbols::border::DOUBLE,
+            BorderSymbols::Thick => symbols::border::THICK,
+            BorderSymbols::Empty => symbols::border::EMPTY,
+            BorderSymbols::Full => symbols::border::FULL,
+            BorderSymbols::ProportionalWide => symbols::border::PROPORTIONAL_WIDE,
+            BorderSymbols::ProportionalTall => symbols::border::PROPORTIONAL_TALL,
+            BorderSymbols::OneEighthWide => symbols::border::ONE_EIGHTH_WIDE,
+            BorderSymbols::OneEighthTall => symbols::border::ONE_EIGHTH_TALL,
+            BorderSymbols::Custom {
+                top_left,
+                top_right,
+                bottom_left,
+                bottom_right,
+                vertical_left,
+                vertical_right,
+                horizontal_top,
+                horizontal_bottom,
+            } => Set {
+                top_left,
+                top_right,
+                bottom_left,
+                bottom_right,
+                vertical_left,
+                vertical_right,
+                horizontal_top,
+                horizontal_bottom,
+            },
+        }
+    }
+}
+
+impl BorderSymbolsFile {
+    pub fn into_symbols(self) -> BorderSymbols {
+        match self {
+            BorderSymbolsFile::Plain => BorderSymbols::Plain,
+            BorderSymbolsFile::Rounded => BorderSymbols::Rounded,
+            BorderSymbolsFile::Double => BorderSymbols::Double,
+            BorderSymbolsFile::Thick => BorderSymbols::Thick,
+            BorderSymbolsFile::Empty => BorderSymbols::Empty,
+            BorderSymbolsFile::Full => BorderSymbols::Full,
+            BorderSymbolsFile::ProportionalWide => BorderSymbols::ProportionalWide,
+            BorderSymbolsFile::ProportionalTall => BorderSymbols::ProportionalTall,
+            BorderSymbolsFile::OneEighthWide => BorderSymbols::OneEighthWide,
+            BorderSymbolsFile::OneEighthTall => BorderSymbols::OneEighthTall,
+            BorderSymbolsFile::Custom {
+                top_left,
+                top_right,
+                bottom_left,
+                bottom_right,
+                vertical_left,
+                vertical_right,
+                horizontal_top,
+                horizontal_bottom,
+            } => BorderSymbols::Custom {
+                top_left,
+                top_right,
+                bottom_left,
+                bottom_right,
+                vertical_left,
+                vertical_right,
+                horizontal_top,
+                horizontal_bottom,
+            },
+            BorderSymbolsFile::CustomExtended {
+                inherit,
+                top_left,
+                top_right,
+                bottom_left,
+                bottom_right,
+                vertical_left,
+                vertical_right,
+                horizontal_top,
+                horizontal_bottom,
+            } => {
+                let symbols = inherit.into_symbols();
+                let set: Set = (&symbols).into();
+                BorderSymbols::Custom {
+                    top_left: top_left.unwrap_or_else(|| set.top_left.to_owned()),
+                    top_right: top_right.unwrap_or_else(|| set.top_right.to_owned()),
+                    bottom_left: bottom_left.unwrap_or_else(|| set.bottom_left.to_owned()),
+                    bottom_right: bottom_right.unwrap_or_else(|| set.bottom_right.to_owned()),
+                    vertical_left: vertical_left.unwrap_or_else(|| set.vertical_left.to_owned()),
+                    vertical_right: vertical_right.unwrap_or_else(|| set.vertical_right.to_owned()),
+                    horizontal_top: horizontal_top.unwrap_or_else(|| set.horizontal_top.to_owned()),
+                    horizontal_bottom: horizontal_bottom
+                        .unwrap_or_else(|| set.horizontal_bottom.to_owned()),
+                }
+            }
+        }
+    }
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct SubPaneFile {
     pub size: String,
@@ -383,6 +546,8 @@ pub struct SubPaneFile {
     pub border_title_position: BorderTitlePosition,
     #[serde(default)]
     pub border_title_alignment: Alignment,
+    #[serde(default)]
+    pub border_symbols: BorderSymbolsFile,
     pub pane: PaneOrSplitFile,
 }
 
@@ -393,6 +558,7 @@ pub struct Pane {
     pub border_title: Vec<Property<PropertyKind>>,
     pub border_title_position: TitlePosition,
     pub border_title_alignment: ratatui::layout::Alignment,
+    pub border_symbols: BorderSymbols,
     pub id: Id,
 }
 
@@ -404,6 +570,7 @@ pub enum SizedPaneOrSplit {
         border_title: Vec<Property<PropertyKind>>,
         border_title_position: TitlePosition,
         border_title_alignment: ratatui::layout::Alignment,
+        border_symbols: BorderSymbols,
         direction: Direction,
         panes: Vec<SizedSubPane>,
     },
@@ -418,6 +585,7 @@ impl Default for SizedPaneOrSplit {
             border_title: Vec::new(),
             border_title_position: TitlePosition::Top,
             border_title_alignment: ratatui::layout::Alignment::Left,
+            border_symbols: BorderSymbols::default(),
         }
     }
 }
@@ -445,6 +613,7 @@ impl PaneOrSplitFile {
         b_title: Vec<Property<PropertyKind>>,
         b_pos: TitlePosition,
         b_alignment: ratatui::layout::Alignment,
+        b_symbols: BorderSymbols,
         library: &HashMap<String, SizedPaneOrSplit>,
     ) -> Result<SizedPaneOrSplit, PaneConversionError> {
         Ok(match self {
@@ -454,27 +623,35 @@ impl PaneOrSplitFile {
                 border_title: b_title,
                 border_title_position: b_pos,
                 border_title_alignment: b_alignment,
+                border_symbols: b_symbols,
                 id: id::new(),
             }),
+            // Components need to get border etc from the usage site and NOT the ones they are given
+            // during resolution because they are given default values initially.
             PaneOrSplitFile::Component(name) => match library.get(name) {
                 Some(SizedPaneOrSplit::Pane(pane)) => {
                     let mut v = pane.clone();
                     v.borders = b;
                     v.border_title.clone_from(&b_title);
+                    v.border_symbols = b_symbols;
+                    v.border_title_alignment = b_alignment;
+                    v.border_title_position = b_pos;
                     SizedPaneOrSplit::Pane(v)
                 }
                 Some(SizedPaneOrSplit::Split {
                     borders,
                     direction,
                     panes,
-                    border_title,
-                    border_title_position,
-                    border_title_alignment,
+                    border_title: _,
+                    border_title_position: _,
+                    border_title_alignment: _,
+                    border_symbols: _,
                 }) => SizedPaneOrSplit::Split {
                     borders: *borders | b,
-                    border_title: border_title.clone(),
-                    border_title_position: *border_title_position,
-                    border_title_alignment: *border_title_alignment,
+                    border_title: b_title,
+                    border_title_position: b_pos,
+                    border_title_alignment: b_alignment,
+                    border_symbols: b_symbols.clone(),
                     direction: *direction,
                     panes: panes.clone(),
                 },
@@ -486,6 +663,7 @@ impl PaneOrSplitFile {
                 border_title: b_title,
                 border_title_position: b_pos,
                 border_title_alignment: b_alignment,
+                border_symbols: b_symbols,
                 panes: panes
                     .iter()
                     .map(|sub_pane| -> Result<SizedSubPane, PaneConversionError> {
@@ -503,11 +681,13 @@ impl PaneOrSplitFile {
                             BorderTitlePosition::Bottom => TitlePosition::Bottom,
                         };
                         let b_alignment = sub_pane.border_title_alignment.into();
+                        let b_symbols = sub_pane.border_symbols.clone().into_symbols();
                         let pane = sub_pane.pane.convert_recursive(
                             borders,
                             b_title,
                             b_pos,
                             b_alignment,
+                            b_symbols,
                             library,
                         )?;
 
@@ -527,6 +707,7 @@ impl PaneOrSplitFile {
             Vec::new(),
             TitlePosition::default(),
             ratatui::layout::Alignment::default(),
+            BorderSymbols::default(),
             library,
         )
     }
@@ -580,6 +761,7 @@ impl Default for TabsFile {
                             border_title: Vec::new(),
                             border_title_position: BorderTitlePosition::Top,
                             border_title_alignment: Alignment::Left,
+                            border_symbols: BorderSymbolsFile::default(),
                             pane: PaneOrSplitFile::Split {
                                 direction: DirectionFile::Vertical,
                                 borders: BordersFile::NONE,
@@ -590,6 +772,7 @@ impl Default for TabsFile {
                                         border_title: Vec::new(),
                                         border_title_position: BorderTitlePosition::Top,
                                         border_title_alignment: Alignment::Left,
+                                        border_symbols: BorderSymbolsFile::default(),
                                         borders: BordersFile::NONE,
                                     },
                                     SubPaneFile {
@@ -598,6 +781,7 @@ impl Default for TabsFile {
                                         borders: BordersFile::NONE,
                                         border_title_position: BorderTitlePosition::Top,
                                         border_title_alignment: Alignment::Left,
+                                        border_symbols: BorderSymbolsFile::default(),
                                         border_title: Vec::new(),
                                     },
                                 ],
@@ -610,6 +794,7 @@ impl Default for TabsFile {
                             border_title: Vec::new(),
                             border_title_position: BorderTitlePosition::Top,
                             border_title_alignment: Alignment::Left,
+                            border_symbols: BorderSymbolsFile::default(),
                         },
                     ],
                 },

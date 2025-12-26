@@ -1169,7 +1169,9 @@ impl SizedPaneOrSplit {
         while let Some((configured_panes, area)) = stack.pop() {
             match configured_panes {
                 SizedPaneOrSplit::Pane(pane) => {
-                    let mut block = Block::default().borders(pane.borders);
+                    let mut block = Block::default()
+                        .borders(pane.borders)
+                        .border_set((&pane.border_symbols).into());
                     if pane.border_title.is_empty() {
                         let pane_area = block.inner(area);
                         pane_callback(pane, pane_area, block, area, &mut custom_data)?;
@@ -1193,6 +1195,7 @@ impl SizedPaneOrSplit {
                     border_title,
                     border_title_position,
                     border_title_alignment,
+                    border_symbols,
                 } => {
                     let parent_other_size = match direction {
                         ratatui::layout::Direction::Horizontal => area.height,
@@ -1200,7 +1203,9 @@ impl SizedPaneOrSplit {
                     };
                     let constraints =
                         panes.iter().map(|pane| pane.size.into_constraint(parent_other_size));
-                    let mut block = Block::default().borders(*borders);
+                    let mut block =
+                        Block::default().borders(*borders).border_set(border_symbols.into());
+
                     if border_title.is_empty() {
                         let pane_areas = block.inner(area);
                         let areas = Layout::new(*direction, constraints).split(pane_areas);
