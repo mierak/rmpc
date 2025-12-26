@@ -1,7 +1,7 @@
 use ratatui::{
     layout::{Position, Rect},
     prelude::{Alignment, Constraint, Direction, Layout},
-    style::{Style, Stylize},
+    style::Style,
     widgets::{Block, StatefulWidget, Widget},
 };
 

@@ -1289,10 +1289,7 @@ mod format_tests {
     use std::{collections::HashMap, time::Duration};
 
     use either::Either;
-    use ratatui::{
-        style::{Style, Stylize},
-        text::Span,
-    };
+    use ratatui::{style::Style, text::Span};
     use rstest::rstest;
 
     use crate::{

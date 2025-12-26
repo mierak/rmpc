@@ -17,15 +17,15 @@ dialoguer = { version = "0.12.0", default-features = false }
 anyhow = "1.0.100"
 bon = "3.8.1"
 base64 = "0.22.1"
-crossterm = { version = "0.28.1", features = ["serde"] }
+crossterm = { version = "0.29.0", features = ["serde"] }
 image = "0.25.9"
-ratatui = { version = "0.29.0", features = ["all-widgets"] }
+ratatui = { version = "0.30.0", features = ["all-widgets"] }
 strum = { workspace = true }
 flate2 = { version = "1.1.5" }
 itertools = "0.14.0"
 ron = "0.12.0"
-derive_more = { version = "2.1.0", features = ["into_iterator", "into", "as_ref", "display", "deref", "debug"] }
-rustix = { version = "1.1.2", features = ["termios", "fs", "stdio", "process"] }
+derive_more = { version = "2.1.1", features = ["into_iterator", "into", "as_ref", "display", "deref", "debug"] }
+rustix = { version = "1.1.3", features = ["termios", "fs", "stdio", "process"] }
 bitflags = { version = "2.10.0", features = ["serde"] }
 log = { version = "0.4.29", features = ["kv"] }
 flexi_logger = "0.31.7"
@@ -45,7 +45,7 @@ notify-debouncer-full = "0.6.0"
 unicode-width = "=0.2.0"
 unicase = "2.8.1"
 serde_path_to_error = "0.1.20"
-serde_json = "1.0.145"
+serde_json = "1.0.147"
 rand = "0.9.2"
 ansi_colours = "1"
 thiserror = "2.0.17"
