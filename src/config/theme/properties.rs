@@ -23,6 +23,9 @@ pub enum SongPropertyFile {
     Track,
     Disc,
     Position,
+    SampleRate(),
+    Bits(),
+    Channels(),
     Other(String),
 }
 
@@ -38,6 +41,9 @@ pub enum SongProperty {
     Track,
     Disc,
     Position,
+    SampleRate(),
+    Bits(),
+    Channels(),
     Other(String),
 }
 
@@ -130,6 +136,9 @@ pub enum StatusPropertyFile {
     },
     ActiveTab,
     InputBuffer(),
+    SampleRate(),
+    Bits(),
+    Channels(),
 }
 
 #[derive(Debug, Clone, Display, Hash, Eq, PartialEq)]
@@ -187,6 +196,9 @@ pub enum StatusProperty {
     },
     ActiveTab,
     InputBuffer(),
+    SampleRate(),
+    Bits(),
+    Channels(),
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
@@ -332,6 +344,9 @@ impl From<SongPropertyFile> for SongProperty {
             SongPropertyFile::Disc => SongProperty::Disc,
             SongPropertyFile::Other(name) => SongProperty::Other(name),
             SongPropertyFile::Position => SongProperty::Position,
+            SongPropertyFile::SampleRate() => SongProperty::SampleRate(),
+            SongPropertyFile::Bits() => SongProperty::Bits(),
+            SongPropertyFile::Channels() => SongProperty::Channels(),
         }
     }
 }
@@ -491,6 +506,9 @@ impl TryFrom<StatusPropertyFile> for StatusProperty {
             }
             StatusPropertyFile::ActiveTab => StatusProperty::ActiveTab,
             StatusPropertyFile::InputBuffer() => StatusProperty::InputBuffer(),
+            StatusPropertyFile::SampleRate() => StatusProperty::SampleRate(),
+            StatusPropertyFile::Bits() => StatusProperty::Bits(),
+            StatusPropertyFile::Channels() => StatusProperty::Channels(),
         })
     }
 }

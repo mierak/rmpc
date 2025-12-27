@@ -18,6 +18,26 @@ pub struct Song {
     pub added: Option<DateTime<Utc>>,
 }
 
+impl Song {
+    pub fn samplerate(&self) -> Option<u32> {
+        self.metadata.get("format").and_then(|audio| {
+            audio.first().split(':').next().and_then(|rate_str| rate_str.parse().ok())
+        })
+    }
+
+    pub fn bits(&self) -> Option<u32> {
+        self.metadata.get("format").and_then(|audio| {
+            audio.first().split(':').nth(1).and_then(|bits_str| bits_str.parse().ok())
+        })
+    }
+
+    pub fn channels(&self) -> Option<u32> {
+        self.metadata.get("format").and_then(|audio| {
+            audio.first().split(':').nth(2).and_then(|channels_str| channels_str.parse().ok())
+        })
+    }
+}
+
 impl std::fmt::Debug for Song {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(
@@ -40,7 +60,7 @@ impl FromMpd for Song {
             "duration" => {
                 self.duration = Some(Duration::from_secs_f64(value.parse().logerr(key, &value)?));
             }
-            "time" | "format" => {} // deprecated or ignored
+            "time" => {} // deprecated or ignored
             "last-modified" => {
                 self.last_modified =
                     value.parse().context("Failed to parse date").logerr(key, &value)?;

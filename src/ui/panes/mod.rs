@@ -525,6 +525,9 @@ impl Song {
                         .map_or_else(|_| v.last().to_owned(), |v| format!("{v:0>2}")),
                 )
             }),
+            SongProperty::SampleRate() => self.samplerate().map(|v| Cow::Owned(v.to_string())),
+            SongProperty::Bits() => self.bits().map(|v| Cow::Owned(v.to_string())),
+            SongProperty::Channels() => self.channels().map(|v| Cow::Owned(v.to_string())),
         }
     }
 
@@ -1022,6 +1025,15 @@ impl Property<PropertyKind> {
                 }
                 StatusProperty::InputBuffer() => {
                     Some(Either::Left(Span::styled(ctx.key_resolver.buffer_to_string(), style)))
+                }
+                StatusProperty::SampleRate() => {
+                    status.samplerate().map(|v| Either::Left(Span::styled(v.to_string(), style)))
+                }
+                StatusProperty::Bits() => {
+                    status.bits().map(|v| Either::Left(Span::styled(v.to_string(), style)))
+                }
+                StatusProperty::Channels() => {
+                    status.channels().map(|v| Either::Left(Span::styled(v.to_string(), style)))
                 }
             },
             PropertyKindOrText::Property(PropertyKind::Widget(w)) => match w {
