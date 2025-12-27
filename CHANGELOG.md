@@ -23,6 +23,7 @@ the queue by the given column.
 - Added `load` and `save` commands to the CLI
 - Added more config options to pane definitions, you can now define border titles, their style, position
 as well as fully custom border symbol sets
+- Added `Bits()`, `SampleRate()` and `Channels()` properties to song and status
 
 ### Changed
 

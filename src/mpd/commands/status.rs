@@ -47,6 +47,26 @@ pub struct Status {
     pub lastloadedplaylist: Option<String>, // last loaded stored playlist
 }
 
+impl Status {
+    pub fn samplerate(&self) -> Option<u32> {
+        self.audio
+            .as_ref()
+            .and_then(|audio| audio.split(':').next().and_then(|rate_str| rate_str.parse().ok()))
+    }
+
+    pub fn bits(&self) -> Option<u32> {
+        self.audio
+            .as_ref()
+            .and_then(|audio| audio.split(':').nth(1).and_then(|bits_str| bits_str.parse().ok()))
+    }
+
+    pub fn channels(&self) -> Option<u32> {
+        self.audio.as_ref().and_then(|audio| {
+            audio.split(':').nth(2).and_then(|channels_str| channels_str.parse().ok())
+        })
+    }
+}
+
 impl FromMpd for Status {
     fn next_internal(&mut self, key: &str, value: String) -> Result<LineHandled, MpdError> {
         match key {

@@ -449,6 +449,9 @@ impl CmpByProp {
                 )
             }
             SongProperty::Duration => CmpByProp::cmp(a.duration, b.duration),
+            SongProperty::SampleRate() => CmpByProp::cmp(a.samplerate(), b.samplerate()),
+            SongProperty::Bits() => CmpByProp::cmp(a.bits(), b.bits()),
+            SongProperty::Channels() => CmpByProp::cmp(a.channels(), b.channels()),
         }
     }
 }
