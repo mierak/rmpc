@@ -20,6 +20,7 @@ use crate::{
         keys::KeyResolver,
         lrc::LrcIndex,
         ring_vec::RingVec,
+        ytdlp::YtDlpManager,
     },
     ui::input::InputManager,
 };
@@ -66,6 +67,7 @@ pub fn ctx(
     let key_resolver = KeyResolver::new(&config);
     Box::leak(Box::new(app_event_channel.1.clone()));
     Ctx {
+        ytdlp_manager: YtDlpManager::new(work_request_channel.0.clone()),
         mpd_version: Version::new(1, 0, 0),
         status: Status::default(),
         config: std::sync::Arc::new(config),

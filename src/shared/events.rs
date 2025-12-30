@@ -9,7 +9,6 @@ use super::{
     lrc::LrcIndex,
     mouse_event::MouseEvent,
     mpd_query::{MpdCommand, MpdQuery, MpdQueryResult, MpdQuerySync},
-    ytdlp::{SearchItem, YtDlpHostKind},
 };
 use crate::{
     config::{
@@ -21,7 +20,19 @@ use crate::{
         theme::UiConfig,
     },
     mpd::{QueuePosition, commands::IdleEvent},
-    shared::{keys::ActionEvent, lrc::LrcMetadata},
+    shared::{
+        keys::ActionEvent,
+        lrc::LrcMetadata,
+        ytdlp::{
+            DownloadId,
+            YtDlpDownloadError,
+            YtDlpDownloadResult,
+            YtDlpHost,
+            YtDlpItem,
+            YtDlpPlaylist,
+            YtDlpSearchItem,
+        },
+    },
     ui::{UiAppEvent, image::facade::EncodeData},
 };
 
@@ -44,10 +55,17 @@ pub(crate) enum WorkRequest {
     },
     SearchYt {
         query: String,
-        kind: YtDlpHostKind,
+        kind: YtDlpHost,
         limit: usize,
         interactive: bool,
         position: Option<QueuePosition>,
+    },
+    YtDlpDownload {
+        id: DownloadId,
+        url: YtDlpItem,
+    },
+    YtDlpResolvePlaylist {
+        playlist: YtDlpPlaylist,
     },
     Command(Command),
     ResizeImage(Box<dyn FnOnce() -> Result<EncodeData> + Send + Sync>),
@@ -56,11 +74,33 @@ pub(crate) enum WorkRequest {
 #[derive(Debug)]
 #[allow(clippy::large_enum_variant)] // the instances are short lived events, its fine.
 pub(crate) enum WorkDone {
-    LyricsIndexed { index: LrcIndex },
-    SingleLrcIndexed { path: PathBuf, metadata: Option<LrcMetadata> },
-    MpdCommandFinished { id: &'static str, target: Option<PaneType>, data: MpdQueryResult },
-    SearchYtResults { items: Vec<SearchItem>, position: Option<QueuePosition> },
-    ImageResized { data: Result<EncodeData> },
+    LyricsIndexed {
+        index: LrcIndex,
+    },
+    SingleLrcIndexed {
+        path: PathBuf,
+        metadata: Option<LrcMetadata>,
+    },
+    MpdCommandFinished {
+        id: &'static str,
+        target: Option<PaneType>,
+        data: MpdQueryResult,
+    },
+    ImageResized {
+        data: Result<EncodeData>,
+    },
+    SearchYtResults {
+        items: Vec<YtDlpSearchItem>,
+        position: Option<QueuePosition>,
+        interactive: bool,
+    },
+    YtDlpPlaylistResolved {
+        urls: Vec<YtDlpItem>,
+    },
+    YtDlpDownloaded {
+        id: DownloadId,
+        result: Result<YtDlpDownloadResult, YtDlpDownloadError>,
+    },
     None,
 }
 

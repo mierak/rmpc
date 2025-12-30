@@ -126,8 +126,10 @@ impl Pane for AlbumArtPane {
                 }
             }
             UiEvent::ModalOpened if is_visible => {
+                if !self.is_modal_open {
+                    self.album_art.hide(ctx)?;
+                }
                 self.is_modal_open = true;
-                self.album_art.hide(ctx)?;
             }
             UiEvent::ModalClosed if is_visible => {
                 self.is_modal_open = false;

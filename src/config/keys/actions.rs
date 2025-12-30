@@ -21,6 +21,7 @@ pub enum GlobalAction {
     ShowCurrentSongInfo,
     ShowOutputs,
     ShowDecoders,
+    ShowDownloads,
     #[strum(to_string = "Partition({name:?})")]
     Partition {
         name: Option<String>,
@@ -68,6 +69,7 @@ pub enum GlobalActionFile {
     ShowCurrentSongInfo,
     ShowOutputs,
     ShowDecoders,
+    ShowDownloads,
     Partition {
         #[serde(default)]
         name: Option<String>,
@@ -121,6 +123,7 @@ impl From<GlobalActionFile> for GlobalAction {
             GlobalActionFile::ShowOutputs => GlobalAction::ShowOutputs,
             GlobalActionFile::ShowDecoders => GlobalAction::ShowDecoders,
             GlobalActionFile::ShowCurrentSongInfo => GlobalAction::ShowCurrentSongInfo,
+            GlobalActionFile::ShowDownloads => GlobalAction::ShowDownloads,
             GlobalActionFile::CommandMode => GlobalAction::CommandMode,
             GlobalActionFile::Command { command, description } => {
                 GlobalAction::Command { command, description }
@@ -179,6 +182,7 @@ impl ToDescription for GlobalAction {
             GlobalAction::ShowCurrentSongInfo => {
                 "Show metadata of the currently playing song in a modal popup".into()
             }
+            GlobalAction::ShowDownloads => "Show current downloads".into(),
             GlobalAction::ToggleRepeat => "Toggle repeat".into(),
             GlobalAction::ToggleSingle => {
                 "Whether to stop playing after single track or repeat track/playlist when repeat is on".into()

@@ -11,11 +11,7 @@ use ratatui::{Terminal, layout::Rect, prelude::Backend};
 
 use super::command::{create_env, run_external};
 use crate::{
-    WorkRequest,
-    config::{
-        Config,
-        cli::{Command, RemoteCommandQuery},
-    },
+    config::{Config, cli::RemoteCommandQuery},
     ctx::Ctx,
     mpd::{
         commands::{IdleEvent, State},
@@ -26,7 +22,7 @@ use crate::{
         ext::error::ErrorExt,
         id::{self, Id},
         keys::KeyResolver,
-        macros::{status_error, status_warn},
+        macros::{modal, status_error, status_warn},
         mpd_client_ext::MpdClientExt,
         mpd_query::{
             EXTERNAL_COMMAND,
@@ -44,7 +40,7 @@ use crate::{
         Ui,
         UiAppEvent,
         UiEvent,
-        modals::{info_modal::InfoModal, select_modal::SelectModal},
+        modals::{downloads::DownloadsModal, info_modal::InfoModal, select_modal::SelectModal},
     },
 };
 
@@ -320,33 +316,71 @@ fn main_task<B: Backend + std::io::Write>(
                     render_wanted = true;
                 }
                 AppEvent::WorkDone(Ok(result)) => match result {
-                    WorkDone::SearchYtResults { mut items, position } => {
-                        let labels: Vec<String> = items
-                            .iter()
-                            .map(|it| it.title.as_deref().unwrap_or("<no title>").to_string())
-                            .collect();
+                    WorkDone::YtDlpPlaylistResolved { urls } => {
+                        ctx.ytdlp_manager.queue_download_many(urls);
+                        ctx.ytdlp_manager.download_next();
+                        render_wanted = true;
+                    }
+                    WorkDone::YtDlpDownloaded { id, result } => {
+                        match ctx.ytdlp_manager.resolve_download(id, result) {
+                            Ok((path, position)) => {
+                                let cache_dir = ctx.config.cache_dir.clone();
+                                ctx.command(move |client| {
+                                    client.add_downloaded_files_to_queue(
+                                        vec![path],
+                                        cache_dir,
+                                        position,
+                                    )?;
+                                    Ok(())
+                                });
+                            }
+                            Err(err) => {
+                                status_error!("Yt-dlp resulted in error: {err}");
+                            }
+                        }
+                        ctx.ytdlp_manager.download_next();
+                        if let Err(err) = ui.on_event(UiEvent::DownloadsUpdated, &mut ctx) {
+                            log::error!(error:? = err; "UI failed to handle DownloadsUpdated event");
+                        }
+                        render_wanted = true;
+                    }
+                    WorkDone::SearchYtResults { items, position, interactive } => {
+                        if items.is_empty() {
+                            status_warn!("No results found");
+                        } else if !interactive {
+                            if let Err(err) =
+                                ctx.ytdlp_manager.download_url(&items[0].url, position)
+                            {
+                                status_error!("Failed to download first search result: {err}");
+                            }
+                        } else {
+                            let labels: Vec<String> = items
+                                .iter()
+                                .map(|it| it.title.as_deref().unwrap_or("<no title>").to_string())
+                                .collect();
 
-                        let modal = SelectModal::builder()
-                            .ctx(&ctx)
-                            .title("Search results")
-                            .confirm_label("Select")
-                            .options(labels)
-                            .on_confirm(move |ctx, _label, idx| {
-                                let url = std::mem::take(&mut items[idx].url);
-                                if let Err(e) = ctx
-                                    .work_sender
-                                    .send(WorkRequest::Command(Command::AddYt { url, position }))
-                                {
-                                    log::error!("Failed to send enqueue command: {e}");
-                                }
-                                Ok(())
-                            })
-                            .build();
+                            let modal = SelectModal::builder()
+                                .ctx(&ctx)
+                                .title("Search results")
+                                .confirm_label("Select")
+                                .options(labels)
+                                .on_confirm(move |ctx, _label, idx| {
+                                    if let Err(err) =
+                                        ctx.ytdlp_manager.download_url(&items[idx].url, position)
+                                    {
+                                        status_error!("Failed to download selected item: {err}");
+                                    } else {
+                                        modal!(ctx, DownloadsModal::new(ctx));
+                                    }
+                                    Ok(())
+                                })
+                                .build();
 
-                        if let Err(err) =
-                            ui.on_ui_app_event(UiAppEvent::Modal(Box::new(modal)), &mut ctx)
-                        {
-                            log::error!(error:? = err; "UI failed to handle modal event");
+                            if let Err(err) =
+                                ui.on_ui_app_event(UiAppEvent::Modal(Box::new(modal)), &mut ctx)
+                            {
+                                log::error!(error:? = err; "UI failed to handle modal event");
+                            }
                         }
 
                         render_wanted = true;

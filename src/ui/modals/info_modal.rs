@@ -34,6 +34,7 @@ pub struct InfoModal<'a> {
     button_group: ButtonGroup<'a>,
     replacement_id: Option<Cow<'static, str>>,
     size: Option<Size>,
+    percent_width: f32,
     title: Option<Cow<'a, str>>,
 }
 
@@ -41,10 +42,13 @@ pub struct InfoModal<'a> {
 #[bon]
 impl<'a> InfoModal<'a> {
     #[builder]
+    #[builder(on(Size, into))]
+    #[builder(on(f32, into))]
     pub fn new(
         ctx: &Ctx,
-        size: Option<impl Into<Size>>,
+        size: Option<Size>,
         confirm_label: Option<&'a str>,
+        percent_width: Option<f32>,
         message: Vec<String>,
         replacement_id: Option<impl Into<Cow<'static, str>>>,
         title: Option<impl Into<Cow<'a, str>>>,
@@ -68,9 +72,10 @@ impl<'a> InfoModal<'a> {
             message,
             button_group_state,
             button_group,
-            size: size.map(|s| s.into()),
+            size,
             title: title.map(|v| v.into()),
             replacement_id: replacement_id.map(|i| i.into()),
+            percent_width: percent_width.unwrap_or(50.0),
         }
     }
 }
@@ -83,7 +88,7 @@ impl Modal for InfoModal<'_> {
     fn render(&mut self, frame: &mut Frame, ctx: &mut Ctx) -> Result<()> {
         let width = match (frame.area().width, self.size) {
             (fw, Some(Size { width, .. })) => width.min(fw),
-            (fw, None) if fw > 60 => fw / 2,
+            (fw, None) if fw > 80 => (fw as f32 * (self.percent_width / 100f32)) as u16,
             (fw, None) => fw,
         };
 
