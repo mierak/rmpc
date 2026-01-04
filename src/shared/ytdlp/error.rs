@@ -6,10 +6,10 @@ use crate::shared::ytdlp::ytdlp_item::YtDlpHost;
 pub enum YtDlpDownloadError {
     #[error("IO error: {0}")]
     IoError(#[from] std::io::Error),
-    #[error("yt-dlp exitted with code: {code:?}: stdout: {stdout}, stderr: {stderr}")]
+    #[error("yt-dlp exited with code: {code:?}: stdout: {stdout}, stderr: {stderr}")]
     YtDlpError { stdout: String, stderr: String, code: Option<i32> },
     #[error(
-        "Did not find file downloaded by yt-dlp in cache directory, yt-dlp exitted with code: {code:?}: stdout: {stdout}, stderr: {stderr}"
+        "Did not find file downloaded by yt-dlp in cache directory, yt-dlp exited with code: {code:?}: stdout: {stdout}, stderr: {stderr}"
     )]
     FileNotFound { stdout: String, stderr: String, code: Option<i32> },
 }
