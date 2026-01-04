@@ -319,7 +319,6 @@ fn main_task<B: Backend + std::io::Write>(
                     WorkDone::YtDlpPlaylistResolved { urls } => {
                         ctx.ytdlp_manager.queue_download_many(urls);
                         ctx.ytdlp_manager.download_next();
-                        render_wanted = true;
                     }
                     WorkDone::YtDlpDownloaded { id, result } => {
                         match ctx.ytdlp_manager.resolve_download(id, result) {
@@ -342,7 +341,6 @@ fn main_task<B: Backend + std::io::Write>(
                         if let Err(err) = ui.on_event(UiEvent::DownloadsUpdated, &mut ctx) {
                             log::error!(error:? = err; "UI failed to handle DownloadsUpdated event");
                         }
-                        render_wanted = true;
                     }
                     WorkDone::SearchYtResults { items, position, interactive } => {
                         if items.is_empty() {

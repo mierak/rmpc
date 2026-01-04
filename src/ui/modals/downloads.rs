@@ -135,14 +135,8 @@ impl Modal for DownloadsModal {
                     self.queue.last();
                     ctx.render()?;
                 }
-                CommonAction::Select => {
-                    // TODO
-                    // self.queue.toggle_mark_selected();
-                    ctx.render()?;
-                }
-                CommonAction::ShowInfo => {
-                    // Maybe use this instead of modal for logs?
-                }
+                CommonAction::Select => {}
+                CommonAction::ShowInfo => {}
 
                 _ => {}
             }
@@ -200,6 +194,7 @@ impl Modal for DownloadsModal {
                 if !self.queue.items.is_empty() && self.queue.selected().is_none() {
                     self.queue.state.select(Some(0), 0);
                 }
+                ctx.render()?;
             }
             _ => {}
         }
