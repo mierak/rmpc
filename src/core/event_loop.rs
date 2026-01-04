@@ -348,10 +348,16 @@ fn main_task<B: Backend + std::io::Write>(
                         if items.is_empty() {
                             status_warn!("No results found");
                         } else if !interactive {
-                            if let Err(err) =
-                                ctx.ytdlp_manager.download_url(&items[0].url, position)
-                            {
-                                status_error!("Failed to download first search result: {err}");
+                            let result = ctx.ytdlp_manager.download_url(&items[0].url, position);
+                            match result {
+                                Ok(()) => {
+                                    if ctx.config.auto_open_downloads {
+                                        modal!(ctx, DownloadsModal::new(&ctx));
+                                    }
+                                }
+                                Err(err) => {
+                                    status_error!("Failed to download first search result: {err}");
+                                }
                             }
                         } else {
                             let labels: Vec<String> = items
@@ -365,12 +371,19 @@ fn main_task<B: Backend + std::io::Write>(
                                 .confirm_label("Select")
                                 .options(labels)
                                 .on_confirm(move |ctx, _label, idx| {
-                                    if let Err(err) =
-                                        ctx.ytdlp_manager.download_url(&items[idx].url, position)
-                                    {
-                                        status_error!("Failed to download selected item: {err}");
-                                    } else {
-                                        modal!(ctx, DownloadsModal::new(ctx));
+                                    let result =
+                                        ctx.ytdlp_manager.download_url(&items[idx].url, position);
+                                    match result {
+                                        Ok(()) => {
+                                            if ctx.config.auto_open_downloads {
+                                                modal!(ctx, DownloadsModal::new(ctx));
+                                            }
+                                        }
+                                        Err(err) => {
+                                            status_error!(
+                                                "Failed to download selected item: {err}"
+                                            );
+                                        }
                                     }
                                     Ok(())
                                 })

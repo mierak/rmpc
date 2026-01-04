@@ -353,15 +353,24 @@ impl<'ui> Ui<'ui> {
                                 }) => {
                                     let kind: YtDlpHost = provider.into();
 
-                                    if let Err(e) = ctx.work_sender.send(WorkRequest::SearchYt {
+                                    let info_msg = format!("Searching '{query}' on {kind}");
+                                    let send_result = ctx.work_sender.send(WorkRequest::SearchYt {
                                         query,
                                         kind,
                                         limit,
                                         interactive,
                                         position,
-                                    }) {
-                                        log::error!("Failed to send SearchYt work: {e}");
+                                    });
+
+                                    match send_result {
+                                        Ok(()) => {
+                                            status_info!("{info_msg}");
+                                        }
+                                        Err(err) => {
+                                            log::error!("Failed to send SearchYt work: {err}");
+                                        }
                                     }
+
                                     Ok(())
                                 }
 
@@ -369,11 +378,17 @@ impl<'ui> Ui<'ui> {
                                     command: Some(Command::AddYt { url, position }),
                                     ..
                                 }) => {
-                                    if let Err(err) = ctx.ytdlp_manager.download_url(&url, position)
-                                    {
-                                        status_error!(err:?; "Failed to queue yt-dlp download");
-                                    } else {
-                                        modal!(ctx, DownloadsModal::new(ctx));
+                                    let send_result =
+                                        ctx.ytdlp_manager.download_url(&url, position);
+                                    match send_result {
+                                        Ok(()) => {
+                                            if ctx.config.auto_open_downloads {
+                                                modal!(ctx, DownloadsModal::new(ctx));
+                                            }
+                                        }
+                                        Err(err) => {
+                                            status_error!(err:?; "Failed to queue yt-dlp download");
+                                        }
                                     }
                                     Ok(())
                                 }

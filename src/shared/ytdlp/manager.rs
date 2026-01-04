@@ -8,7 +8,7 @@ use crate::{
     shared::{
         events::WorkRequest,
         id::{self, Id},
-        macros::status_error,
+        macros::{status_error, status_info},
         ytdlp::{
             YtDlpDownloadError,
             YtDlpDownloadResult,
@@ -92,6 +92,8 @@ impl YtDlpManager {
                     self.work_sender.send(WorkRequest::YtDlpResolvePlaylist { playlist })
                 {
                     status_error!(err:?; "Failed to send playlist download request");
+                } else {
+                    status_info!("Fetching playlist info");
                 }
             }
         }
@@ -111,6 +113,8 @@ impl YtDlpManager {
                         status_error!(err:?; "Failed to send download request");
                         break;
                     }
+
+                    status_info!("Downloading {} from {}", item.inner.id, item.inner.kind);
                     item.state = DownloadState::Downloading;
 
                     // Only ever download one at a time
@@ -151,6 +155,7 @@ impl YtDlpManager {
     }
 
     pub fn queue_download_many(&self, items: Vec<YtDlpItem>) {
+        status_info!("Queueing {} items for download", items.len());
         for item in items {
             self.queue_download(item, None);
         }
@@ -167,6 +172,10 @@ impl YtDlpManager {
                     if result.was_already_downloaded {
                         item.state =
                             DownloadState::AlreadyDownloaded { path: result.file_path.clone() };
+                        status_info!(
+                            "File for {} was already downloaded, skipping download",
+                            item.inner.id
+                        );
                     } else {
                         item.state = DownloadState::Completed {
                             logs: Self::join_stdout_stderr(
@@ -176,6 +185,7 @@ impl YtDlpManager {
                             ),
                             path: result.file_path.clone(),
                         };
+                        status_info!("Downloaded {}", item.inner.id);
                     }
                     Ok((result.file_path, item.add_position))
                 }
