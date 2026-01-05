@@ -78,6 +78,7 @@ pub struct Ctx {
     pub(crate) input: InputManager,
     pub(crate) key_resolver: KeyResolver,
     pub(crate) ytdlp_manager: YtDlpManager,
+    pub(crate) cached_queue_time_total: Duration,
 }
 
 #[bon]
@@ -100,6 +101,7 @@ impl Ctx {
 
         let status = client.get_status()?;
         let queue = client.playlist_info()?.unwrap_or_default();
+        let cached_queue_time_total = queue.iter().filter_map(|s| s.duration).sum();
 
         if !supported_commands.contains("albumart") || !supported_commands.contains("readpicture") {
             config.album_art.method = ImageMethod::None;
@@ -136,6 +138,7 @@ impl Ctx {
             stickers_supported,
             input: InputManager::default(),
             key_resolver,
+            cached_queue_time_total,
         })
     }
 
@@ -247,9 +250,17 @@ impl Ctx {
             return None;
         }
 
-        self.status
-            .songid
-            .and_then(|id| self.queue.iter().enumerate().find(|(_, song)| song.id == id))
+        // Use indexing by "song" instead of finding the song by id when the queue is
+        // very large to avoid performance issues. The indexing is not used by default
+        // because it can cause small/short desyncs when queue is being updated by
+        // moving/shuffling the songs.
+        if self.queue.len() > 3_000 {
+            self.status.song.and_then(|idx| self.queue.get(idx).map(|song| (idx, song)))
+        } else {
+            self.status
+                .songid
+                .and_then(|id| self.queue.iter().enumerate().find(|(_, song)| song.id == id))
+        }
     }
 
     pub(crate) fn find_current_lyrics_path(&self) -> Option<PathBuf> {

@@ -528,17 +528,9 @@ fn main_task<B: Backend + std::io::Write>(
                                     let mut env = create_env(&ctx, std::iter::empty());
 
                                     let prev_song_file = (previous_status.state != State::Stop)
-                                        .then_some(
-                                            previous_status
-                                                .songid
-                                                .and_then(|id| {
-                                                    ctx.queue
-                                                        .iter()
-                                                        .enumerate()
-                                                        .find(|(_, song)| song.id == id)
-                                                })
-                                                .map(|(_, s)| s.file.clone()),
-                                        )
+                                        .then_some(previous_status.song.and_then(|idx| {
+                                            ctx.queue.get(idx).map(|song| song.file.clone())
+                                        }))
                                         .flatten();
 
                                     if let (Some(prev_song), Some(played)) =
@@ -565,12 +557,14 @@ fn main_task<B: Backend + std::io::Write>(
                             ctx.last_status_update = Instant::now();
                             render_wanted = true;
                         }
-                        ("global_volume_update", None, MpdQueryResult::Volume(volume)) => {
+                        (GLOBAL_VOLUME_UPDATE, None, MpdQueryResult::Volume(volume)) => {
                             ctx.status.volume = volume;
                             render_wanted = true;
                         }
-                        ("global_queue_update", None, MpdQueryResult::Queue(queue)) => {
+                        (GLOBAL_QUEUE_UPDATE, None, MpdQueryResult::Queue(queue)) => {
                             ctx.queue = queue.unwrap_or_default();
+                            ctx.cached_queue_time_total =
+                                ctx.queue.iter().filter_map(|s| s.duration).sum();
                             render_wanted = true;
                             log::debug!(len = ctx.queue.len(); "Queue updated");
                             if let Err(err) = ui.on_event(UiEvent::QueueChanged, &mut ctx) {
@@ -775,17 +769,18 @@ fn handle_idle_event(event: IdleEvent, ctx: &Ctx, result_ui_evs: &mut HashSet<Id
                 .id(GLOBAL_QUEUE_UPDATE)
                 .replace_id("playlist")
                 .query(move |client| Ok(MpdQueryResult::Queue(client.playlist_info()?)));
-            if ctx.config.reflect_changes_to_playlist {
-                // Do not replace because we want to update currently loaded playlist if any
-                ctx.query().id(GLOBAL_STATUS_UPDATE).replace_id("status_from_playlist").query(
-                    move |client| {
-                        Ok(MpdQueryResult::Status {
-                            data: client.get_status()?,
-                            source_event: Some(IdleEvent::Playlist),
-                        })
-                    },
-                );
-            }
+
+            // Do not replace because we want to update currently loaded playlist if any
+            // Also have to query every time because the current song position may change
+            // during queue update (shuffle, move, ...)
+            ctx.query().id(GLOBAL_STATUS_UPDATE).replace_id("status_from_playlist").query(
+                move |client| {
+                    Ok(MpdQueryResult::Status {
+                        data: client.get_status()?,
+                        source_event: Some(IdleEvent::Playlist),
+                    })
+                },
+            );
         }
         IdleEvent::Sticker => {
             if ctx.stickers_supported.into() {

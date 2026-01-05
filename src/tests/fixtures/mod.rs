@@ -2,7 +2,7 @@ use std::{
     cell::{Cell, RefCell},
     collections::{HashMap, HashSet},
     os::unix::net::UnixStream,
-    time::Instant,
+    time::{Duration, Instant},
 };
 
 use crossbeam::channel::{Receiver, Sender, unbounded};
@@ -90,6 +90,7 @@ pub fn ctx(
         song_played: None,
         input: InputManager::default(),
         key_resolver,
+        cached_queue_time_total: Duration::default(),
     }
 }
 
