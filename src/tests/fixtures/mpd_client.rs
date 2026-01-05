@@ -155,10 +155,7 @@ impl MpdClient for TestMpdClient {
         todo!("Not yet implemented")
     }
 
-    fn enter_idle(&mut self) -> MpdResult<()>
-    where
-        Self: SocketClient,
-    {
+    fn enter_idle(&mut self, _subsystem: Option<IdleEvent>) -> MpdResult<()> {
         todo!("Not yet implemented")
     }
 

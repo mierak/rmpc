@@ -233,7 +233,7 @@ pub trait MpdClient: Sized {
     fn update(&mut self, path: Option<&str>) -> MpdResult<Update>;
     fn rescan(&mut self, path: Option<&str>) -> MpdResult<Update>;
     fn idle(&mut self, subsystem: Option<IdleEvent>) -> MpdResult<Vec<IdleEvent>>;
-    fn enter_idle(&mut self) -> MpdResult<()>;
+    fn enter_idle(&mut self, subsystem: Option<IdleEvent>) -> MpdResult<()>;
     fn noidle(&mut self) -> MpdResult<()>;
 
     fn get_volume(&mut self) -> MpdResult<Volume>;
@@ -424,8 +424,8 @@ impl MpdClient for Client<'_> {
         self.send_idle(subsystem).and_then(|()| self.read_response())
     }
 
-    fn enter_idle(&mut self) -> MpdResult<()> {
-        self.send_idle(None)
+    fn enter_idle(&mut self, subsystem: Option<IdleEvent>) -> MpdResult<()> {
+        self.send_idle(subsystem)
     }
 
     fn noidle(&mut self) -> MpdResult<()> {

@@ -1,7 +1,6 @@
 use std::{path::PathBuf, str::FromStr};
 
 use anyhow::{Result, bail};
-use itertools::Itertools;
 
 use crate::{
     config::cli_config::CliConfig,
@@ -11,7 +10,11 @@ use crate::{
     },
 };
 
-pub fn init_and_download(config: &CliConfig, url: &str) -> Result<Vec<PathBuf>> {
+pub fn init_and_download(
+    config: &CliConfig,
+    url: &str,
+    mut for_each: impl FnMut(PathBuf) -> Result<()>,
+) -> Result<()> {
     let Some(cache_dir) = &config.cache_dir else {
         bail!("Youtube support requires 'cache_dir' to be configured")
     };
@@ -30,37 +33,34 @@ pub fn init_and_download(config: &CliConfig, url: &str) -> Result<Vec<PathBuf>> 
 
     match resolved {
         YtDlpContent::Single(host) => {
-            let result = ytdlp
-                .download_single(&host)
-                .inspect(|ok| {
-                    eprintln!("Downloaded '{}'", ok.file_path.display());
-                })
-                .inspect_err(|err| {
+            match ytdlp.download_single(&host) {
+                Ok(result) => {
+                    eprintln!("Downloaded '{}'", result.file_path.display());
+                    for_each(result.file_path)?;
+                }
+                Err(err) => {
                     eprintln!("Failed to download: {err}");
-                })?;
+                }
+            }
 
-            Ok(vec![result.file_path])
+            Ok(())
         }
         YtDlpContent::Playlist(playlist) => {
+            eprintln!("Resolving playlist '{}'", playlist.id);
             let resolved = ytdlp.resolve_playlist_urls(&playlist)?;
-            let success = resolved
-                .iter()
-                .map(|item| {
-                    ytdlp
-                        .download_single(item)
-                        .inspect(|ok| {
-                            eprintln!("Downloaded '{}' from playlist", ok.file_path.display());
-                        })
-                        .inspect_err(|err| {
-                            eprintln!("Failed to download item from playlist: {err}");
-                        })
-                        .map(|res| res.file_path)
-                })
-                // Drop all the unsuccessful ones, errors have been printed out to stderr already
-                .filter_map(|item| item.ok())
-                .collect_vec();
+            for item in resolved {
+                match ytdlp.download_single(&item) {
+                    Ok(result) => {
+                        eprintln!("Downloaded '{}' from playlist", result.file_path.display());
+                        for_each(result.file_path)?;
+                    }
+                    Err(err) => {
+                        eprintln!("Failed to download from playlist: {err}");
+                    }
+                }
+            }
 
-            Ok(success)
+            Ok(())
         }
     }
 }

@@ -249,10 +249,10 @@ impl DownloadsModal {
                                 let path = std::mem::take(path);
                                 section.add_item(action.to_string(), move |ctx| {
                                     let cache_dir = ctx.config.cache_dir.clone();
-                                    ctx.command(|client| {
-                                        client.add_downloaded_files_to_queue(
-                                            vec![path],
-                                            cache_dir,
+                                    ctx.command(move |client| {
+                                        client.add_downloaded_file_to_queue(
+                                            path,
+                                            cache_dir.as_deref(),
                                             None,
                                         )?;
                                         Ok(())

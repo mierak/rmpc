@@ -325,9 +325,9 @@ fn main_task<B: Backend + std::io::Write>(
                             Ok((path, position)) => {
                                 let cache_dir = ctx.config.cache_dir.clone();
                                 ctx.command(move |client| {
-                                    client.add_downloaded_files_to_queue(
-                                        vec![path],
-                                        cache_dir,
+                                    client.add_downloaded_file_to_queue(
+                                        path,
+                                        cache_dir.as_deref(),
                                         position,
                                     )?;
                                     Ok(())

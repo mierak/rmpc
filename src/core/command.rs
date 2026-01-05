@@ -277,10 +277,26 @@ impl Command {
                 Ok(())
             })),
             Command::AddYt { url, position } => {
-                let file_paths = ytdlp::init_and_download(config, &url)?;
-                let cache_dir = config.cache_dir.clone();
+                let config = config.clone();
                 Ok(Box::new(move |client| {
-                    client.add_downloaded_files_to_queue(file_paths, cache_dir, position)?;
+                    // Idle with message subsytem, the cli client is never subscribed to any
+                    // channels so this will idle indefinitely
+                    client.enter_idle(Some(IdleEvent::Message))?;
+
+                    ytdlp::init_and_download(&config, &url, |path| {
+                        client.noidle()?;
+                        if let Err(err) = client.add_downloaded_file_to_queue(
+                            path,
+                            config.cache_dir.as_deref(),
+                            position,
+                        ) {
+                            eprintln!("Failed to add downloaded file to queue: {err}");
+                        }
+                        client.enter_idle(Some(IdleEvent::Message))?;
+                        Ok(())
+                    })?;
+
+                    client.noidle()?;
                     Ok(())
                 }))
             }
@@ -296,11 +312,24 @@ impl Command {
                         .map(|item| item.url)?
                 };
 
-                let file_paths = ytdlp::init_and_download(config, &chosen_url)?;
-                let cache_dir = config.cache_dir.clone();
-
+                let config = config.clone();
                 Ok(Box::new(move |client| {
-                    client.add_downloaded_files_to_queue(file_paths, cache_dir, position)?;
+                    // Idle with message subsytem, the cli client is never subscribed to any
+                    // channels so this will idle indefinitely
+                    client.enter_idle(Some(IdleEvent::Message))?;
+
+                    ytdlp::init_and_download(&config, &chosen_url, |path| {
+                        client.noidle()?;
+                        client.add_downloaded_file_to_queue(
+                            path,
+                            config.cache_dir.as_deref(),
+                            position,
+                        )?;
+                        client.enter_idle(Some(IdleEvent::Message))?;
+                        Ok(())
+                    })?;
+
+                    client.noidle()?;
                     Ok(())
                 }))
             }

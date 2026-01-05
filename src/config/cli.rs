@@ -248,7 +248,7 @@ pub enum Command {
         #[arg(short = 'i', long = "interactive")]
         interactive: bool,
         /// How many results to show with --list
-        #[arg(long = "limit", default_value_t = 5, requires("interactive"))]
+        #[arg(short = 'l', long = "limit", default_value_t = 5, requires("interactive"))]
         limit: usize,
         /// If provided, queue the new item at this position instead of the end
         /// of the queue. Allowed positions are <number> (absolute) and
@@ -256,11 +256,15 @@ pub enum Command {
         #[arg(short, long, allow_negative_numbers = true)]
         position: Option<QueuePosition>,
     },
+    /// Save the current queue as a playlist
     Save {
+        /// Playlist name to create
         #[arg(required = true)]
         name: String,
     },
+    /// Loads a playlist into the current queue
     Load {
+        /// Name of the playlist to load
         #[arg(required = true)]
         names: Vec<String>,
     },
