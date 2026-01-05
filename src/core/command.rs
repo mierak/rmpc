@@ -22,7 +22,7 @@ use crate::{
         lrc::{LrcIndex, get_lrc_path},
         macros::status_error,
         mpd_client_ext::MpdClientExt,
-        ytdlp::{YtDlp, YtDlpHostKind},
+        ytdlp::{self, YtDlp, YtDlpHost},
     },
 };
 
@@ -277,25 +277,59 @@ impl Command {
                 Ok(())
             })),
             Command::AddYt { url, position } => {
-                let file_paths = YtDlp::init_and_download(config, &url)?;
-                let cache_dir = config.cache_dir.clone();
+                let config = config.clone();
                 Ok(Box::new(move |client| {
-                    client.add_downloaded_files_to_queue(file_paths, cache_dir, position)?;
+                    // Idle with message subsystem, the cli client is never subscribed to any
+                    // channels so this will idle indefinitely
+                    client.enter_idle(Some(IdleEvent::Message))?;
+
+                    ytdlp::init_and_download(&config, &url, |path| {
+                        client.noidle()?;
+                        if let Err(err) = client.add_downloaded_file_to_queue(
+                            path,
+                            config.cache_dir.as_deref(),
+                            position,
+                        ) {
+                            eprintln!("Failed to add downloaded file to queue: {err}");
+                        }
+                        client.enter_idle(Some(IdleEvent::Message))?;
+                        Ok(())
+                    })?;
+
+                    client.noidle()?;
                     Ok(())
                 }))
             }
             Command::SearchYt { query, provider, interactive, limit, position } => {
-                let kind: YtDlpHostKind = provider.into();
+                let kind: YtDlpHost = provider.into();
                 let chosen_url = if interactive {
-                    YtDlp::search_pick_cli(kind, query.trim(), limit)?
+                    ytdlp::search_pick_cli(kind, query.trim(), limit)?
                 } else {
-                    YtDlp::search_single(kind, query.trim())?
+                    YtDlp::search(kind, query.trim(), 1)?
+                        .into_iter()
+                        .next()
+                        .ok_or_else(|| anyhow::anyhow!("No results found for query '{query}'"))
+                        .map(|item| item.url)?
                 };
-                let file_paths = YtDlp::init_and_download(config, &chosen_url)?;
-                let cache_dir = config.cache_dir.clone();
 
+                let config = config.clone();
                 Ok(Box::new(move |client| {
-                    client.add_downloaded_files_to_queue(file_paths, cache_dir, position)?;
+                    // Idle with message subsystem, the cli client is never subscribed to any
+                    // channels so this will idle indefinitely
+                    client.enter_idle(Some(IdleEvent::Message))?;
+
+                    ytdlp::init_and_download(&config, &chosen_url, |path| {
+                        client.noidle()?;
+                        client.add_downloaded_file_to_queue(
+                            path,
+                            config.cache_dir.as_deref(),
+                            position,
+                        )?;
+                        client.enter_idle(Some(IdleEvent::Message))?;
+                        Ok(())
+                    })?;
+
+                    client.noidle()?;
                     Ok(())
                 }))
             }
@@ -453,12 +487,12 @@ impl Command {
     }
 }
 
-impl From<Provider> for YtDlpHostKind {
+impl From<Provider> for YtDlpHost {
     fn from(p: Provider) -> Self {
         match p {
-            Provider::Youtube => YtDlpHostKind::Youtube,
-            Provider::Soundcloud => YtDlpHostKind::Soundcloud,
-            Provider::Nicovideo => YtDlpHostKind::NicoVideo,
+            Provider::Youtube => YtDlpHost::Youtube,
+            Provider::Soundcloud => YtDlpHost::Soundcloud,
+            Provider::Nicovideo => YtDlpHost::NicoVideo,
         }
     }
 }

@@ -125,7 +125,7 @@ fn client_task(
                             health!(client.set_read_timeout(config.mpd_idle_read_timeout_ms), "Failed to set read timeout for idle client");
 
                             log::trace!("Read timeout set, entering idle state");
-                            health!(client.enter_idle(), "Failed to enter idle state");
+                            health!(client.enter_idle(None), "Failed to enter idle state");
 
                             log::trace!("Sending client received confirmation");
                             health!(client_received_tx.send_timeout((), Duration::from_secs(3)), "Failed to send client received confirmation");

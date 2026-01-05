@@ -36,6 +36,7 @@ use crate::{
         mpd_client_ext::MpdClientExt,
         mpd_query::MpdQuerySync,
         ring_vec::RingVec,
+        ytdlp::YtDlpManager,
     },
     ui::{StatusMessage, input::InputManager},
 };
@@ -76,6 +77,7 @@ pub struct Ctx {
     pub(crate) stickers_supported: StickersSupport,
     pub(crate) input: InputManager,
     pub(crate) key_resolver: KeyResolver,
+    pub(crate) ytdlp_manager: YtDlpManager,
 }
 
 #[bon]
@@ -111,6 +113,7 @@ impl Ctx {
         let active_tab = config.tabs.names.first().context("Expected at least one tab")?.clone();
         scheduler.start();
         Ok(Self {
+            ytdlp_manager: YtDlpManager::new(work_sender.clone()),
             mpd_version: client.version(),
             lrc_index: LrcIndex::default(),
             config: std::sync::Arc::new(config),

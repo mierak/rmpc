@@ -1,4 +1,8 @@
-use std::{collections::HashMap, path::PathBuf, sync::Arc};
+use std::{
+    collections::HashMap,
+    path::{Path, PathBuf},
+    sync::Arc,
+};
 
 use anyhow::Context;
 use itertools::Itertools;
@@ -76,10 +80,10 @@ pub trait MpdClientExt {
         items: Vec<Enqueue>,
     ) -> Result<(), MpdError>;
     fn delete_sticker_multiple(&mut self, key: &str, items: Vec<Enqueue>) -> Result<(), MpdError>;
-    fn add_downloaded_files_to_queue(
+    fn add_downloaded_file_to_queue(
         &mut self,
-        paths: Vec<String>,
-        cache_dir: Option<PathBuf>,
+        paths: PathBuf,
+        cache_dir: Option<&Path>,
         position: Option<QueuePosition>,
     ) -> Result<(), MpdError>;
 }
@@ -470,18 +474,19 @@ impl<T: MpdClient + MpdCommand + ProtoClient> MpdClientExt for T {
         Ok(())
     }
 
-    fn add_downloaded_files_to_queue(
+    fn add_downloaded_file_to_queue(
         &mut self,
-        paths: Vec<String>,
-        cache_dir: Option<PathBuf>,
+        path: PathBuf,
+        cache_dir: Option<&Path>,
         position: Option<QueuePosition>,
     ) -> Result<(), MpdError> {
-        self.send_start_cmd_list()?;
-        for file in &paths {
-            self.send_add(file, position)?;
-        }
-        self.send_execute_cmd_list()?;
-        match self.read_ok() {
+        let result = self.add(
+            path.as_os_str().to_str().ok_or_else(|| {
+                MpdError::Generic(format!("Path '{}' is not valid UTF-8", path.display()))
+            })?,
+            position,
+        );
+        match result {
             Ok(()) => {}
             Err(MpdError::Mpd(err)) if err.is_no_exist() => {
                 let Some(cache_dir) = cache_dir else {
@@ -533,12 +538,12 @@ impl<T: MpdClient + MpdCommand + ProtoClient> MpdClientExt for T {
                 }
 
                 log::debug!("Trying to add the downloaded files again");
-                self.send_start_cmd_list()?;
-                for file in &paths {
-                    self.send_add(file, position)?;
-                }
-                self.send_execute_cmd_list()?;
-                self.read_ok()?;
+                self.add(
+                    path.as_os_str().to_str().ok_or_else(|| {
+                        MpdError::Generic(format!("Path '{}' is not valid UTF-8", path.display()))
+                    })?,
+                    position,
+                )?;
             }
             original @ Err(_) => original?,
         }

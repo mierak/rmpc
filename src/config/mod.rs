@@ -94,6 +94,7 @@ pub struct Config {
     pub show_playlists_in_browser: ShowPlaylistsMode,
     pub directories_sort: Arc<SortOptions>,
     pub cava: Cava,
+    pub auto_open_downloads: bool,
 }
 
 #[derive(Debug, Default, Clone, Copy, Serialize, Deserialize, PartialEq)]
@@ -188,6 +189,8 @@ pub struct ConfigFile {
     pub directories_sort: SortModeFile,
     #[serde(default)]
     pub cava: CavaFile,
+    #[serde(default = "defaults::bool::<true>")]
+    pub auto_open_downloads: bool,
 }
 
 #[derive(Debug, Serialize, Deserialize, Copy, Clone, PartialEq, Eq)]
@@ -254,6 +257,7 @@ impl Default for ConfigFile {
             reflect_changes_to_playlist: false,
             cava: CavaFile::default(),
             show_playlists_in_browser: ShowPlaylistsMode::default(),
+            auto_open_downloads: true,
         }
     }
 }
@@ -496,6 +500,7 @@ impl ConfigFile {
             keep_state_on_song_change: self.keep_state_on_song_change,
             reflect_changes_to_playlist: self.reflect_changes_to_playlist,
             cava: self.cava.into(),
+            auto_open_downloads: self.auto_open_downloads,
         };
 
         if skip_album_art_check {

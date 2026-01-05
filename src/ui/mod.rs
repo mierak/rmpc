@@ -50,12 +50,12 @@ use crate::{
         macros::{modal, status_error, status_info, status_warn},
         mouse_event::MouseEvent,
         mpd_client_ext::{Enqueue, MpdClientExt},
-        ytdlp::YtDlpHostKind,
+        ytdlp::YtDlpHost,
     },
     ui::{
         image::facade::EncodeData,
         input::{InputEvent, InputResultEvent},
-        modals::menu::create_rating_modal,
+        modals::{downloads::DownloadsModal, menu::create_rating_modal},
     },
 };
 
@@ -337,8 +337,7 @@ impl<'ui> Ui<'ui> {
                     }
                 }
                 GlobalAction::CommandMode => {
-                    modal!(
-                        ctx,
+                    let modal =
                         InputModal::new(ctx).title("Execute a command").on_confirm(|ctx, value| {
                             match Args::parse_cli_line(value) {
                                 Ok(Args {
@@ -352,16 +351,44 @@ impl<'ui> Ui<'ui> {
                                         }),
                                     ..
                                 }) => {
-                                    let kind: YtDlpHostKind = provider.into();
+                                    let kind: YtDlpHost = provider.into();
 
-                                    if let Err(e) = ctx.work_sender.send(WorkRequest::SearchYt {
+                                    let info_msg = format!("Searching '{query}' on {kind}");
+                                    let send_result = ctx.work_sender.send(WorkRequest::SearchYt {
                                         query,
                                         kind,
                                         limit,
                                         interactive,
                                         position,
-                                    }) {
-                                        log::error!("Failed to send SearchYt work: {e}");
+                                    });
+
+                                    match send_result {
+                                        Ok(()) => {
+                                            status_info!("{info_msg}");
+                                        }
+                                        Err(err) => {
+                                            log::error!("Failed to send SearchYt work: {err}");
+                                        }
+                                    }
+
+                                    Ok(())
+                                }
+
+                                Ok(Args {
+                                    command: Some(Command::AddYt { url, position }),
+                                    ..
+                                }) => {
+                                    let send_result =
+                                        ctx.ytdlp_manager.download_url(&url, position);
+                                    match send_result {
+                                        Ok(()) => {
+                                            if ctx.config.auto_open_downloads {
+                                                modal!(ctx, DownloadsModal::new(ctx));
+                                            }
+                                        }
+                                        Err(err) => {
+                                            status_error!(err:?; "Failed to queue yt-dlp download");
+                                        }
                                     }
                                     Ok(())
                                 }
@@ -383,8 +410,8 @@ impl<'ui> Ui<'ui> {
                                     Ok(())
                                 }
                             }
-                        })
-                    );
+                        });
+                    modal!(ctx, modal);
                 }
                 GlobalAction::NextTrack if ctx.status.state != State::Stop => {
                     let keep_state = ctx.config.keep_state_on_song_change;
@@ -614,6 +641,9 @@ impl<'ui> Ui<'ui> {
                 }
                 GlobalAction::AddRandom => {
                     modal!(ctx, AddRandomModal::new(ctx));
+                }
+                GlobalAction::ShowDownloads => {
+                    modal!(ctx, DownloadsModal::new(ctx));
                 }
             }
         } else if let Some(action) = key.claim_common() {
@@ -1004,6 +1034,7 @@ pub enum UiEvent {
     PlaybackStateChanged,
     ImageEncoded { data: EncodeData },
     ImageEncodeFailed { err: anyhow::Error },
+    DownloadsUpdated,
 }
 
 impl TryFrom<IdleEvent> for UiEvent {
