@@ -270,6 +270,27 @@ impl<T: ScrollingState> DirState<T> {
         self.clamp_to_offset(scrolloff);
     }
 
+    pub fn scroll_down(&mut self, amount: usize, scrolloff: usize) {
+        let Some(viewport_len) = self.viewport_len else {
+            return;
+        };
+        let Some(content_len) = self.content_len else {
+            return;
+        };
+
+        let old_offset = self.offset();
+        let max_offset = content_len.saturating_sub(viewport_len);
+        let new_offset = (old_offset + amount).min(max_offset);
+
+        if new_offset == old_offset {
+            return;
+        }
+
+        self.inner.set_offset(new_offset);
+        self.scrollbar_state = self.scrollbar_state.position(new_offset);
+        self.clamp_to_offset(scrolloff);
+    }
+
     pub fn clamp_to_offset(&mut self, scrolloff: usize) {
         let Some(viewport_len) = self.viewport_len else {
             return;
@@ -285,26 +306,6 @@ impl<T: ScrollingState> DirState<T> {
         } else if selected < offset + scrolloff {
             self.select(Some(offset + scrolloff), scrolloff);
         }
-    }
-
-    pub fn scroll_down(&mut self, amount: usize, scrolloff: usize) {
-        let Some(viewport_len) = self.viewport_len else {
-            return;
-        };
-        let Some(content_len) = self.content_len else {
-            return;
-        };
-
-        let old_offset = self.offset();
-        let new_offset = old_offset + amount;
-
-        if new_offset + viewport_len > content_len {
-            return;
-        }
-
-        self.inner.set_offset(new_offset);
-        self.scrollbar_state = self.scrollbar_state.position(new_offset);
-        self.clamp_to_offset(scrolloff);
     }
 
     pub fn select(&mut self, idx: Option<usize>, scrolloff: usize) {

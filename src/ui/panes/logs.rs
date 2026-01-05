@@ -124,12 +124,12 @@ impl Pane for LogsPane {
 
         match event.kind {
             MouseEventKind::ScrollUp => {
-                self.scrolling_state.scroll_up(1, ctx.config.scrolloff);
+                self.scrolling_state.scroll_up(ctx.config.scroll_amount, ctx.config.scrolloff);
 
                 ctx.render()?;
             }
             MouseEventKind::ScrollDown => {
-                self.scrolling_state.scroll_down(1, ctx.config.scrolloff);
+                self.scrolling_state.scroll_down(ctx.config.scroll_amount, ctx.config.scrolloff);
 
                 ctx.render()?;
             }
