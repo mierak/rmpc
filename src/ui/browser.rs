@@ -359,12 +359,16 @@ where
                 self.fetch_data_internal(ctx);
             }
             MouseEventKind::ScrollUp if current_area.contains(position) => {
-                self.stack_mut().current_mut().scroll_up(1, ctx.config.scrolloff);
+                self.stack_mut()
+                    .current_mut()
+                    .scroll_up(ctx.config.scroll_amount, ctx.config.scrolloff);
                 self.fetch_data_internal(ctx);
                 ctx.render()?;
             }
             MouseEventKind::ScrollDown if current_area.contains(position) => {
-                self.stack_mut().current_mut().scroll_down(1, ctx.config.scrolloff);
+                self.stack_mut()
+                    .current_mut()
+                    .scroll_down(ctx.config.scroll_amount, ctx.config.scrolloff);
                 self.fetch_data_internal(ctx);
                 ctx.render()?;
             }

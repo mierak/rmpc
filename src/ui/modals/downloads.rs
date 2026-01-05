@@ -175,11 +175,11 @@ impl Modal for DownloadsModal {
                 ctx.render()?;
             }
             MouseEventKind::ScrollDown => {
-                self.queue.next(ctx.config.scrolloff, false);
+                self.queue.scroll_up(ctx.config.scroll_amount, ctx.config.scrolloff);
                 ctx.render()?;
             }
             MouseEventKind::ScrollUp => {
-                self.queue.prev(ctx.config.scrolloff, false);
+                self.queue.scroll_up(ctx.config.scroll_amount, ctx.config.scrolloff);
                 ctx.render()?;
             }
             MouseEventKind::Drag { drag_start_position: _ } => {}

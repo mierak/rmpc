@@ -731,12 +731,12 @@ impl Pane for QueuePane {
             }
             MouseEventKind::MiddleClick => {}
             MouseEventKind::ScrollDown if self.areas[Areas::Table].contains(event.into()) => {
-                self.queue.scroll_down(1, ctx.config.scrolloff);
+                self.queue.scroll_down(ctx.config.scroll_amount, ctx.config.scrolloff);
                 ctx.render()?;
             }
             MouseEventKind::ScrollDown => {}
             MouseEventKind::ScrollUp if self.areas[Areas::Table].contains(event.into()) => {
-                self.queue.scroll_up(1, ctx.config.scrolloff);
+                self.queue.scroll_up(ctx.config.scroll_amount, ctx.config.scrolloff);
                 ctx.render()?;
             }
             MouseEventKind::ScrollUp => {}

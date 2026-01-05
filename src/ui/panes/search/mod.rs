@@ -1194,7 +1194,7 @@ impl Pane for SearchPane {
                     ctx.render()?;
                 }
                 Phase::BrowseResults => {
-                    self.songs_dir.scroll_down(1, ctx.config.scrolloff);
+                    self.songs_dir.scroll_down(ctx.config.scroll_amount, ctx.config.scrolloff);
                     ctx.render()?;
                 }
             },
@@ -1209,7 +1209,7 @@ impl Pane for SearchPane {
                     ctx.render()?;
                 }
                 Phase::BrowseResults => {
-                    self.songs_dir.scroll_up(1, ctx.config.scrolloff);
+                    self.songs_dir.scroll_up(ctx.config.scroll_amount, ctx.config.scrolloff);
                     ctx.render()?;
                 }
             },

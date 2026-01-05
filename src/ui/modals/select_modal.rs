@@ -297,12 +297,12 @@ impl<V: Display + std::fmt::Debug, Callback: FnOnce(&Ctx, V, usize) -> Result<()
             }
             MouseEventKind::ScrollUp if self.options_area.contains(event.into()) => {
                 self.focused = FocusedComponent::List;
-                self.scrolling_state.scroll_up(1, ctx.config.scrolloff);
+                self.scrolling_state.scroll_up(ctx.config.scroll_amount, ctx.config.scrolloff);
                 ctx.render()?;
             }
             MouseEventKind::ScrollDown if self.options_area.contains(event.into()) => {
                 self.focused = FocusedComponent::List;
-                self.scrolling_state.scroll_down(1, ctx.config.scrolloff);
+                self.scrolling_state.scroll_down(ctx.config.scroll_amount, ctx.config.scrolloff);
                 ctx.render()?;
             }
             MouseEventKind::ScrollDown => {}

@@ -27,6 +27,7 @@ as well as fully custom border symbol sets
 - Downloads from ytdlp not show inside a modal letting you have some basic control over them as well
 - Added `auto_open_downloads` to config to control whether the download modal should open automatically
 after starting a ytdlp download
+- Added `scroll_amount` config option
 
 ### Changed
 

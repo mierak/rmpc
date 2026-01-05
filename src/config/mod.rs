@@ -69,6 +69,7 @@ pub struct Config {
     pub normal_timeout_ms: u64,
     pub insert_timeout_ms: u64,
     pub enable_mouse: bool,
+    pub scroll_amount: usize,
     pub enable_config_hot_reload: bool,
     pub status_update_interval_ms: Option<u64>,
     pub select_current_song_on_change: bool,
@@ -152,6 +153,8 @@ pub struct ConfigFile {
     mpd_idle_read_timeout_ms: Option<u64>,
     #[serde(default = "defaults::bool::<true>")]
     enable_mouse: bool,
+    #[serde(default = "defaults::usize::<1>")]
+    scroll_amount: usize,
     #[serde(default = "defaults::bool::<true>")]
     pub enable_config_hot_reload: bool,
     #[serde(default)]
@@ -245,6 +248,7 @@ impl Default for ConfigFile {
             search: SearchFile::default(),
             tabs: TabsFile::default(),
             enable_mouse: true,
+            scroll_amount: 1,
             enable_config_hot_reload: true,
             wrap_navigation: false,
             password: None,
@@ -437,6 +441,7 @@ impl ConfigFile {
             mpd_write_timeout: Duration::from_millis(self.mpd_write_timeout_ms),
             mpd_idle_read_timeout_ms: self.mpd_idle_read_timeout_ms.map(Duration::from_millis),
             enable_mouse: self.enable_mouse,
+            scroll_amount: self.scroll_amount,
             enable_config_hot_reload: self.enable_config_hot_reload,
             normal_timeout_ms: self.normal_timeout_ms,
             insert_timeout_ms: self.insert_timeout_ms,
