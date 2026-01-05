@@ -990,10 +990,9 @@ impl Property<PropertyKind> {
                     )))
                 }
                 StatusProperty::QueueTimeTotal { separator } => {
-                    let sum: Duration = ctx.queue.iter().filter_map(|s| s.duration).sum();
                     let formatted = match separator {
-                        Some(sep) => sum.format_to_duration(sep),
-                        None => sum.to_string(),
+                        Some(sep) => ctx.cached_queue_time_total.format_to_duration(sep),
+                        None => ctx.cached_queue_time_total.to_string(),
                     };
                     Some(Either::Left(Span::styled(formatted, style)))
                 }
@@ -1944,6 +1943,8 @@ mod format_tests {
                 songid: Some(0),
                 ..Default::default()
             };
+            ctx.cached_queue_time_total =
+                ctx.queue.iter().map(|s| s.duration.unwrap_or_default()).sum();
 
             let result = format.as_span(Some(&current_song), &ctx, "", TagResolutionStrategy::All);
 

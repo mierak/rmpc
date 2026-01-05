@@ -20,7 +20,7 @@ pub struct Status {
                                 * version number */
     pub playlistlength: u32, // integer, the length of the playlist
     pub state: State,        // play, stop, or pause
-    pub song: Option<u32>,   /* playlist song number of the current song
+    pub song: Option<usize>, /* playlist song number of the current song
                               * stopped on or playing */
     pub songid: Option<u32>, /* playlist songid of the current song stopped
                               * on or playing */
