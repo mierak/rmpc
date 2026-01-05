@@ -24,6 +24,9 @@ the queue by the given column.
 - Added more config options to pane definitions, you can now define border titles, their style, position
 as well as fully custom border symbol sets
 - Added `Bits()`, `SampleRate()` and `Channels()` properties to song and status
+- Downloads from ytdlp not show inside a modal letting you have some basic control over them as well
+- Added `auto_open_downloads` to config to control whether the download modal should open automatically
+after starting a ytdlp download
 
 ### Changed
 

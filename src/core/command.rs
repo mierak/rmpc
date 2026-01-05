@@ -279,7 +279,7 @@ impl Command {
             Command::AddYt { url, position } => {
                 let config = config.clone();
                 Ok(Box::new(move |client| {
-                    // Idle with message subsytem, the cli client is never subscribed to any
+                    // Idle with message subsystem, the cli client is never subscribed to any
                     // channels so this will idle indefinitely
                     client.enter_idle(Some(IdleEvent::Message))?;
 
@@ -314,7 +314,7 @@ impl Command {
 
                 let config = config.clone();
                 Ok(Box::new(move |client| {
-                    // Idle with message subsytem, the cli client is never subscribed to any
+                    // Idle with message subsystem, the cli client is never subscribed to any
                     // channels so this will idle indefinitely
                     client.enter_idle(Some(IdleEvent::Message))?;
 
