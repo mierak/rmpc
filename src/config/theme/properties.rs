@@ -26,6 +26,8 @@ pub enum SongPropertyFile {
     SampleRate(),
     Bits(),
     Channels(),
+    Added(),
+    LastModified(),
     Other(String),
 }
 
@@ -44,6 +46,8 @@ pub enum SongProperty {
     SampleRate(),
     Bits(),
     Channels(),
+    Added(),
+    LastModified(),
     Other(String),
 }
 
@@ -347,6 +351,8 @@ impl From<SongPropertyFile> for SongProperty {
             SongPropertyFile::SampleRate() => SongProperty::SampleRate(),
             SongPropertyFile::Bits() => SongProperty::Bits(),
             SongPropertyFile::Channels() => SongProperty::Channels(),
+            SongPropertyFile::Added() => SongProperty::Added(),
+            SongPropertyFile::LastModified() => SongProperty::LastModified(),
         }
     }
 }

@@ -528,6 +528,8 @@ impl Song {
             SongProperty::SampleRate() => self.samplerate().map(|v| Cow::Owned(v.to_string())),
             SongProperty::Bits() => self.bits().map(|v| Cow::Owned(v.to_string())),
             SongProperty::Channels() => self.channels().map(|v| Cow::Owned(v.to_string())),
+            SongProperty::Added() => self.added.map(|d| Cow::Owned(d.to_string())),
+            SongProperty::LastModified() => Some(Cow::Owned(self.last_modified.to_string())),
         }
     }
 

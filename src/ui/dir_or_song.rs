@@ -452,6 +452,10 @@ impl CmpByProp {
             SongProperty::SampleRate() => CmpByProp::cmp(a.samplerate(), b.samplerate()),
             SongProperty::Bits() => CmpByProp::cmp(a.bits(), b.bits()),
             SongProperty::Channels() => CmpByProp::cmp(a.channels(), b.channels()),
+            SongProperty::Added() => CmpByProp::cmp(a.added, b.added),
+            SongProperty::LastModified() => {
+                CmpByProp::cmp(Some(a.last_modified), Some(b.last_modified))
+            }
         }
     }
 }
