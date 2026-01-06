@@ -28,6 +28,7 @@ as well as fully custom border symbol sets
 - Added `auto_open_downloads` to config to control whether the download modal should open automatically
 after starting a ytdlp download
 - Added `scroll_amount` config option
+- Added `Added()` and `LastModified()` song properties
 
 ### Changed
 
