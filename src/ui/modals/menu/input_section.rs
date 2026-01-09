@@ -86,16 +86,17 @@ impl Section for InputSection<'_> {
         self.is_current = false;
     }
 
-    fn confirm(&mut self, ctx: &Ctx) -> Result<()> {
+    fn confirm(&mut self, ctx: &Ctx) -> Result<bool> {
         if ctx.input.is_active(self.buffer_id) {
             if let Some(cb) = self.action.take() {
                 let value = ctx.input.value(self.buffer_id);
                 (cb)(ctx, value);
             }
+            Ok(true)
         } else {
             ctx.input.insert_mode(self.buffer_id);
+            Ok(false)
         }
-        Ok(())
     }
 
     fn on_close(&mut self, ctx: &Ctx) -> Result<()> {

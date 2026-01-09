@@ -120,7 +120,7 @@ impl Section for MultiActionSection<'_> {
         self.selected_idx = None;
     }
 
-    fn confirm(&mut self, ctx: &Ctx) -> Result<()> {
+    fn confirm(&mut self, ctx: &Ctx) -> Result<bool> {
         if let Some(selected_idx) = self.selected_idx {
             let label = std::mem::take(&mut self.items[selected_idx].label);
             let selected_button = self.items[selected_idx].buttons_state.selected;
@@ -129,7 +129,7 @@ impl Section for MultiActionSection<'_> {
             }
         }
 
-        Ok(())
+        Ok(true)
     }
 
     fn len(&self) -> usize {

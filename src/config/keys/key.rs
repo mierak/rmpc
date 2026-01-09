@@ -55,6 +55,84 @@ impl KeySequence {
         let mut iter = self.0.iter();
         std::iter::from_fn(move || iter.next())
     }
+
+    pub fn new() -> Self {
+        Self(Vec::new())
+    }
+
+    pub fn char(mut self, c: char) -> Self {
+        let key = if c.is_uppercase() {
+            Key { key: KeyCode::Char(c.to_ascii_uppercase()), modifiers: KeyModifiers::SHIFT }
+        } else {
+            Key { key: KeyCode::Char(c), modifiers: KeyModifiers::NONE }
+        };
+        self.0.push(key);
+        self
+    }
+
+    pub fn ctrl(mut self) -> Self {
+        if let Some(last_key) = self.0.last_mut() {
+            last_key.modifiers |= KeyModifiers::CONTROL;
+        }
+        self
+    }
+
+    pub fn shift(mut self) -> Self {
+        if let Some(last_key) = self.0.last_mut()
+            && !matches!(last_key.key, KeyCode::Char(_))
+        {
+            if matches!(last_key.key, KeyCode::Tab) {
+                last_key.key = KeyCode::BackTab;
+            }
+            last_key.modifiers |= KeyModifiers::SHIFT;
+        }
+        self
+    }
+
+    pub fn tab(mut self) -> Self {
+        self.0.push(Key { key: KeyCode::Tab, modifiers: KeyModifiers::NONE });
+        self
+    }
+
+    pub fn cr(mut self) -> Self {
+        self.0.push(Key { key: KeyCode::Enter, modifiers: KeyModifiers::NONE });
+        self
+    }
+
+    pub fn up(mut self) -> Self {
+        self.0.push(Key { key: KeyCode::Up, modifiers: KeyModifiers::NONE });
+        self
+    }
+
+    pub fn down(mut self) -> Self {
+        self.0.push(Key { key: KeyCode::Down, modifiers: KeyModifiers::NONE });
+        self
+    }
+
+    pub fn left(mut self) -> Self {
+        self.0.push(Key { key: KeyCode::Left, modifiers: KeyModifiers::NONE });
+        self
+    }
+
+    pub fn right(mut self) -> Self {
+        self.0.push(Key { key: KeyCode::Right, modifiers: KeyModifiers::NONE });
+        self
+    }
+
+    pub fn esc(mut self) -> Self {
+        self.0.push(Key { key: KeyCode::Esc, modifiers: KeyModifiers::NONE });
+        self
+    }
+
+    pub fn page_up(mut self) -> Self {
+        self.0.push(Key { key: KeyCode::PageUp, modifiers: KeyModifiers::NONE });
+        self
+    }
+
+    pub fn page_down(mut self) -> Self {
+        self.0.push(Key { key: KeyCode::PageDown, modifiers: KeyModifiers::NONE });
+        self
+    }
 }
 
 impl From<Key> for KeySequence {

@@ -132,7 +132,9 @@ impl Modal for MenuModal<'_> {
                 InputResultEvent::Push => {}
                 InputResultEvent::Pop => {}
                 InputResultEvent::Confirm => {
-                    self.sections[self.current_section_idx].confirm(ctx)?;
+                    if self.sections[self.current_section_idx].confirm(ctx)? {
+                        self.destroy(ctx)?;
+                    }
                 }
                 InputResultEvent::Cancel => {
                     self.sections[self.current_section_idx].unfocus(ctx);
@@ -191,10 +193,7 @@ impl Modal for MenuModal<'_> {
                     self.destroy(ctx)?;
                 }
                 CommonAction::Confirm => {
-                    self.sections[self.current_section_idx].confirm(ctx)?;
-                    if ctx.input.is_insert_mode() {
-                        ctx.render()?;
-                    } else {
+                    if self.sections[self.current_section_idx].confirm(ctx)? {
                         self.destroy(ctx)?;
                     }
                 }

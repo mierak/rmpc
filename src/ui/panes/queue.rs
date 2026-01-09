@@ -25,7 +25,6 @@ use crate::{
             QueueActions,
             actions::{AddKind, AutoplayKind, DeleteKind, RateKind, SaveKind},
         },
-        tabs::PaneType,
         theme::{
             AlbumSeparator,
             properties::{Property, PropertyKindOrText, SongProperty},
@@ -37,7 +36,7 @@ use crate::{
         QueuePosition,
         client::Client,
         commands::Song,
-        mpd_client::{MpdClient, MpdCommand, SingleOrRange},
+        mpd_client::{MpdClient, MpdCommand},
         proto_client::ProtoClient,
     },
     shared::{
@@ -919,81 +918,6 @@ impl Pane for QueuePane {
                         ctx.render()?;
                     } else {
                         status_info!("No song is currently playing");
-                    }
-                }
-                QueueActions::Save => {
-                    modal!(
-                        ctx,
-                        InputModal::new(ctx)
-                            .title("Save queue as playlist")
-                            .confirm_label("Save")
-                            .input_label("Playlist name:")
-                            .on_confirm(move |ctx, value| {
-                                let value = value.to_owned();
-                                ctx.command(move |client| {
-                                    match client.save_queue_as_playlist(&value, None) {
-                                        Ok(()) => {
-                                            status_info!("Playlist '{}' saved", value);
-                                        }
-                                        Err(err) => {
-                                            status_error!(err:?; "Failed to save playlist '{}'",value);
-                                        }
-                                    }
-                                    Ok(())
-                                });
-                                Ok(())
-                            })
-                    );
-                }
-                QueueActions::AddToPlaylist if !self.queue.marked().is_empty() => {
-                    let mut selected_uris: Vec<String> = Vec::new();
-
-                    self.queue.marked().ranges().for_each(|r| {
-                        let sor: SingleOrRange = r.into();
-
-                        if let Some(end) = sor.end {
-                            for idx in sor.start..end {
-                                if let Some(marked_song) = self.queue.items.get(idx) {
-                                    selected_uris.push(marked_song.file.clone());
-                                }
-                            }
-                        } else if let Some(marked_song) = self.queue.items.get(sor.start) {
-                            selected_uris.push(marked_song.file.clone());
-                        }
-                    });
-
-                    ctx.query().id(ADD_TO_PLAYLIST_MULTIPLE).target(PaneType::Queue).query(
-                        move |client| {
-                            let playlists = client
-                                .list_playlists()?
-                                .into_iter()
-                                .map(|v| v.name)
-                                .sorted()
-                                .collect_vec();
-
-                            Ok(MpdQueryResult::AddToPlaylistMultiple {
-                                playlists,
-                                song_files: selected_uris,
-                            })
-                        },
-                    );
-                }
-                QueueActions::AddToPlaylist => {
-                    if let Some(selected_song) = self.queue.selected() {
-                        let uri = selected_song.file.clone();
-                        ctx.query()
-                            .id(ADD_TO_PLAYLIST)
-                            .replace_id(ADD_TO_PLAYLIST)
-                            .target(PaneType::Queue)
-                            .query(move |client| {
-                                let playlists = client
-                                    .list_playlists()?
-                                    .into_iter()
-                                    .map(|v| v.name)
-                                    .sorted()
-                                    .collect_vec();
-                                Ok(MpdQueryResult::AddToPlaylist { playlists, song_file: uri })
-                            });
                     }
                 }
                 QueueActions::Shuffle if !self.queue.marked().is_empty() => {

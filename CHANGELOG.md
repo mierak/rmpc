@@ -38,6 +38,7 @@ with the default ones. Set `clear` to true to keep the old behavior.
 - Rmpc now checks for embedded image first and cover image in a file second by default, this can be
 configured with the new `album_art.order` option
 - The queue table should now be more performant for a very large number of items
+- Default keybinds have been updated. This will not affect you if have properly setup config file.
 
 ### Fixed
 
@@ -55,6 +56,11 @@ You can still force other image backend via config.
 should fix cases with `cache_dir` being set inside MPD's music directory
 - Added missing confirmation when deleting playlist/songs from playlist
 - Some very minor speedups in queue with very large queue sizes
+
+### Removed
+
+- `Save` and `AddToPlaylist` queue actions. These have been undocumented and mostly unused. Use
+the `Save()` navigation action instead.
 
 ## [0.10.0] - 2025-11-11
 
