@@ -51,7 +51,8 @@ trait Section {
     fn unselect(&mut self, ctx: &Ctx);
     fn unfocus(&mut self, _ctx: &Ctx) {}
 
-    fn confirm(&mut self, ctx: &Ctx) -> Result<()>;
+    /// Returns true if the modal should be destroyed upon executing
+    fn confirm(&mut self, ctx: &Ctx) -> Result<bool>;
     fn on_close(&mut self, _ctx: &Ctx) -> Result<()> {
         Ok(())
     }
@@ -147,7 +148,7 @@ impl Section for SectionType<'_> {
         }
     }
 
-    fn confirm(&mut self, ctx: &Ctx) -> Result<()> {
+    fn confirm(&mut self, ctx: &Ctx) -> Result<bool> {
         match self {
             SectionType::Menu(s) => s.confirm(ctx),
             SectionType::Multi(s) => s.confirm(ctx),

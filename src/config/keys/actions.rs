@@ -328,7 +328,9 @@ pub enum QueueActionsFile {
     Play,
     #[deprecated]
     Save,
+    #[deprecated]
     AddToPlaylist,
+    #[deprecated]
     ShowInfo,
     JumpToCurrent,
     Shuffle,
@@ -341,9 +343,6 @@ pub enum QueueActions {
     Delete,
     DeleteAll,
     Play,
-    #[deprecated]
-    Save,
-    AddToPlaylist,
     JumpToCurrent,
     Shuffle,
     Unused,
@@ -358,8 +357,8 @@ impl TryFrom<QueueActionsFile> for QueueActions {
             QueueActionsFile::Delete => Ok(QueueActions::Delete),
             QueueActionsFile::DeleteAll => Ok(QueueActions::DeleteAll),
             QueueActionsFile::Play => Ok(QueueActions::Play),
-            QueueActionsFile::Save => Ok(QueueActions::Save),
-            QueueActionsFile::AddToPlaylist => Ok(QueueActions::AddToPlaylist),
+            QueueActionsFile::Save => Ok(QueueActions::Unused),
+            QueueActionsFile::AddToPlaylist => Ok(QueueActions::Unused),
             QueueActionsFile::ShowInfo => Ok(QueueActions::Unused),
             QueueActionsFile::JumpToCurrent => Ok(QueueActions::JumpToCurrent),
             QueueActionsFile::Shuffle => Ok(QueueActions::Shuffle),
@@ -381,8 +380,6 @@ impl ToDescription for QueueActions {
             QueueActions::Delete => "Remove song under cursor from the queue".into(),
             QueueActions::DeleteAll => "Clear current queue".into(),
             QueueActions::Play => "Play song under cursor".into(),
-            QueueActions::Save => "Save current queue as a new playlist".into(),
-            QueueActions::AddToPlaylist => "Add song under cursor to an existing playlist".into(),
             QueueActions::Unused => "unused".into(),
             QueueActions::JumpToCurrent => {
                 "Moves the cursor in Queue table to the currently playing song".into()

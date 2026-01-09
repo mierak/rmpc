@@ -122,13 +122,13 @@ impl Section for SelectSection {
         self.state.set_offset(offset);
     }
 
-    fn confirm(&mut self, ctx: &Ctx) -> Result<()> {
+    fn confirm(&mut self, ctx: &Ctx) -> Result<bool> {
         if let Some(selected_idx) = self.state.get_selected()
             && let Some(cb) = self.on_confirm.take()
         {
             (cb)(ctx, std::mem::take(&mut self.items[selected_idx].value))?;
         }
-        Ok(())
+        Ok(true)
     }
 
     fn len(&self) -> usize {

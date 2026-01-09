@@ -126,13 +126,13 @@ impl Section for ListSection {
         self.state.set_offset(offset);
     }
 
-    fn confirm(&mut self, ctx: &Ctx) -> Result<()> {
+    fn confirm(&mut self, ctx: &Ctx) -> Result<bool> {
         if let Some(selected_idx) = self.state.get_selected()
             && let Some(cb) = self.items[selected_idx].on_confirm.take()
         {
             (cb)(ctx)?;
         }
-        Ok(())
+        Ok(true)
     }
 
     fn len(&self) -> usize {
