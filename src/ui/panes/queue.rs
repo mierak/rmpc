@@ -1,7 +1,4 @@
-use std::{
-    cmp::Ordering,
-    collections::{HashMap, HashSet},
-};
+use std::collections::HashSet;
 
 use anyhow::Result;
 use enum_map::{Enum, EnumMap, enum_map};
@@ -12,7 +9,7 @@ use ratatui::{
     prelude::{Constraint, Layout, Rect},
     style::Style,
     text::{Line, Span},
-    widgets::{Block, Borders, Row, Table, TableState},
+    widgets::{Block, Row, TableState},
 };
 
 use super::Pane;
@@ -27,20 +24,13 @@ use crate::{
         },
         theme::{
             AlbumSeparator,
-            properties::{Property, PropertyKindOrText, SongProperty},
+            properties::{Property, SongProperty},
         },
     },
     core::command::{create_env, run_external},
     ctx::{Ctx, LIKE_STICKER, RATING_STICKER},
-    mpd::{
-        QueuePosition,
-        client::Client,
-        commands::Song,
-        mpd_client::{MpdClient, MpdCommand},
-        proto_client::ProtoClient,
-    },
+    mpd::{QueuePosition, client::Client, commands::Song, mpd_client::MpdClient},
     shared::{
-        cmp::StringCompare,
         ext::{btreeset_ranges::BTreeSetRanges, rect::RectExt},
         keys::ActionEvent,
         macros::{modal, status_error, status_info, status_warn},
@@ -67,6 +57,7 @@ use crate::{
             },
             select_modal::SelectModal,
         },
+        panes::queue_header::QueueHeaderPane,
         widgets::virtualized_table::VirtualizedTable,
     },
 };
@@ -74,7 +65,6 @@ use crate::{
 #[derive(Debug)]
 pub struct QueuePane {
     queue: Dir<Song, TableState>,
-    header: Vec<String>,
     column_widths: Vec<Constraint>,
     column_formats: Vec<Property<SongProperty>>,
     areas: EnumMap<Areas, Rect>,
@@ -84,8 +74,6 @@ pub struct QueuePane {
 #[derive(Debug, Enum)]
 enum Areas {
     Table,
-    TableBlock,
-    TableHeader,
     Scrollbar,
     FilterArea,
 }
@@ -95,11 +83,10 @@ const ADD_TO_PLAYLIST_MULTIPLE: &str = "add_to_playlist_multiple";
 
 impl QueuePane {
     pub fn new(ctx: &Ctx) -> Self {
-        let (header, column_widths, column_formats) = Self::init(ctx);
+        let (column_widths, column_formats) = Self::init(ctx);
 
         Self {
             queue: Dir::new(ctx.queue.clone()),
-            header,
             column_widths,
             column_formats,
             areas: enum_map! {
@@ -109,9 +96,8 @@ impl QueuePane {
         }
     }
 
-    fn init(ctx: &Ctx) -> (Vec<String>, Vec<Constraint>, Vec<Property<SongProperty>>) {
+    pub fn init(ctx: &Ctx) -> (Vec<Constraint>, Vec<Property<SongProperty>>) {
         (
-            ctx.config.theme.song_table_format.iter().map(|v| v.label.clone()).collect_vec(),
             ctx.config
                 .theme
                 .song_table_format
@@ -255,117 +241,6 @@ impl QueuePane {
 
         modal!(ctx, modal);
     }
-
-    fn calculate_swaps<T: AsRef<str>>(
-        &self,
-        mut desired: Vec<(u32, T)>,
-    ) -> Result<Vec<(usize, usize)>> {
-        let cmp = StringCompare::builder().fold_case(true).build();
-        let is_non_decreasing = desired.is_sorted_by(|(_, a), (_, b)| {
-            matches!(cmp.compare(a.as_ref(), b.as_ref()), Ordering::Less | Ordering::Equal)
-        });
-
-        if is_non_decreasing {
-            desired.sort_by(|(_, a), (_, b)| cmp.compare(a.as_ref(), b.as_ref()).reverse());
-        } else {
-            desired.sort_by(|(_, a), (_, b)| cmp.compare(a.as_ref(), b.as_ref()));
-        }
-
-        let mut current: Vec<u32> = self.queue.items.iter().map(|s| s.id).collect();
-        let mut index: HashMap<u32, usize> =
-            current.iter().enumerate().map(|(i, id)| (*id, i)).collect();
-        let mut swaps = Vec::new();
-
-        for i in 0..current.len() {
-            let target_id = desired[i].0;
-            if current[i] == target_id {
-                continue; // already at the correct position
-            }
-
-            let j = *index
-                .get(&target_id)
-                .ok_or_else(|| anyhow::anyhow!("desired contains an ID not present in current"))?;
-
-            swaps.push((i, j));
-
-            let ai = current[i];
-            current.swap(i, j);
-
-            index.insert(ai, j);
-            index.insert(target_id, i);
-        }
-
-        Ok(swaps)
-    }
-
-    fn sort_by_column(&mut self, idx: usize, ctx: &Ctx) -> Result<()> {
-        let swaps = match &self.column_formats.get(idx).as_ref().map(|v| &v.kind) {
-            Some(PropertyKindOrText::Text(_)) => {
-                // Do nothing, everything is a constant text
-                Vec::new()
-            }
-            Some(PropertyKindOrText::Sticker(sticker_name)) => {
-                let evald = self
-                    .queue
-                    .items
-                    .iter()
-                    .map(|song| {
-                        (
-                            song.id,
-                            ctx.song_stickers(&song.file)
-                                .and_then(|s| s.get(sticker_name))
-                                .map(|s| s.as_str())
-                                .unwrap_or_default(),
-                        )
-                    })
-                    .collect_vec();
-
-                self.calculate_swaps(evald)?
-            }
-            Some(PropertyKindOrText::Property(_))
-            | Some(PropertyKindOrText::Group(_))
-            | Some(PropertyKindOrText::Transform(_)) => {
-                let evald = self
-                    .queue
-                    .items
-                    .iter()
-                    .map(|song| {
-                        (
-                            song.id,
-                            self.column_formats[idx]
-                                .as_string(
-                                    Some(song),
-                                    "",
-                                    ctx.config.theme.multiple_tag_resolution_strategy,
-                                    ctx,
-                                )
-                                .unwrap_or_default(),
-                        )
-                    })
-                    .collect_vec();
-
-                self.calculate_swaps(evald)?
-            }
-            None => {
-                // Should not really ever happen. But no reason to handle this ars a
-                // hard error.
-                log::warn!("Tried to sort by non-existing column index {idx}");
-                Vec::new()
-            }
-        };
-
-        ctx.command(move |client| {
-            client.send_start_cmd_list()?;
-            for swap in swaps {
-                client.send_swap_position(swap.0, swap.1)?;
-            }
-            client.send_execute_cmd_list()?;
-            client.read_ok()?;
-            Ok(())
-        });
-
-        Ok(())
-    }
 }
 
 impl Pane for QueuePane {
@@ -378,9 +253,6 @@ impl Pane for QueuePane {
         let table_block = {
             let border_style = config.as_border_style();
             let mut b = Block::default().border_style(border_style);
-            if config.theme.show_song_table_header {
-                b = b.borders(Borders::TOP);
-            }
             if self.areas[Areas::FilterArea].height == 0
                 && let Some(ref title) = filter_text
             {
@@ -413,18 +285,6 @@ impl Pane for QueuePane {
         let current_song_id = ctx.find_current_song_in_queue().map(|(_, song)| song.id);
         let marked = std::mem::take(self.queue.marked_mut());
         let filter = ctx.input.value(self.queue.filter_buffer_id);
-
-        if config.theme.show_song_table_header {
-            let header_table = Table::default()
-                .header(Row::new(self.header.iter().enumerate().map(|(idx, title)| {
-                    Line::from(title.as_str()).alignment(formats[idx].alignment.into())
-                })))
-                .style(config.as_text_style())
-                .widths(self.column_widths.clone())
-                .block(config.as_header_table_block());
-
-            frame.render_widget(header_table, self.areas[Areas::TableHeader]);
-        }
 
         let table = VirtualizedTable::new(&self.queue.items)
             .column_widths(self.column_widths.clone())
@@ -488,7 +348,7 @@ impl Pane for QueuePane {
                 row.into_row(columns)
             });
 
-        frame.render_widget(table_block, self.areas[Areas::TableBlock]);
+        frame.render_widget(table_block, self.areas[Areas::Table]);
         frame.render_stateful_widget(table, self.areas[Areas::Table], &mut self.queue.state);
 
         let _ = std::mem::replace(self.queue.marked_mut(), marked);
@@ -520,36 +380,15 @@ impl Pane for QueuePane {
     fn calculate_areas(&mut self, area: Rect, ctx: &Ctx) -> Result<()> {
         let Ctx { config, .. } = ctx;
 
-        let header_height: u16 = config.theme.show_song_table_header.into();
         let scrollbar_area_width: u16 = config.theme.scrollbar.is_some().into();
 
-        let [header_area, queue_area] =
-            Layout::vertical([Constraint::Length(header_height), Constraint::Min(0)]).areas(area);
-        let [header_area, _scrollbar_placeholder] = Layout::horizontal([
+        let [table_area, scrollbar_area] = Layout::horizontal([
             Constraint::Percentage(100),
             Constraint::Length(scrollbar_area_width),
         ])
-        .areas(header_area);
-        let [table_block_area, scrollbar_area] = Layout::horizontal([
-            Constraint::Percentage(100),
-            Constraint::Length(scrollbar_area_width),
-        ])
-        .areas(queue_area);
+        .areas(area);
 
-        // Apply empty margin on left and right
-        let table_block_area = table_block_area.shrink_horizontally(1);
-        let header_area = header_area.shrink_horizontally(1);
-        // Make scrollbar not overlap header/table separator if separator is visible
-        let scrollbar_area =
-            scrollbar_area.shrink_from_top(config.theme.show_song_table_header.into());
-
-        let table_area = if config.theme.show_song_table_header {
-            table_block_area.shrink_from_top(1)
-        } else {
-            table_block_area
-        };
-
-        let table_area = if self.queue.filter_active && !ctx.config.theme.show_song_table_header {
+        let mut table_area = if self.queue.filter_active {
             self.areas[Areas::FilterArea] =
                 Rect::new(table_area.x, table_area.y, table_area.width, 1);
             table_area.shrink_from_top(1)
@@ -558,9 +397,10 @@ impl Pane for QueuePane {
             table_area
         };
 
+        // Create 1 column space between the table and the scrollbar
+        table_area.width = table_area.width.saturating_sub(1);
+
         self.areas[Areas::Table] = table_area;
-        self.areas[Areas::TableBlock] = table_block_area;
-        self.areas[Areas::TableHeader] = header_area;
         self.areas[Areas::Scrollbar] = scrollbar_area;
 
         Ok(())
@@ -643,8 +483,7 @@ impl Pane for QueuePane {
                 self.before_show(ctx)?;
             }
             UiEvent::ConfigChanged => {
-                let (header, column_widths, column_formats) = Self::init(ctx);
-                self.header = header;
+                let (column_widths, column_formats) = Self::init(ctx);
                 self.column_formats = column_formats;
                 self.column_widths = column_widths;
             }
@@ -667,25 +506,11 @@ impl Pane for QueuePane {
             return Ok(());
         }
 
-        if !self.areas[Areas::Table].contains(position)
-            && !self.areas[Areas::TableHeader].contains(position)
-        {
+        if !self.areas[Areas::Table].contains(position) {
             return Ok(());
         }
 
         match event.kind {
-            MouseEventKind::LeftClick | MouseEventKind::DoubleClick
-                if self.areas[Areas::TableHeader].contains(event.into()) =>
-            {
-                let widths = Layout::horizontal(self.column_widths.as_slice())
-                    .flex(Flex::Start)
-                    .spacing(1)
-                    .split(self.areas[Areas::TableHeader]);
-                if let Some(header_idx) = widths.iter().position(|w| w.contains(position)) {
-                    self.sort_by_column(header_idx, ctx)?;
-                }
-                ctx.render()?;
-            }
             MouseEventKind::LeftClick if self.areas[Areas::Table].contains(event.into()) => {
                 let clicked_row: usize = event.y.saturating_sub(self.areas[Areas::Table].y).into();
                 if let Some(idx) = self.queue.state.get_at_rendered_row(clicked_row) {
@@ -937,7 +762,7 @@ impl Pane for QueuePane {
                     status_info!("Shuffled the queue");
                 }
                 QueueActions::SortByColumn(idx) => {
-                    self.sort_by_column(*idx, ctx)?;
+                    QueueHeaderPane::sort_by_column(self.column_formats.as_slice(), *idx, ctx)?;
                     ctx.render()?;
                 }
                 QueueActions::Unused => {}

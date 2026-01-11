@@ -63,7 +63,11 @@ use crate::{
         keys::ActionEvent,
         mouse_event::MouseEvent,
     },
-    ui::{input::InputResultEvent, widgets::header::PropertyTemplates},
+    ui::{
+        input::InputResultEvent,
+        panes::queue_header::QueueHeaderPane,
+        widgets::header::PropertyTemplates,
+    },
 };
 
 pub mod album_art;
@@ -80,6 +84,7 @@ pub mod playlists;
 pub mod progress_bar;
 pub mod property;
 pub mod queue;
+pub mod queue_header;
 pub mod search;
 pub mod tabs;
 pub mod tag_browser;
@@ -88,6 +93,7 @@ pub mod volume;
 #[derive(Debug, Display, strum::EnumDiscriminants)]
 pub enum Panes<'pane_ref, 'pane> {
     Queue(&'pane_ref mut QueuePane),
+    QueueHeader(&'pane_ref mut QueueHeaderPane),
     #[cfg(debug_assertions)]
     Logs(&'pane_ref mut LogsPane),
     Directories(&'pane_ref mut DirectoriesPane),
@@ -116,6 +122,7 @@ impl<P: Pane + std::fmt::Debug> BoxedPane for P {}
 #[derive(Debug)]
 pub struct PaneContainer<'panes> {
     pub queue: QueuePane,
+    pub queue_header: QueueHeaderPane,
     #[cfg(debug_assertions)]
     pub logs: LogsPane,
     pub directories: DirectoriesPane,
@@ -139,6 +146,7 @@ impl<'panes> PaneContainer<'panes> {
     pub fn new(ctx: &Ctx) -> Result<Self> {
         Ok(Self {
             queue: QueuePane::new(ctx),
+            queue_header: QueueHeaderPane::new(ctx),
             #[cfg(debug_assertions)]
             logs: LogsPane::new(),
             directories: DirectoriesPane::new(ctx),
@@ -193,6 +201,7 @@ impl<'panes> PaneContainer<'panes> {
     ) -> Result<Panes<'pane_ref, 'panes>> {
         match pane {
             PaneType::Queue => Ok(Panes::Queue(&mut self.queue)),
+            PaneType::QueueHeader() => Ok(Panes::QueueHeader(&mut self.queue_header)),
             #[cfg(debug_assertions)]
             PaneType::Logs => Ok(Panes::Logs(&mut self.logs)),
             PaneType::Directories => Ok(Panes::Directories(&mut self.directories)),
@@ -231,6 +240,7 @@ macro_rules! pane_call {
     ($screen:ident, $fn:ident($($param:expr),+)) => {
         match &mut $screen {
             Panes::Queue(s) => s.$fn($($param),+),
+            Panes::QueueHeader(s) => s.$fn($($param),+),
             #[cfg(debug_assertions)]
             Panes::Logs(s) => s.$fn($($param),+),
             Panes::Directories(s) => s.$fn($($param),+),

@@ -33,12 +33,19 @@ after starting a ytdlp download
 ### Changed
 
 - **Breaking** Keybinds now only override the defaults. Meaning your configured keybinds are combined
+- **Breaking** `show_song_table_header` has been removed. The queue header is now in a separate `QueueHeader`
+pane. You will need to update your config to include it in your tabs.
 with the default ones. Set `clear` to true to keep the old behavior.
+- **Breaking** `draw_borders` has been deprecated. The `Tabs` pane is no longer affected by this, use the
+- `Queue` pane no longer has empty space on the sides
+borders configuration on the pane itself instead. This now only affects borders in the browser panes
+and this will be romeved in the future as well.
 - Moved docs to a new [repository](https://github.com/rmpc-org/rmpc-org.github.io) and [domain](https://rmpc.mierak.dev/)
 - Rmpc now checks for embedded image first and cover image in a file second by default, this can be
 configured with the new `album_art.order` option
 - The queue table should now be more performant for a very large number of items
-- Default keybinds have been updated. This will not affect you if have properly setup config file.
+- Default keybinds have been updated. This will not affect you if have a properly setup config file.
+- Default theme has been updated. This will not affect you if have a properly setup config file.
 
 ### Fixed
 

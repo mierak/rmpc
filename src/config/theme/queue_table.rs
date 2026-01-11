@@ -74,6 +74,7 @@ pub struct SongTableColumnFile {
     /// Label to display in the column header
     /// If not set, the property name will be used
     pub(super) label: Option<String>,
+    pub(super) label_prop: Option<PropertyFile<SongPropertyFile>>,
     /// Width of the column in percent
     pub(super) width_percent: Option<u16>,
     pub(super) width: Option<String>,
@@ -84,7 +85,7 @@ pub struct SongTableColumnFile {
 #[derive(Debug, Clone)]
 pub struct SongTableColumn {
     pub prop: Property<SongProperty>,
-    pub label: String,
+    pub label: Property<SongProperty>,
     pub width: PercentOrLength,
     pub alignment: Alignment,
 }
@@ -109,6 +110,11 @@ impl Default for QueueTableColumnsFile {
                     style: None,
                 },
                 label: None,
+                label_prop: Some(PropertyFile {
+                    kind: PropertyKindFileOrText::Text("Artist".to_string()),
+                    default: None,
+                    style: None,
+                }),
                 width_percent: None,
                 width: Some("20%".to_string()),
                 alignment: None,
@@ -124,6 +130,11 @@ impl Default for QueueTableColumnsFile {
                     style: None,
                 },
                 label: None,
+                label_prop: Some(PropertyFile {
+                    kind: PropertyKindFileOrText::Text("Title".to_string()),
+                    default: None,
+                    style: None,
+                }),
                 width_percent: None,
                 width: Some("35%".to_string()),
                 alignment: None,
@@ -147,6 +158,11 @@ impl Default for QueueTableColumnsFile {
                     }),
                 },
                 label: None,
+                label_prop: Some(PropertyFile {
+                    kind: PropertyKindFileOrText::Text("Album".to_string()),
+                    default: None,
+                    style: None,
+                }),
                 width_percent: None,
                 width: Some("30%".to_string()),
                 alignment: None,
@@ -162,6 +178,11 @@ impl Default for QueueTableColumnsFile {
                     style: None,
                 },
                 label: None,
+                label_prop: Some(PropertyFile {
+                    kind: PropertyKindFileOrText::Text("Duration".to_string()),
+                    default: None,
+                    style: None,
+                }),
                 width_percent: None,
                 width: Some("15%".to_string()),
                 alignment: Some(Alignment::Right),
@@ -179,14 +200,27 @@ impl TryFrom<QueueTableColumnsFile> for QueueTableColumns {
                 .0
                 .into_iter()
                 .map(|v| -> Result<_> {
-                    let prop: Property<SongProperty> = v.prop.try_into()?;
-                    let label = v.label.unwrap_or_else(|| match &prop.kind {
-                        PropertyKindOrText::Text { .. } => String::new(),
-                        PropertyKindOrText::Sticker { .. } => String::new(),
-                        PropertyKindOrText::Transform { .. } => String::new(),
-                        PropertyKindOrText::Property(prop) => prop.to_string(),
-                        PropertyKindOrText::Group(_) => String::new(),
-                    });
+                    let prop: Property<SongProperty> = v.prop.convert()?;
+
+                    let text = |label: String| Property {
+                        kind: PropertyKindOrText::Text(label),
+                        default: None,
+                        style: None,
+                    };
+
+                    let label = match (v.label, v.label_prop) {
+                        (Some(_), Some(new)) | (None, Some(new)) => {
+                            new.convert_text_group_only()?
+                        }
+                        (Some(old), None) => text(old.clone()),
+                        (None, None) => match &prop.kind {
+                            PropertyKindOrText::Text { .. } => text(String::new()),
+                            PropertyKindOrText::Sticker { .. } => text(String::new()),
+                            PropertyKindOrText::Transform { .. } => text(String::new()),
+                            PropertyKindOrText::Property(prop) => text(prop.to_string()),
+                            PropertyKindOrText::Group(_) => text(String::new()),
+                        },
+                    };
 
                     Ok(SongTableColumn {
                         prop,
@@ -222,19 +256,17 @@ impl TryFrom<QueueTableColumnsFile> for QueueTableColumns {
     }
 }
 
-impl TryFrom<PropertyFile<SongPropertyFile>> for Property<SongProperty> {
-    type Error = anyhow::Error;
-
-    fn try_from(value: PropertyFile<SongPropertyFile>) -> std::result::Result<Self, Self::Error> {
-        Ok(Self {
-            kind: match value.kind {
+impl PropertyFile<SongPropertyFile> {
+    pub fn convert(self) -> Result<Property<SongProperty>> {
+        Ok(Property {
+            kind: match self.kind {
                 PropertyKindFileOrText::Text(value) => PropertyKindOrText::Text(value),
                 PropertyKindFileOrText::Transform(TransformFile::Truncate {
                     content,
                     length,
                     from_start,
                 }) => PropertyKindOrText::Transform(Transform::Truncate {
-                    content: Box::new((*content).try_into()?),
+                    content: Box::new((*content).convert()?),
                     length,
                     from_start,
                 }),
@@ -242,10 +274,10 @@ impl TryFrom<PropertyFile<SongPropertyFile>> for Property<SongProperty> {
                     content,
                     replacements,
                 }) => PropertyKindOrText::Transform(Transform::Replace {
-                    content: Box::new((*content).try_into()?),
+                    content: Box::new((*content).convert()?),
                     replacements: replacements
                         .into_iter()
-                        .map(|r| -> Result<_> { Ok((r.r#match, r.replace.try_into()?)) })
+                        .map(|r| -> Result<_> { Ok((r.r#match, r.replace.convert()?)) })
                         .try_collect()?,
                 }),
                 PropertyKindFileOrText::Sticker(value) => PropertyKindOrText::Sticker(value),
@@ -253,17 +285,44 @@ impl TryFrom<PropertyFile<SongPropertyFile>> for Property<SongProperty> {
                 PropertyKindFileOrText::Group(group) => {
                     let res: Vec<_> = group
                         .into_iter()
-                        .map(|p| -> Result<Property<SongProperty>> { p.try_into() })
+                        .map(|p| -> Result<Property<SongProperty>> { p.convert() })
                         .try_collect()?;
                     PropertyKindOrText::Group(res)
                 }
             },
-            style: Some(value.style.to_config_or(None, None)?),
-            default: value
+            style: Some(self.style.to_config_or(None, None)?),
+            default: self
                 .default
-                .map(|v| -> Result<_> {
-                    Ok(Box::new(TryFrom::<PropertyFile<SongPropertyFile>>::try_from(*v)?))
-                })
+                .map(|v| -> Result<_> { Ok(Box::new((*v).convert()?)) })
+                .transpose()?,
+        })
+    }
+
+    fn convert_text_group_only(self) -> Result<Property<SongProperty>> {
+        Ok(Property {
+            kind: match self.kind {
+                PropertyKindFileOrText::Transform(_) => {
+                    bail!("Transforms are not supported in the label")
+                }
+                PropertyKindFileOrText::Sticker(_) => {
+                    bail!("Stickers are not supported in the label")
+                }
+                PropertyKindFileOrText::Property(_) => {
+                    bail!("Properties are not supported in the label")
+                }
+                PropertyKindFileOrText::Text(value) => PropertyKindOrText::Text(value),
+                PropertyKindFileOrText::Group(group) => {
+                    let res: Vec<_> = group
+                        .into_iter()
+                        .map(|p| -> Result<Property<SongProperty>> { p.convert_text_group_only() })
+                        .try_collect()?;
+                    PropertyKindOrText::Group(res)
+                }
+            },
+            style: Some(self.style.to_config_or(None, None)?),
+            default: self
+                .default
+                .map(|v| -> Result<_> { Ok(Box::new((*v).convert_text_group_only()?)) })
                 .transpose()?,
         })
     }

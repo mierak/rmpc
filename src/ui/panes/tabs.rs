@@ -44,7 +44,6 @@ impl TabsPane<'_> {
     fn init_tabs<'a>(tab_names: Vec<String>, ctx: &Ctx) -> Tabs<'a> {
         Tabs::new(tab_names)
             .divider("")
-            .block(ctx.config.as_tabs_block())
             .style(ctx.config.theme.tab_bar.inactive_style)
             .alignment(ratatui::prelude::Alignment::Center)
             .highlight_style(ctx.config.theme.tab_bar.active_style)
