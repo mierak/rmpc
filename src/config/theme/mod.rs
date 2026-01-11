@@ -108,6 +108,7 @@ pub struct UiConfigFile {
     pub(super) modal_backdrop: bool,
     pub(super) borders_style: Option<StyleFile>,
     pub(super) highlighted_item_style: Option<StyleFile>,
+    #[serde(default = "defaults::current_item_style")]
     pub(super) current_item_style: Option<StyleFile>,
     pub(super) highlight_border_style: Option<StyleFile>,
     #[deprecated]
@@ -415,9 +416,7 @@ impl TryFrom<UiConfigFile> for UiConfig {
                     .to_config_or(Some(Color::Black), Some(Color::Blue))?,
                 inactive_style: value.tab_bar.inactive_style.to_config_or(None, header_bg_color)?,
             },
-            current_item_style: value
-                .current_item_style
-                .to_config_or(Some(Color::Black), Some(Color::Blue))?,
+            current_item_style: value.current_item_style.to_config_or(None, None)?,
             default_album_art: value.default_album_art_path.map_or(
                 Ok(DEFAULT_ART as &'static [u8]),
                 |path| -> Result<_> {

@@ -131,6 +131,14 @@ pub fn default_tag_separator() -> String {
     " | ".to_string()
 }
 
+pub fn current_item_style() -> Option<StyleFile> {
+    Some(StyleFile {
+        fg: Some("black".to_string()),
+        bg: Some("blue".to_string()),
+        modifiers: Some(Modifiers::Bold),
+    })
+}
+
 pub fn default_preview_label_style() -> StyleFile {
     StyleFile { fg: Some("yellow".to_string()), bg: None, modifiers: None }
 }
