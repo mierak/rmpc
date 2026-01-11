@@ -1071,15 +1071,18 @@ impl Property<PropertyKind> {
                         },
                     ]))
                 }
-                WidgetProperty::ScanStatus => ctx.db_update_start.map(|update_start| {
-                    Either::Left(Span::styled(
-                        ScanStatus::new(Some(update_start))
-                            .get_str()
-                            .unwrap_or_default()
-                            .to_string(),
-                        style,
-                    ))
-                }),
+                WidgetProperty::ScanStatus => ctx
+                    .db_update_start
+                    .map(|update_start| {
+                        Either::Left(Span::styled(
+                            ScanStatus::new(Some(update_start))
+                                .get_str()
+                                .unwrap_or_default()
+                                .to_string(),
+                            style,
+                        ))
+                    })
+                    .or_else(|| self.default_as_span(song, ctx, tag_separator, strategy)),
             },
             PropertyKindOrText::Group(group) => {
                 let mut buf = Vec::new();

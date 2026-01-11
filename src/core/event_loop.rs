@@ -461,7 +461,7 @@ fn main_task<B: Backend + std::io::Write>(
 
                             let mut start_render_loop = || {
                                 _update_db_loop_guard = Some(ctx.scheduler.repeated(
-                                    Duration::from_secs(1),
+                                    Duration::from_millis(250),
                                     |(tx, _)| {
                                         tx.send(AppEvent::RequestRender)?;
                                         Ok(())
@@ -801,7 +801,14 @@ fn handle_idle_event(event: IdleEvent, ctx: &Ctx, result_ui_evs: &mut HashSet<Id
                 })
             });
         }
-        IdleEvent::Update => {}
+        IdleEvent::Update => {
+            ctx.query().id(GLOBAL_STATUS_UPDATE).replace_id("status").query(move |client| {
+                Ok(MpdQueryResult::Status {
+                    data: client.get_status()?,
+                    source_event: Some(IdleEvent::Update),
+                })
+            });
+        }
         IdleEvent::Output => {}
         IdleEvent::Partition
         | IdleEvent::Subscription
