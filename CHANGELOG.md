@@ -63,6 +63,7 @@ You can still force other image backend via config.
 should fix cases with `cache_dir` being set inside MPD's music directory
 - Added missing confirmation when deleting playlist/songs from playlist
 - Some very minor speedups in queue with very large queue sizes
+- `ScanStatus` not working
 
 ### Removed
 

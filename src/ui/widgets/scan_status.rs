@@ -17,7 +17,7 @@ impl ScanStatus {
     /// scanning
     pub fn get_str(&mut self) -> Option<&str> {
         let start = self.update_start?;
-        let elapsed_secs = start.elapsed().as_millis() as usize / 1000;
+        let elapsed_secs = start.elapsed().as_millis() as usize / 250;
         let t =
             DEFAULT_LOADING_CHARS.get(elapsed_secs % DEFAULT_LOADING_CHARS.len()).unwrap_or(&"");
         Some(t)
