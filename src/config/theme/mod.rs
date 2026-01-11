@@ -67,7 +67,6 @@ pub struct UiConfig {
     pub progress_bar: ProgressBarConfig,
     pub tab_bar: TabBar,
     pub scrollbar: Option<ScrollbarConfig>,
-    pub show_song_table_header: bool,
     pub song_table_format: Vec<SongTableColumn>,
     pub song_table_album_separator: AlbumSeparator,
     pub header: HeaderConfig,
@@ -102,6 +101,7 @@ pub struct UiConfigFile {
     pub(super) preview_label_style: StyleFile,
     #[serde(default = "defaults::default_preview_metaga_group_heading_style")]
     pub(super) preview_metadata_group_style: StyleFile,
+    #[deprecated]
     pub(super) header_background_color: Option<String>,
     pub(super) modal_background_color: Option<String>,
     #[serde(default)]
@@ -110,15 +110,18 @@ pub struct UiConfigFile {
     pub(super) highlighted_item_style: Option<StyleFile>,
     pub(super) current_item_style: Option<StyleFile>,
     pub(super) highlight_border_style: Option<StyleFile>,
+    #[deprecated]
+    #[serde(default)]
     pub(super) show_song_table_header: bool,
     pub(super) song_table_format: QueueTableColumnsFile,
     #[serde(default)]
     pub(super) song_table_album_separator: AlbumSeparator,
+    #[serde(default)]
     pub(super) header: HeaderConfigFile,
     pub(super) default_album_art_path: Option<String>,
     #[serde(default)]
     pub(super) layout: PaneOrSplitFile,
-    #[serde(default)]
+    #[serde(default = "defaults::components")]
     pub(super) components: HashMap<String, PaneOrSplitFile>,
     #[serde(default = "defaults::default_tag_separator")]
     pub(super) format_tag_separator: String,
@@ -143,7 +146,7 @@ impl Default for UiConfigFile {
             background_color: None,
             text_color: None,
             header_background_color: None,
-            show_song_table_header: true,
+            show_song_table_header: false,
             header: HeaderConfigFile::default(),
             modal_background_color: None,
             modal_backdrop: false,
@@ -205,7 +208,7 @@ impl Default for UiConfigFile {
                 modifiers: Some(Modifiers::Bold),
             },
             level_styles: LevelStylesFile::default(),
-            components: HashMap::default(),
+            components: defaults::components(),
             lyrics: LyricsConfigFile::default(),
             cava: CavaThemeFile::default(),
             border_symbol_sets: BorderSetLibFile::default(),
@@ -395,7 +398,6 @@ impl TryFrom<UiConfigFile> for UiConfig {
                 .highlight_border_style
                 .to_config_or(Some(Color::Blue), None)?,
             symbols: value.symbols.into(),
-            show_song_table_header: value.show_song_table_header,
             scrollbar: value.scrollbar.map(|sc| sc.into_config(fallback_border_fg)).transpose()?,
             progress_bar: value.progress_bar.into_config()?,
             song_table_format: TryInto::<QueueTableColumns>::try_into(value.song_table_format)?.0,

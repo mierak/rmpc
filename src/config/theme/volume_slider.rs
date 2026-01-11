@@ -27,10 +27,10 @@ pub struct VolumeSliderConfig {
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct VolumeSliderConfigFile {
     #[serde(default)]
-    pub(super) symbols: Symbols,
-    pub(super) track_style: Option<StyleFile>,
-    pub(super) filled_style: Option<StyleFile>,
-    pub(super) thumb_style: Option<StyleFile>,
+    pub symbols: Symbols,
+    pub track_style: Option<StyleFile>,
+    pub filled_style: Option<StyleFile>,
+    pub thumb_style: Option<StyleFile>,
 }
 #[derive(Debug, Clone, Hash, Serialize, Deserialize, PartialEq, Eq)]
 pub struct Symbols {

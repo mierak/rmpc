@@ -529,6 +529,7 @@ pub mod btreeset_ranges {
 pub mod rect {
     use ratatui::layout::Rect;
 
+    #[allow(unused)]
     pub trait RectExt {
         fn shrink_from_top(self, amount: u16) -> Rect;
         fn shrink_horizontally(self, amount: u16) -> Rect;

@@ -40,11 +40,11 @@ impl Default for ProgressBarConfigFile {
     fn default() -> Self {
         Self {
             symbols: vec![
-                "[".to_owned(),
-                "-".to_owned(),
-                ">".to_owned(),
-                " ".to_owned(),
-                "]".to_owned(),
+                "[".to_string(),
+                "━".to_string(),
+                "➤".to_string(),
+                " ".to_string(),
+                "]".to_string(),
             ],
             elapsed_style: Some(StyleFile {
                 fg: Some("blue".to_string()),
@@ -53,7 +53,7 @@ impl Default for ProgressBarConfigFile {
             }),
             thumb_style: Some(StyleFile {
                 fg: Some("blue".to_string()),
-                bg: Some("#1e2030".to_string()),
+                bg: None,
                 modifiers: None,
             }),
             track_style: Some(StyleFile {

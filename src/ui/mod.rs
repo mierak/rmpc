@@ -16,8 +16,7 @@ use ratatui::{
     Frame,
     layout::Rect,
     style::{Color, Style},
-    symbols::border,
-    widgets::{Block, Borders},
+    widgets::Block,
 };
 use tab_screen::TabScreen;
 
@@ -911,6 +910,7 @@ impl<'ui> Ui<'ui> {
                 #[cfg(debug_assertions)]
                 Panes::Logs(p) => p.on_event(&mut event, visible, ctx),
                 Panes::Queue(p) => p.on_event(&mut event, visible, ctx),
+                Panes::QueueHeader(p) => p.on_event(&mut event, visible, ctx),
                 Panes::Directories(p) => p.on_event(&mut event, visible, ctx),
                 Panes::Albums(p) => p.on_event(&mut event, visible, ctx),
                 Panes::Artists(p) => p.on_event(&mut event, visible, ctx),
@@ -956,6 +956,7 @@ impl<'ui> Ui<'ui> {
                     #[cfg(debug_assertions)]
                     Panes::Logs(p) => p.on_query_finished(id, data, visible, ctx),
                     Panes::Queue(p) => p.on_query_finished(id, data, visible, ctx),
+                    Panes::QueueHeader(p) => p.on_query_finished(id, data, visible, ctx),
                     Panes::Directories(p) => p.on_query_finished(id, data, visible, ctx),
                     Panes::Albums(p) => p.on_query_finished(id, data, visible, ctx),
                     Panes::Artists(p) => p.on_query_finished(id, data, visible, ctx),
@@ -1104,24 +1105,6 @@ impl Config {
             })
             .unwrap_or(current_screen)
             .clone()
-    }
-
-    fn as_header_table_block(&self) -> ratatui::widgets::Block<'_> {
-        if !self.theme.draw_borders {
-            return ratatui::widgets::Block::default();
-        }
-        Block::default().border_style(self.as_border_style())
-    }
-
-    fn as_tabs_block<'block>(&self) -> ratatui::widgets::Block<'block> {
-        if !self.theme.draw_borders {
-            return ratatui::widgets::Block::default()/* .padding(Padding::new(0, 0, 1, 1)) */;
-        }
-
-        ratatui::widgets::Block::default()
-            .borders(Borders::TOP | Borders::BOTTOM)
-            .border_set(border::ONE_EIGHTH_WIDE)
-            .border_style(self.as_border_style())
     }
 
     fn as_border_style(&self) -> ratatui::style::Style {
