@@ -33,9 +33,9 @@ impl Widget for Header<'_> {
         let song = self.ctx.find_current_song_in_queue().map(|(_, song)| song);
         for row in 0..row_count {
             let [left, center, right] = *Layout::horizontal([
-                Constraint::Percentage(30),
-                Constraint::Percentage(40),
-                Constraint::Percentage(30),
+                Constraint::Percentage(config.theme.header_column_widths[0]),
+                Constraint::Percentage(config.theme.header_column_widths[1]),
+                Constraint::Percentage(config.theme.header_column_widths[2]),
             ])
             .split(layouts[row]) else {
                 return;
