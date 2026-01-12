@@ -37,7 +37,8 @@ after starting a ytdlp download
 pane. You will need to update your config to include it in your tabs.
 with the default ones. Set `clear` to true to keep the old behavior.
 - **Breaking** `draw_borders` has been deprecated. The `Tabs` pane is no longer affected by this, use the
-- **Breaking** `current_item_style` now merges on top of the item's style instead of having defaults,
+- **Breaking** `current_item_style` and `highlighted_item_style` now merge on top of the item's style
+instead of having defaults,
 specify all the style properties (fg, bg, modifiers) to keep the old look
 borders configuration on the pane itself instead. This now only affects borders in the browser panes
 and this will be romeved in the future as well.

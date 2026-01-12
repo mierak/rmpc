@@ -107,6 +107,7 @@ pub struct UiConfigFile {
     #[serde(default)]
     pub(super) modal_backdrop: bool,
     pub(super) borders_style: Option<StyleFile>,
+    #[serde(default = "defaults::highlighted_item_style")]
     pub(super) highlighted_item_style: Option<StyleFile>,
     #[serde(default = "defaults::current_item_style")]
     pub(super) current_item_style: Option<StyleFile>,
@@ -392,9 +393,6 @@ impl TryFrom<UiConfigFile> for UiConfig {
             text_color: StringColor(value.text_color).to_color()?,
             header_background_color: header_bg_color,
             borders_style: value.borders_style.to_config_or(Some(fallback_border_fg), None)?,
-            highlighted_item_style: value
-                .highlighted_item_style
-                .to_config_or(Some(Color::Blue), None)?,
             highlight_border_style: value
                 .highlight_border_style
                 .to_config_or(Some(Color::Blue), None)?,
@@ -416,6 +414,7 @@ impl TryFrom<UiConfigFile> for UiConfig {
                     .to_config_or(Some(Color::Black), Some(Color::Blue))?,
                 inactive_style: value.tab_bar.inactive_style.to_config_or(None, header_bg_color)?,
             },
+            highlighted_item_style: value.highlighted_item_style.to_config_or(None, None)?,
             current_item_style: value.current_item_style.to_config_or(None, None)?,
             default_album_art: value.default_album_art_path.map_or(
                 Ok(DEFAULT_ART as &'static [u8]),

@@ -139,6 +139,10 @@ pub fn current_item_style() -> Option<StyleFile> {
     })
 }
 
+pub fn highlighted_item_style() -> Option<StyleFile> {
+    Some(StyleFile { fg: Some("blue".to_string()), bg: None, modifiers: Some(Modifiers::Bold) })
+}
+
 pub fn default_preview_label_style() -> StyleFile {
     StyleFile { fg: Some("yellow".to_string()), bg: None, modifiers: None }
 }
