@@ -30,6 +30,10 @@ pub fn default_column_widths() -> Vec<u16> {
     vec![20, 38, 42]
 }
 
+pub fn default_header_column_widths() -> Vec<u16> {
+    vec![30, 40, 30]
+}
+
 pub fn bool<const V: bool>() -> bool {
     V
 }

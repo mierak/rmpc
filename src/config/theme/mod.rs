@@ -69,6 +69,7 @@ pub struct UiConfig {
     pub scrollbar: Option<ScrollbarConfig>,
     pub song_table_format: Vec<SongTableColumn>,
     pub song_table_album_separator: AlbumSeparator,
+    pub header_column_widths: [u16; 3],
     pub header: HeaderConfig,
     #[debug("{}", default_album_art.len())]
     pub default_album_art: &'static [u8],
@@ -118,6 +119,8 @@ pub struct UiConfigFile {
     pub(super) song_table_format: QueueTableColumnsFile,
     #[serde(default)]
     pub(super) song_table_album_separator: AlbumSeparator,
+    #[serde(default = "defaults::default_header_column_widths")]
+    pub(super) header_column_widths: Vec<u16>,
     #[serde(default)]
     pub(super) header: HeaderConfigFile,
     pub(super) default_album_art_path: Option<String>,
@@ -149,6 +152,7 @@ impl Default for UiConfigFile {
             text_color: None,
             header_background_color: None,
             show_song_table_header: false,
+            header_column_widths: vec![30, 40, 30],
             header: HeaderConfigFile::default(),
             modal_background_color: None,
             modal_backdrop: false,
@@ -401,6 +405,11 @@ impl TryFrom<UiConfigFile> for UiConfig {
             progress_bar: value.progress_bar.into_config()?,
             song_table_format: TryInto::<QueueTableColumns>::try_into(value.song_table_format)?.0,
             song_table_album_separator: value.song_table_album_separator,
+            header_column_widths: [
+                value.header_column_widths[0],
+                value.header_column_widths[1],
+                value.header_column_widths[2],
+            ],
             header: value.header.try_into()?,
             column_widths: [
                 value.browser_column_widths[0],
