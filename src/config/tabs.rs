@@ -519,18 +519,14 @@ pub enum BorderTitlePosition {
     Bottom,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[derive(Debug, Default, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(default)]
 pub struct SubPaneFile {
     pub size: String,
-    #[serde(default)]
     pub borders: BordersFile,
-    #[serde(default)]
     pub border_title: Vec<PropertyFile<PropertyKindFile>>,
-    #[serde(default)]
     pub border_title_position: BorderTitlePosition,
-    #[serde(default)]
     pub border_title_alignment: Alignment,
-    #[serde(default)]
     pub border_symbols: BorderSymbolsFile,
     pub pane: PaneOrSplitFile,
 }

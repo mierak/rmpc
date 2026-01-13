@@ -17,7 +17,6 @@ use actions::{CommonActionFile, GlobalActionFile, QueueActionsFile};
 pub use key::Key;
 use serde::{Deserialize, Serialize};
 
-use super::defaults;
 use crate::config::keys::{
     actions::{DuplicateStrategy, RateKind, SaveKind},
     key::KeySequence,
@@ -40,17 +39,13 @@ pub struct KeyConfig {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[serde(default)]
 pub struct KeyConfigFile {
-    #[serde(default = "defaults::bool::<false>")]
     pub clear: bool,
-    #[serde(default)]
     pub global: HashMap<KeySequence, GlobalActionFile>,
-    #[serde(default)]
     pub navigation: HashMap<KeySequence, CommonActionFile>,
     #[cfg(debug_assertions)]
-    #[serde(default)]
     pub logs: HashMap<KeySequence, LogsActionsFile>,
-    #[serde(default)]
     pub queue: HashMap<KeySequence, QueueActionsFile>,
 }
 

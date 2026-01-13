@@ -84,61 +84,41 @@ pub struct UiConfig {
 }
 
 #[derive(Debug, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(default)]
 pub struct UiConfigFile {
-    #[serde(default = "defaults::bool::<true>")]
     pub(super) draw_borders: bool,
     pub(super) symbols: SymbolsFile,
     pub(super) tab_bar: TabBarFile,
     pub(super) progress_bar: ProgressBarConfigFile,
-    #[serde(default = "defaults::default_scrollbar")]
     pub(super) scrollbar: Option<ScrollbarConfigFile>,
-    #[serde(default = "defaults::default_column_widths")]
     pub(super) browser_column_widths: Vec<u16>,
-    #[serde(default)]
     pub(super) browser_song_format: SongFormatFile,
     pub(super) background_color: Option<String>,
     pub(super) text_color: Option<String>,
-    #[serde(default = "defaults::default_preview_label_style")]
     pub(super) preview_label_style: StyleFile,
-    #[serde(default = "defaults::default_preview_metaga_group_heading_style")]
     pub(super) preview_metadata_group_style: StyleFile,
     #[deprecated]
     pub(super) header_background_color: Option<String>,
     pub(super) modal_background_color: Option<String>,
-    #[serde(default)]
     pub(super) modal_backdrop: bool,
     pub(super) borders_style: Option<StyleFile>,
-    #[serde(default = "defaults::highlighted_item_style")]
     pub(super) highlighted_item_style: Option<StyleFile>,
-    #[serde(default = "defaults::current_item_style")]
     pub(super) current_item_style: Option<StyleFile>,
     pub(super) highlight_border_style: Option<StyleFile>,
     #[deprecated]
-    #[serde(default)]
     pub(super) show_song_table_header: bool,
     pub(super) song_table_format: QueueTableColumnsFile,
-    #[serde(default)]
     pub(super) song_table_album_separator: AlbumSeparator,
-    #[serde(default = "defaults::default_header_column_widths")]
     pub(super) header_column_widths: Vec<u16>,
-    #[serde(default)]
     pub(super) header: HeaderConfigFile,
     pub(super) default_album_art_path: Option<String>,
-    #[serde(default)]
     pub(super) layout: PaneOrSplitFile,
-    #[serde(default = "defaults::components")]
     pub(super) components: HashMap<String, PaneOrSplitFile>,
-    #[serde(default = "defaults::default_tag_separator")]
     pub(super) format_tag_separator: String,
-    #[serde(default)]
     pub(super) multiple_tag_resolution_strategy: TagResolutionStrategy,
-    #[serde(default)]
     pub(super) level_styles: LevelStylesFile,
-    #[serde(default)]
     pub(super) lyrics: LyricsConfigFile,
-    #[serde(default)]
     pub(super) cava: CavaThemeFile,
-    #[serde(default)]
     pub border_symbol_sets: BorderSetLibFile,
 }
 

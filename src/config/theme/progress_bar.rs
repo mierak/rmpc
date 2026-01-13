@@ -27,12 +27,12 @@ pub struct ProgressBarConfig {
 }
 
 #[derive(Debug, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(default)]
 pub struct ProgressBarConfigFile {
     pub(super) symbols: Vec<String>,
     pub(super) track_style: Option<StyleFile>,
     pub(super) elapsed_style: Option<StyleFile>,
     pub(super) thumb_style: Option<StyleFile>,
-    #[serde(default = "super::defaults::bool::<true>")]
     pub(super) use_track_when_empty: bool,
 }
 
