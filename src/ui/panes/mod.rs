@@ -38,6 +38,7 @@ use super::{
 use crate::{
     MpdQueryResult,
     config::{
+        duration_format::DurationFormat,
         tabs::{Pane as ConfigPane, PaneType, SizedPaneOrSplit},
         theme::{
             SymbolsConfig,
@@ -1002,9 +1003,13 @@ impl Property<PropertyKind> {
                     )))
                 }
                 StatusProperty::QueueTimeTotal { separator } => {
-                    let formatted = match separator {
-                        Some(sep) => ctx.cached_queue_time_total.format_to_duration(sep),
-                        None => ctx.cached_queue_time_total.to_string(),
+                    let secs = ctx.cached_queue_time_total.as_secs();
+                    let formatted = match &ctx.config.duration_format {
+                        DurationFormat::Custom(_) => ctx.config.duration_format.format(secs, None),
+                        _ if separator.is_some() => {
+                            DurationFormat::Human.format(secs, separator.as_deref())
+                        }
+                        _ => ctx.config.duration_format.format(secs, separator.as_deref()),
                     };
                     Some(Either::Left(Span::styled(formatted, style)))
                 }
@@ -1025,10 +1030,16 @@ impl Property<PropertyKind> {
                             }
                         },
                     );
-                    let formatted = match separator {
-                        Some(sep) => remaining_time.format_to_duration(sep),
-                        None => remaining_time.to_string(),
+
+                    let secs = remaining_time.as_secs();
+                    let formatted = match &ctx.config.duration_format {
+                        DurationFormat::Custom(_) => ctx.config.duration_format.format(secs, None),
+                        _ if separator.is_some() => {
+                            DurationFormat::Human.format(secs, separator.as_deref())
+                        }
+                        _ => ctx.config.duration_format.format(secs, separator.as_deref()),
                     };
+
                     Some(Either::Left(Span::styled(formatted, style)))
                 }
                 StatusProperty::ActiveTab => {
