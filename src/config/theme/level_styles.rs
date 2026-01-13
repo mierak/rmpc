@@ -13,16 +13,12 @@ pub struct LevelStyles {
 }
 
 #[derive(Debug, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(default)]
 pub struct LevelStylesFile {
-    #[serde(default = "defaults::default_trace_color")]
     trace: StyleFile,
-    #[serde(default = "defaults::default_debug_color")]
     debug: StyleFile,
-    #[serde(default = "defaults::default_warn_color")]
     warn: StyleFile,
-    #[serde(default = "defaults::default_error_color")]
     error: StyleFile,
-    #[serde(default = "defaults::default_info_color")]
     info: StyleFile,
 }
 

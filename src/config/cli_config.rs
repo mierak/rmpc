@@ -7,15 +7,23 @@ use super::{Config, ConfigFile, MpdAddress, address::MpdPassword, utils::tilde_e
 use crate::config::utils::tilde_expand_path;
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(default)]
 pub struct CliConfigFile {
-    #[serde(default = "super::defaults::mpd_address")]
     pub address: String,
-    #[serde(default)]
     password: Option<String>,
-    #[serde(default)]
     cache_dir: Option<PathBuf>,
-    #[serde(default)]
     lyrics_dir: Option<String>,
+}
+
+impl Default for CliConfigFile {
+    fn default() -> Self {
+        Self {
+            address: "127.0.0.1:6600".to_string(),
+            password: None,
+            cache_dir: None,
+            lyrics_dir: None,
+        }
+    }
 }
 
 #[derive(Debug, Default, Clone)]

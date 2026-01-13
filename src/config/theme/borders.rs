@@ -65,23 +65,16 @@ impl<'a> From<&'a BorderSet> for Set<'a> {
 }
 
 #[derive(Debug, Default, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(default)]
 pub struct BorderSetInherited {
     pub parent: Box<BorderSymbolsFile>,
-    #[serde(default)]
     pub top_left: Option<String>,
-    #[serde(default)]
     pub top_right: Option<String>,
-    #[serde(default)]
     pub bottom_left: Option<String>,
-    #[serde(default)]
     pub bottom_right: Option<String>,
-    #[serde(default)]
     pub vertical_left: Option<String>,
-    #[serde(default)]
     pub vertical_right: Option<String>,
-    #[serde(default)]
     pub horizontal_top: Option<String>,
-    #[serde(default)]
     pub horizontal_bottom: Option<String>,
 }
 
