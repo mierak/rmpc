@@ -38,19 +38,12 @@ use super::{
 use crate::{
     MpdQueryResult,
     config::{
-        duration_format::DurationFormat,
         tabs::{Pane as ConfigPane, PaneType, SizedPaneOrSplit},
         theme::{
-            SymbolsConfig,
-            TagResolutionStrategy,
+            SymbolsConfig, TagResolutionStrategy,
             properties::{
-                Property,
-                PropertyKind,
-                PropertyKindOrText,
-                SongProperty,
-                StatusProperty,
-                Transform,
-                WidgetProperty,
+                Property, PropertyKind, PropertyKindOrText, SongProperty, StatusProperty,
+                Transform, WidgetProperty,
             },
         },
     },
@@ -65,8 +58,7 @@ use crate::{
         mouse_event::MouseEvent,
     },
     ui::{
-        input::InputResultEvent,
-        panes::queue_header::QueueHeaderPane,
+        input::InputResultEvent, panes::queue_header::QueueHeaderPane,
         widgets::header::PropertyTemplates,
     },
 };
@@ -1004,13 +996,7 @@ impl Property<PropertyKind> {
                 }
                 StatusProperty::QueueTimeTotal { separator } => {
                     let secs = ctx.cached_queue_time_total.as_secs();
-                    let formatted = match &ctx.config.duration_format {
-                        DurationFormat::Custom(_) => ctx.config.duration_format.format(secs, None),
-                        _ if separator.is_some() => {
-                            DurationFormat::Human.format(secs, separator.as_deref())
-                        }
-                        _ => ctx.config.duration_format.format(secs, separator.as_deref()),
-                    };
+                    let formatted = ctx.config.duration_format.format(secs, separator.as_deref());
                     Some(Either::Left(Span::styled(formatted, style)))
                 }
                 StatusProperty::QueueTimeRemaining { separator } => {
@@ -1031,15 +1017,10 @@ impl Property<PropertyKind> {
                         },
                     );
 
-                    let secs = remaining_time.as_secs();
-                    let formatted = match &ctx.config.duration_format {
-                        DurationFormat::Custom(_) => ctx.config.duration_format.format(secs, None),
-                        _ if separator.is_some() => {
-                            DurationFormat::Human.format(secs, separator.as_deref())
-                        }
-                        _ => ctx.config.duration_format.format(secs, separator.as_deref()),
-                    };
-
+                    let formatted = ctx
+                        .config
+                        .duration_format
+                        .format(remaining_time.as_secs(), separator.as_deref());
                     Some(Either::Left(Span::styled(formatted, style)))
                 }
                 StatusProperty::ActiveTab => {
@@ -1336,14 +1317,9 @@ mod format_tests {
 
     use crate::{
         config::theme::{
-            StyleFile,
-            TagResolutionStrategy,
+            StyleFile, TagResolutionStrategy,
             properties::{
-                Property,
-                PropertyKind,
-                PropertyKindOrText,
-                SongProperty,
-                StatusProperty,
+                Property, PropertyKind, PropertyKindOrText, SongProperty, StatusProperty,
                 StatusPropertyFile,
             },
         },
@@ -1404,12 +1380,16 @@ mod format_tests {
             let format = Property::<PropertyKind> {
                 kind: PropertyKindOrText::Transform(Transform::Replace {
                     content: Box::new(Property { kind: input_props, style: None, default: None }),
-                    replacements: [(input, Property {
-                        kind: replace_props,
-                        style: None,
-                        default: replace_default
-                            .map(|d| Box::new(Property { kind: d, style: None, default: None })),
-                    })]
+                    replacements: [(
+                        input,
+                        Property {
+                            kind: replace_props,
+                            style: None,
+                            default: replace_default.map(|d| {
+                                Box::new(Property { kind: d, style: None, default: None })
+                            }),
+                        },
+                    )]
                     .into_iter()
                     .collect(),
                 }),
@@ -1479,12 +1459,16 @@ mod format_tests {
             let format = Property::<SongProperty> {
                 kind: PropertyKindOrText::Transform(Transform::Replace {
                     content: Box::new(Property { kind: input_props, style: None, default: None }),
-                    replacements: [(input, Property {
-                        kind: replace_props,
-                        style: None,
-                        default: replace_default
-                            .map(|d| Box::new(Property { kind: d, style: None, default: None })),
-                    })]
+                    replacements: [(
+                        input,
+                        Property {
+                            kind: replace_props,
+                            style: None,
+                            default: replace_default.map(|d| {
+                                Box::new(Property { kind: d, style: None, default: None })
+                            }),
+                        },
+                    )]
                     .into_iter()
                     .collect(),
                 }),
@@ -1547,12 +1531,16 @@ mod format_tests {
             let format = Property::<SongProperty> {
                 kind: PropertyKindOrText::Transform(Transform::Replace {
                     content: Box::new(Property { kind: input_props, style: None, default: None }),
-                    replacements: [(input, Property {
-                        kind: replace_props,
-                        style: None,
-                        default: replace_default
-                            .map(|d| Box::new(Property { kind: d, style: None, default: None })),
-                    })]
+                    replacements: [(
+                        input,
+                        Property {
+                            kind: replace_props,
+                            style: None,
+                            default: replace_default.map(|d| {
+                                Box::new(Property { kind: d, style: None, default: None })
+                            }),
+                        },
+                    )]
                     .into_iter()
                     .collect(),
                 }),
