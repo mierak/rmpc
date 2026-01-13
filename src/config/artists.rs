@@ -8,12 +8,10 @@ pub struct Artists {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(default)]
 pub struct ArtistsFile {
-    #[serde(default)]
     pub album_display_mode: AlbumDisplayMode,
-    #[serde(default)]
     pub album_sort_by: AlbumSortMode,
-    #[serde(default = "default_album_date_tags")]
     pub album_date_tags: Vec<AlbumDateTag>,
 }
 
