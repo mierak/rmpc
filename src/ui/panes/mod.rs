@@ -402,7 +402,7 @@ pub(crate) mod browser {
                         start_of_line_spacer.clone(),
                         Span::styled("Duration", key_style),
                         separator.clone(),
-                        Span::from(duration.as_secs().to_string()),
+                        Span::from(ctx.config.duration_format.format(duration.as_secs())),
                     ])
                     .into(),
                 );
@@ -1003,7 +1003,10 @@ impl Property<PropertyKind> {
                 }
                 StatusProperty::QueueTimeTotal { separator } => {
                     let secs = ctx.cached_queue_time_total.as_secs();
-                    let formatted = ctx.config.duration_format.format(secs, separator.as_deref());
+                    let formatted = ctx
+                        .config
+                        .duration_format
+                        .format_with_separator(secs, separator.as_deref());
                     Some(Either::Left(Span::styled(formatted, style)))
                 }
                 StatusProperty::QueueTimeRemaining { separator } => {
@@ -1023,11 +1026,10 @@ impl Property<PropertyKind> {
                             }
                         },
                     );
-
                     let formatted = ctx
                         .config
                         .duration_format
-                        .format(remaining_time.as_secs(), separator.as_deref());
+                        .format_with_separator(remaining_time.as_secs(), separator.as_deref());
                     Some(Either::Left(Span::styled(formatted, style)))
                 }
                 StatusProperty::ActiveTab => {

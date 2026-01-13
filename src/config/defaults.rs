@@ -649,3 +649,7 @@ pub fn components() -> HashMap<String, PaneOrSplitFile> {
         }),
     ])
 }
+
+pub fn duration_format() -> String {
+    "%m:%S".to_string()
+}

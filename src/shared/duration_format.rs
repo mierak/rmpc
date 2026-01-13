@@ -1,0 +1,234 @@
+use serde::{Deserialize, Serialize};
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct DurationFormat {
+    parts: Vec<FormatPart>,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+enum FormatPart {
+    Literal(String),
+    Days,
+    DaysPadded,
+    Hours,
+    HoursPadded,
+    Minutes,
+    MinutesPadded,
+    Seconds,
+    SecondsPadded,
+    TotalSeconds,
+}
+
+impl Default for DurationFormat {
+    fn default() -> Self {
+        Self::parse("%m:%S")
+    }
+}
+
+impl DurationFormat {
+    pub fn parse(template: &str) -> Self {
+        let mut parts = Vec::new();
+        let mut literal = String::new();
+        let mut chars = template.chars().peekable();
+
+        while let Some(c) = chars.next() {
+            if c == '%' {
+                match chars.peek() {
+                    Some('%') => {
+                        chars.next();
+                        literal.push('%');
+                    }
+                    Some('d') => {
+                        chars.next();
+                        if !literal.is_empty() {
+                            parts.push(FormatPart::Literal(std::mem::take(&mut literal)));
+                        }
+                        parts.push(FormatPart::Days);
+                    }
+                    Some('D') => {
+                        chars.next();
+                        if !literal.is_empty() {
+                            parts.push(FormatPart::Literal(std::mem::take(&mut literal)));
+                        }
+                        parts.push(FormatPart::DaysPadded);
+                    }
+                    Some('h') => {
+                        chars.next();
+                        if !literal.is_empty() {
+                            parts.push(FormatPart::Literal(std::mem::take(&mut literal)));
+                        }
+                        parts.push(FormatPart::Hours);
+                    }
+                    Some('H') => {
+                        chars.next();
+                        if !literal.is_empty() {
+                            parts.push(FormatPart::Literal(std::mem::take(&mut literal)));
+                        }
+                        parts.push(FormatPart::HoursPadded);
+                    }
+                    Some('m') => {
+                        chars.next();
+                        if !literal.is_empty() {
+                            parts.push(FormatPart::Literal(std::mem::take(&mut literal)));
+                        }
+                        parts.push(FormatPart::Minutes);
+                    }
+                    Some('M') => {
+                        chars.next();
+                        if !literal.is_empty() {
+                            parts.push(FormatPart::Literal(std::mem::take(&mut literal)));
+                        }
+                        parts.push(FormatPart::MinutesPadded);
+                    }
+                    Some('s') => {
+                        chars.next();
+                        if !literal.is_empty() {
+                            parts.push(FormatPart::Literal(std::mem::take(&mut literal)));
+                        }
+                        parts.push(FormatPart::Seconds);
+                    }
+                    Some('S') => {
+                        chars.next();
+                        if !literal.is_empty() {
+                            parts.push(FormatPart::Literal(std::mem::take(&mut literal)));
+                        }
+                        parts.push(FormatPart::SecondsPadded);
+                    }
+                    Some('t') => {
+                        chars.next();
+                        if !literal.is_empty() {
+                            parts.push(FormatPart::Literal(std::mem::take(&mut literal)));
+                        }
+                        parts.push(FormatPart::TotalSeconds);
+                    }
+                    Some(_) | None => literal.push('%'),
+                }
+            } else {
+                literal.push(c);
+            }
+        }
+
+        if !literal.is_empty() {
+            parts.push(FormatPart::Literal(literal));
+        }
+
+        Self { parts }
+    }
+
+    pub fn format(&self, total_seconds: u64) -> String {
+        use std::fmt::Write;
+
+        let mut result = String::with_capacity(16);
+        let days = total_seconds / 86400;
+        let hours = (total_seconds / 3600) % 24;
+        let minutes = (total_seconds / 60) % 60;
+        let seconds = total_seconds % 60;
+
+        for part in &self.parts {
+            match part {
+                FormatPart::Literal(s) => result.push_str(s),
+                FormatPart::Days => {
+                    let _ = write!(result, "{days}");
+                }
+                FormatPart::DaysPadded => {
+                    let _ = write!(result, "{days:02}");
+                }
+                FormatPart::Hours => {
+                    let _ = write!(result, "{hours}");
+                }
+                FormatPart::HoursPadded => {
+                    let _ = write!(result, "{hours:02}");
+                }
+                FormatPart::Minutes => {
+                    let _ = write!(result, "{minutes}");
+                }
+                FormatPart::MinutesPadded => {
+                    let _ = write!(result, "{minutes:02}");
+                }
+                FormatPart::Seconds => {
+                    let _ = write!(result, "{seconds}");
+                }
+                FormatPart::SecondsPadded => {
+                    let _ = write!(result, "{seconds:02}");
+                }
+                FormatPart::TotalSeconds => {
+                    let _ = write!(result, "{total_seconds}");
+                }
+            }
+        }
+
+        result
+    }
+
+    pub fn format_with_separator(&self, total_seconds: u64, separator: Option<&str>) -> String {
+        if let Some(sep) = separator {
+            if total_seconds == 0 {
+                return "0s".to_string();
+            }
+            let days = total_seconds / 86400;
+            let hours = (total_seconds / 3600) % 24;
+            let minutes = (total_seconds / 60) % 60;
+            let seconds = total_seconds % 60;
+            return if days > 0 {
+                format!("{days}d{sep}{hours}h{sep}{minutes}m{sep}{seconds}s")
+            } else if hours > 0 {
+                format!("{hours}h{sep}{minutes}m{sep}{seconds}s")
+            } else {
+                format!("{minutes}m{sep}{seconds}s")
+            };
+        }
+        self.format(total_seconds)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_human_style_via_separator() {
+        let fmt = DurationFormat::parse("");
+        assert_eq!(fmt.format_with_separator(45, Some(" ")), "0m 45s");
+        assert_eq!(fmt.format_with_separator(85, Some(" ")), "1m 25s");
+        assert_eq!(fmt.format_with_separator(3665, Some(" ")), "1h 1m 5s");
+        assert_eq!(fmt.format_with_separator(95, Some(", ")), "1m, 35s");
+    }
+
+    #[test]
+    fn test_custom_format_tokens() {
+        let classic = DurationFormat::parse("%M:%S");
+        assert_eq!(classic.format(45), "00:45");
+        assert_eq!(classic.format(85), "01:25");
+
+        let mixed = DurationFormat::parse("%h hours, %M mins");
+        assert_eq!(mixed.format(3665), "1 hours, 01 mins");
+
+        let unpadded = DurationFormat::parse("%m:%s");
+        assert_eq!(unpadded.format(85), "1:25");
+    }
+
+    #[test]
+    fn test_total_seconds_token() {
+        let total = DurationFormat::parse("%t seconds");
+        assert_eq!(total.format(90), "90 seconds");
+        assert_eq!(total.format(3600), "3600 seconds");
+    }
+
+    #[test]
+    fn test_literal_percent() {
+        let fmt = DurationFormat::parse("Usage: 100%%");
+        assert_eq!(fmt.format(60), "Usage: 100%");
+
+        let fmt2 = DurationFormat::parse("%M%%");
+        assert_eq!(fmt2.format(60), "01%");
+    }
+
+    #[test]
+    fn test_zero_duration() {
+        let fmt = DurationFormat::parse("");
+        assert_eq!(fmt.format_with_separator(0, Some(" ")), "0s");
+
+        let fmt2 = DurationFormat::parse("%M:%S");
+        assert_eq!(fmt2.format(0), "00:00");
+    }
+}
