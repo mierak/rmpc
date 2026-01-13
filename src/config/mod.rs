@@ -29,6 +29,7 @@ pub mod cava;
 pub mod cli;
 pub mod cli_config;
 mod defaults;
+pub mod duration_format;
 pub mod keys;
 mod search;
 pub mod sort_mode;
@@ -44,6 +45,7 @@ use self::{
 };
 use crate::{
     config::{
+        duration_format::DurationFormat,
         tabs::{SizedPaneOrSplit, Tab, TabName},
         utils::tilde_expand_path,
     },
@@ -96,6 +98,7 @@ pub struct Config {
     pub directories_sort: Arc<SortOptions>,
     pub cava: Cava,
     pub auto_open_downloads: bool,
+    pub duration_format: DurationFormat,
 }
 
 #[derive(Debug, Default, Clone, Copy, Serialize, Deserialize, PartialEq)]
@@ -194,6 +197,8 @@ pub struct ConfigFile {
     pub cava: CavaFile,
     #[serde(default = "defaults::bool::<true>")]
     pub auto_open_downloads: bool,
+    #[serde(default)]
+    pub duration_format: DurationFormat,
 }
 
 #[derive(Debug, Serialize, Deserialize, Copy, Clone, PartialEq, Eq)]
@@ -262,6 +267,7 @@ impl Default for ConfigFile {
             cava: CavaFile::default(),
             show_playlists_in_browser: ShowPlaylistsMode::default(),
             auto_open_downloads: true,
+            duration_format: DurationFormat::default(),
         }
     }
 }
@@ -506,6 +512,7 @@ impl ConfigFile {
             reflect_changes_to_playlist: self.reflect_changes_to_playlist,
             cava: self.cava.into(),
             auto_open_downloads: self.auto_open_downloads,
+            duration_format: self.duration_format,
         };
 
         if skip_album_art_check {
