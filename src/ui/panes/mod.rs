@@ -24,7 +24,7 @@ use ratatui::{
     widgets::Block,
 };
 use search::SearchPane;
-use strum::Display;
+use strum::{Display, IntoDiscriminant};
 use tabs::TabsPane;
 use tag_browser::TagBrowserPane;
 use volume::VolumePane;
@@ -65,7 +65,7 @@ use crate::{
     },
     ui::{
         input::InputResultEvent,
-        panes::queue_header::QueueHeaderPane,
+        panes::{empty::EmptyPane, queue_header::QueueHeaderPane},
         widgets::header::PropertyTemplates,
     },
 };
@@ -74,6 +74,7 @@ pub mod album_art;
 pub mod albums;
 pub mod cava;
 pub mod directories;
+pub mod empty;
 #[cfg(debug_assertions)]
 pub mod frame_count;
 pub mod header;
@@ -113,6 +114,7 @@ pub enum Panes<'pane_ref, 'pane> {
     Property(PropertyPane<'pane_ref>),
     Others(&'pane_ref mut Box<dyn BoxedPane>),
     Cava(&'pane_ref mut CavaPane),
+    Empty(&'pane_ref mut EmptyPane),
 }
 
 pub trait BoxedPane: Pane + std::fmt::Debug {}
@@ -139,6 +141,7 @@ pub struct PaneContainer<'panes> {
     pub cava: CavaPane,
     #[cfg(debug_assertions)]
     pub frame_count: FrameCountPane,
+    pub empty: EmptyPane,
     pub others: HashMap<PaneType, Box<dyn BoxedPane>>,
 }
 
@@ -163,6 +166,7 @@ impl<'panes> PaneContainer<'panes> {
             cava: CavaPane::new(ctx),
             #[cfg(debug_assertions)]
             frame_count: FrameCountPane::new(),
+            empty: EmptyPane,
             others: Self::init_other_panes(ctx).collect(),
         })
     }
@@ -232,6 +236,7 @@ impl<'panes> PaneContainer<'panes> {
                     .with_context(|| format!("expected pane to be defined {p:?}"))?,
             )),
             PaneType::Cava => Ok(Panes::Cava(&mut self.cava)),
+            PaneType::Empty => Ok(Panes::Empty(&mut self.empty)),
         }
     }
 }
@@ -260,6 +265,7 @@ macro_rules! pane_call {
             Panes::Property(s) => s.$fn($($param),+),
             Panes::Others(s) => s.$fn($($param),+),
             Panes::Cava(s) => s.$fn($($param),+),
+            Panes::Empty(s) => s.$fn($($param),+),
         }
     }
 }
@@ -1037,6 +1043,10 @@ impl Property<PropertyKind> {
                 StatusProperty::InputBuffer() => {
                     Some(Either::Left(Span::styled(ctx.key_resolver.buffer_to_string(), style)))
                 }
+                StatusProperty::InputMode() => Some(Either::Left(Span::styled(
+                    ctx.input.mode().discriminant().to_string(),
+                    style,
+                ))),
                 StatusProperty::SampleRate() => {
                     status.samplerate().map(|v| Either::Left(Span::styled(v.to_string(), style)))
                 }
