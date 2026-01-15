@@ -34,11 +34,11 @@
         trace: (fg: "magenta", bg: "black"),
     ),
     progress_bar: (
-        symbols: ["[", "━", "➤", " ", "]"],
-        track_style: (fg: "#1e2030"),
+        symbols: ["█", "█", "█", " ", "█"],
+        track_style: None,
         elapsed_style: (fg: "blue"),
         thumb_style: (fg: "blue"),
-        use_track_when_empty: false,
+        use_track_when_empty: true,
     ),
     scrollbar: (
         symbols: ["│", "█", "▲", "▼"],
@@ -140,12 +140,26 @@
                 size: "100%",
             ),
             (
-                pane: Pane(ProgressBar),
-                borders: "ALL",
-                border_symbols: Rounded,
-                border_title_alignment: Right,
-                border_title: [(kind: Text(" ")), (kind: Property(Status(QueueLength()))), (kind: Text(" songs / ")), (kind: Property(Status(QueueTimeTotal()))), (kind: Text(" total time "))],
                 size: "3",
+                pane: Split(
+                    direction: Horizontal,
+                    panes: [
+                        (
+                            size: "12",
+                            borders: "ALL",
+                            border_symbols: Inherited(parent: Rounded, top_right: "┬", bottom_right: "┴"),
+                            pane: Component("input_mode")
+                        ),
+                        (
+                            size: "100%",
+                            borders: "TOP | BOTTOM | RIGHT",
+                            border_symbols: Rounded,
+                            border_title: [(kind: Text(" ")), (kind: Property(Status(QueueLength()))), (kind: Text(" songs / ")), (kind: Property(Status(QueueTimeTotal()))), (kind: Text(" total time "))],
+                            border_title_alignment: Right,
+                            pane: Component("progress_bar"),
+                        ),
+                    ]
+                ),
             ),
         ],
     ),
@@ -193,39 +207,63 @@
                 (kind: Property(Song(Album)), default: (kind: Text("Unknown Album"))),
             ], align: Center, scroll_speed: 1
         )),
-        "states": Pane(Property(
+        "states": Split(
+            direction: Horizontal,
+            panes: [
+                (
+                    size: "1",
+                    pane: Pane(Empty())
+                ),
+                (
+                    size: "100%",
+                    pane: Pane(Property(content: [(kind: Property(Status(InputBuffer())), style: (fg: "blue"), align: Left)]))
+                ),
+                (
+                    size: "6",
+                    pane: Pane(Property(content: [
+                        (kind: Text("["), style: (fg: "blue", modifiers: "Bold")),
+                        (kind: Property(Status(RepeatV2(
+                            on_label: "z",
+                            off_label: "z",
+                            on_style: (fg: "yellow", modifiers: "Bold"),
+                            off_style: (fg: "blue", modifiers: "Dim"),
+                        )))),
+                        (kind: Property(Status(RandomV2(
+                            on_label: "x",
+                            off_label: "x",
+                            on_style: (fg: "yellow", modifiers: "Bold"),
+                            off_style: (fg: "blue", modifiers: "Dim"),
+                        )))),
+                        (kind: Property(Status(ConsumeV2(
+                            on_label: "c",
+                            off_label: "c",
+                            oneshot_label: "c",
+                            on_style: (fg: "yellow", modifiers: "Bold"),
+                            off_style: (fg: "blue", modifiers: "Dim"),
+                            oneshot_style: (fg: "red", modifiers: "Dim"),
+                        )))),
+                        (kind: Property(Status(SingleV2(
+                            on_label: "v",
+                            off_label: "v",
+                            oneshot_label: "v",
+                            on_style: (fg: "yellow", modifiers: "Bold"),
+                            off_style: (fg: "blue", modifiers: "Dim"),
+                            oneshot_style: (fg: "red", modifiers: "Bold"),
+                        )))),
+                        (kind: Text("]"), style: (fg: "blue", modifiers: "Bold")),
+                        ],
+                        align: Right
+                    ))
+                ),
+            ]
+        ),
+        "input_mode": Pane(Property(
             content: [
-                (kind: Text("["), style: (fg: "blue", modifiers: "Bold")),
-                (kind: Property(Status(RepeatV2(
-                    on_label: "z",
-                    off_label: "z",
-                    on_style: (fg: "yellow", modifiers: "Bold"),
-                    off_style: (fg: "blue", modifiers: "Dim"),
-                )))),
-                (kind: Property(Status(RandomV2(
-                    on_label: "x",
-                    off_label: "x",
-                    on_style: (fg: "yellow", modifiers: "Bold"),
-                    off_style: (fg: "blue", modifiers: "Dim"),
-                )))),
-                (kind: Property(Status(ConsumeV2(
-                    on_label: "c",
-                    off_label: "c",
-                    oneshot_label: "c",
-                    on_style: (fg: "yellow", modifiers: "Bold"),
-                    off_style: (fg: "blue", modifiers: "Dim"),
-                    oneshot_style: (fg: "red", modifiers: "Dim"),
-                )))),
-                (kind: Property(Status(SingleV2(
-                    on_label: "v",
-                    off_label: "v",
-                    oneshot_label: "v",
-                    on_style: (fg: "yellow", modifiers: "Bold"),
-                    off_style: (fg: "blue", modifiers: "Dim"),
-                    oneshot_style: (fg: "red", modifiers: "Bold"),
-                )))),
-                (kind: Text("]"), style: (fg: "blue", modifiers: "Bold")),
-            ], align: Right
+                (kind: Transform(Replace(content: (kind: Property(Status(InputMode()))), replacements: [
+                    (match: "Normal", replace: (kind: Text(" NORMAL "), style: (fg: "black", bg: "blue"))),
+                    (match: "Insert", replace: (kind: Text(" INSERT "), style: (fg: "black", bg: "green"))),
+                ])))
+            ], align: Center
         )),
         "header_left": Split(
             direction: Vertical,
@@ -248,5 +286,22 @@
                 (size: "1", pane: Component("states")),
             ]
         ),
+        "progress_bar": Split(
+            direction: Horizontal,
+            panes: [
+                (
+                    size: "1",
+                    pane: Pane(Empty())
+                ),
+                (
+                    size: "100%",
+                    pane: Pane(ProgressBar)
+                ),
+                (
+                    size: "1",
+                    pane: Pane(Empty())
+                ),
+            ]
+        )
     },
 )

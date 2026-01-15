@@ -8,6 +8,7 @@ use ratatui::{style::Style, text::Span};
 use crate::ui::input::{BufferId, InputEvent, InputResultEvent, buffer::InputBuffer};
 
 #[derive(Debug, Default, Clone, Copy, strum::EnumDiscriminants)]
+#[strum_discriminants(derive(strum::Display, strum::AsRefStr))]
 pub enum InputMode {
     #[default]
     Normal,

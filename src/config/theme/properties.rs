@@ -140,6 +140,7 @@ pub enum StatusPropertyFile {
     },
     ActiveTab,
     InputBuffer(),
+    InputMode(),
     SampleRate(),
     Bits(),
     Channels(),
@@ -200,6 +201,7 @@ pub enum StatusProperty {
     },
     ActiveTab,
     InputBuffer(),
+    InputMode(),
     SampleRate(),
     Bits(),
     Channels(),
@@ -512,6 +514,7 @@ impl TryFrom<StatusPropertyFile> for StatusProperty {
             }
             StatusPropertyFile::ActiveTab => StatusProperty::ActiveTab,
             StatusPropertyFile::InputBuffer() => StatusProperty::InputBuffer(),
+            StatusPropertyFile::InputMode() => StatusProperty::InputMode(),
             StatusPropertyFile::SampleRate() => StatusProperty::SampleRate(),
             StatusPropertyFile::Bits() => StatusProperty::Bits(),
             StatusPropertyFile::Channels() => StatusProperty::Channels(),

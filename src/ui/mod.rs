@@ -928,6 +928,8 @@ impl<'ui> Ui<'ui> {
                 Panes::Cava(p) => p.on_event(&mut event, visible, ctx),
                 // Property and the dummy TabContent pane do not need to receive events
                 Panes::Property(_) | Panes::TabContent => Ok(()),
+                // Empty pane is a noop, no events
+                Panes::Empty(_) => Ok(()),
             }?;
         }
 
@@ -975,6 +977,8 @@ impl<'ui> Ui<'ui> {
                     // Property and the dummy TabContent pane do not need to receive command
                     // notifications
                     Panes::Property(_) | Panes::TabContent => Ok(()),
+                    // Empty pane is a noop, no commands
+                    Panes::Empty(_) => Ok(()),
                 }?;
             }
             None => match (id, data) {
