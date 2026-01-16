@@ -206,13 +206,8 @@ pub mod error {
 }
 
 pub mod duration {
-    const SECONDS_IN_DAY: u64 = 60 * 60 * 24;
-    const SECONDS_IN_HOUR: u64 = 60 * 60;
-    const SECONDS_IN_MINUTE: u64 = 60;
-
     pub trait DurationExt {
         fn to_string(&self) -> String;
-        fn format_to_duration(&self, unit_separator: &str) -> String;
     }
 
     impl DurationExt for std::time::Duration {
@@ -236,53 +231,6 @@ pub mod duration {
                 format!("{days}d {frac_hours:0>2}:{frac_min:0>2}:{frac_secs:0>2}")
             }
         }
-
-        fn format_to_duration(&self, unit_separator: &str) -> String {
-            let mut total_seconds = self.as_secs();
-            if total_seconds == 0 {
-                return "0s".to_string();
-            }
-
-            let mut buf = String::new();
-            if total_seconds >= SECONDS_IN_DAY {
-                let days = total_seconds / SECONDS_IN_DAY;
-                total_seconds = total_seconds.saturating_sub(days * SECONDS_IN_DAY);
-                buf.push_str(&days.to_string());
-                buf.push('d');
-                if total_seconds > 0 {
-                    buf.push_str(unit_separator);
-                }
-            }
-
-            if total_seconds >= SECONDS_IN_HOUR {
-                let hours = total_seconds / SECONDS_IN_HOUR;
-                total_seconds = total_seconds.saturating_sub(hours * SECONDS_IN_HOUR);
-                buf.push_str(&hours.to_string());
-
-                buf.push('h');
-                if total_seconds > 0 {
-                    buf.push_str(unit_separator);
-                }
-            }
-
-            if total_seconds >= SECONDS_IN_MINUTE {
-                let minutes = total_seconds / SECONDS_IN_MINUTE;
-                total_seconds = total_seconds.saturating_sub(minutes * SECONDS_IN_MINUTE);
-                buf.push_str(&minutes.to_string());
-
-                buf.push('m');
-                if total_seconds > 0 {
-                    buf.push_str(unit_separator);
-                }
-            }
-
-            if total_seconds > 0 {
-                buf.push_str(&total_seconds.to_string());
-                buf.push('s');
-            }
-
-            buf
-        }
     }
 
     #[cfg(test)]
@@ -292,19 +240,6 @@ pub mod duration {
         use test_case::test_case;
 
         use super::*;
-
-        #[test_case(Duration::from_secs(0), "0s")]
-        #[test_case(Duration::from_secs(1), "1s")]
-        #[test_case(Duration::from_secs(60), "1m")]
-        #[test_case(Duration::from_secs(95), "1m, 35s")]
-        #[test_case(Duration::from_secs(3600), "1h")]
-        #[test_case(Duration::from_secs(3601), "1h, 1s")]
-        #[test_case(Duration::from_secs(3661), "1h, 1m, 1s")]
-        #[test_case(Duration::from_secs(3600 * 24), "1d")]
-        #[test_case(Duration::from_secs(99999), "1d, 3h, 46m, 39s")]
-        fn duration_format(input: Duration, expected: &str) {
-            assert_eq!(input.format_to_duration(", "), expected);
-        }
 
         #[test_case(Duration::from_secs(0), "0:00")]
         #[test_case(Duration::from_secs(1), "0:01")]
