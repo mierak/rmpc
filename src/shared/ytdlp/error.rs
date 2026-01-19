@@ -12,6 +12,8 @@ pub enum YtDlpDownloadError {
         "Did not find file downloaded by yt-dlp in cache directory, yt-dlp exited with code: {code:?}: stdout: {stdout}, stderr: {stderr}"
     )]
     FileNotFound { stdout: String, stderr: String, code: Option<i32> },
+    #[error("Invalid yt-dlp configuration: {0}")]
+    InvalidConfig(&'static str),
 }
 
 #[derive(Error, Debug)]

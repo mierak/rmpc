@@ -205,6 +205,10 @@ impl YtDlpManager {
                     item.state = DownloadState::Failed { logs: vec![err.to_string()] };
                     bail!("Download failed because of IO error");
                 }
+                Err(YtDlpDownloadError::InvalidConfig(err)) => {
+                    item.state = DownloadState::Failed { logs: vec![err.to_string()] };
+                    bail!(err);
+                }
             }
         } else {
             Err(anyhow::anyhow!("Download ID not found"))
