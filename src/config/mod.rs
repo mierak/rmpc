@@ -36,7 +36,7 @@ pub mod tabs;
 pub mod theme;
 
 pub use address::MpdAddress;
-pub use search::Search;
+pub use search::{FilterKindFile, Search};
 
 use self::{
     keys::{KeyConfig, KeyConfigFile},

@@ -2,17 +2,19 @@ use itertools::Itertools;
 use serde::{Deserialize, Serialize};
 
 use super::defaults;
-use crate::mpd::mpd_client::FilterKind;
 
+#[allow(clippy::struct_excessive_bools)]
 #[derive(Debug, Default, Clone)]
 pub struct Search {
     pub case_sensitive: bool,
     pub ignore_diacritics: bool,
     pub search_button: bool,
-    pub mode: FilterKind,
+    pub custom_query: bool,
+    pub mode: FilterKindFile,
     pub tags: Vec<SearchableTag>,
 }
 
+#[allow(clippy::struct_excessive_bools)]
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct SearchFile {
     case_sensitive: bool,
@@ -20,6 +22,8 @@ pub struct SearchFile {
     ignore_diacritics: bool,
     #[serde(default = "defaults::bool::<false>")]
     search_button: bool,
+    #[serde(default = "defaults::bool::<false>")]
+    custom_query: bool,
     mode: FilterKindFile,
     tags: Vec<SearchableTagFile>,
 }
@@ -49,7 +53,8 @@ impl TryFrom<SearchFile> for Search {
             case_sensitive: value.case_sensitive,
             ignore_diacritics: value.ignore_diacritics,
             search_button: value.search_button,
-            mode: value.mode.into(),
+            mode: value.mode,
+            custom_query: value.custom_query,
             tags: if value.tags.is_empty() {
                 vec![SearchableTag { label: "Any Tag".to_string(), value: "any".to_string() }]
             } else {
@@ -70,6 +75,7 @@ impl Default for SearchFile {
             ignore_diacritics: false,
             search_button: false,
             mode: FilterKindFile::Contains,
+            custom_query: false,
             tags: [
                 SearchableTagFile { value: "any".to_string(), label: "Any Tag".to_string() },
                 SearchableTagFile { value: "artist".to_string(), label: "Artist".to_string() },
@@ -87,22 +93,13 @@ impl Default for SearchFile {
     }
 }
 
-#[derive(Debug, Default, Clone, Serialize, Deserialize, PartialEq, Eq)]
-enum FilterKindFile {
+#[derive(Debug, Default, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
+pub enum FilterKindFile {
     Exact,
+    NotExact,
     StartsWith,
     #[default]
     Contains,
     Regex,
-}
-
-impl From<FilterKindFile> for FilterKind {
-    fn from(value: FilterKindFile) -> Self {
-        match value {
-            FilterKindFile::Exact => FilterKind::Exact,
-            FilterKindFile::StartsWith => FilterKind::StartsWith,
-            FilterKindFile::Contains => FilterKind::Contains,
-            FilterKindFile::Regex => FilterKind::Regex,
-        }
-    }
+    NotRegex,
 }

@@ -1569,14 +1569,17 @@ impl Tag {
     }
 }
 
-#[derive(Debug, Default, Copy, Clone, PartialEq, Eq)]
+#[derive(Debug, Default, Clone, PartialEq, Eq)]
 #[allow(dead_code)]
 pub enum FilterKind {
     Exact,
+    NotExact,
     StartsWith,
     #[default]
     Contains,
     Regex,
+    NotRegex,
+    CustomQuery(String),
 }
 
 #[derive(Debug)]
@@ -1598,6 +1601,8 @@ impl<'value> Filter<'value> {
         Self { tag: tag.into(), value: value.into(), kind: FilterKind::Exact }
     }
 
+    /// The `tag` and `value` parameters are ignored when the kind is set to
+    /// `Custom`.
     pub fn new_with_kind<T: Into<Tag>, V: Into<Cow<'value, str>>>(
         tag: T,
         value: V,
@@ -1606,15 +1611,20 @@ impl<'value> Filter<'value> {
         Self { tag: tag.into(), value: value.into(), kind }
     }
 
+    /// The `tag` and `value` parameters are ignored when the kind is set to
+    /// `Custom`.
     pub fn with_type(mut self, t: FilterKind) -> Self {
         self.kind = t;
         self
     }
 
     pub fn to_query_str(&self) -> String {
-        match self.kind {
+        match &self.kind {
             FilterKind::Exact => {
                 format!("{} == '{}'", self.tag.as_str(), self.value.escape_filter())
+            }
+            FilterKind::NotExact => {
+                format!("{} != '{}'", self.tag.as_str(), self.value.escape_filter())
             }
             FilterKind::StartsWith => {
                 format!("{} starts_with '{}'", self.tag.as_str(), self.value.escape_filter())
@@ -1625,6 +1635,10 @@ impl<'value> Filter<'value> {
             FilterKind::Regex => {
                 format!("{} =~ '{}'", self.tag.as_str(), self.value.escape_filter())
             }
+            FilterKind::NotRegex => {
+                format!("{} !~ '{}'", self.tag.as_str(), self.value.escape_filter())
+            }
+            FilterKind::CustomQuery(query) => query.escape_filter(),
         }
     }
 }
