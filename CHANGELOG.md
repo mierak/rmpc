@@ -29,6 +29,7 @@ as well as fully custom border symbol sets
 after starting a ytdlp download
 - Added `scroll_amount` config option
 - Added `Added()` and `LastModified()` song properties
+- Added `NotExact` and `NotRegex` search options
 
 ### Changed
 

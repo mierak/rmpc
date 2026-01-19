@@ -26,7 +26,7 @@ use crate::{
     mpd::{
         client::Client,
         commands::Song,
-        mpd_client::{Filter, MpdClient, MpdCommand},
+        mpd_client::{Filter, FilterKind, MpdClient, MpdCommand},
         proto_client::ProtoClient,
         version::Version,
     },
@@ -86,6 +86,7 @@ impl SearchPane {
             .highlight_item_style(config.theme.highlighted_item_style)
             .stickers_supported(ctx.stickers_supported.into())
             .strip_diacritics_supported(ctx.mpd_version >= Version::new(0, 25, 0))
+            .custom_query(config.search.custom_query)
             .build();
 
         Self {
@@ -184,17 +185,29 @@ impl SearchPane {
 
     fn search(&mut self, ctx: &Ctx) {
         let search_mode = self.inputs.search_mode();
-        let filter = self.inputs.inputs.iter().filter_map(|input| match &input {
-            InputType::Textbox(TextboxInput { buffer_id, filter_key: Some(key), .. }) => {
-                let value = ctx.input.value(*buffer_id).trim().to_owned();
-                if !value.is_empty() && !key.is_empty() {
-                    Some((key.to_owned(), value, search_mode))
-                } else {
-                    None
-                }
-            }
-            _ => None,
-        });
+        let filter = if let Some(custom_query) = self.inputs.custom_query(ctx)
+            && !custom_query.is_empty()
+        {
+            vec![Filter::new(String::new(), "").with_type(FilterKind::CustomQuery(custom_query))]
+        } else {
+            self.inputs
+                .inputs
+                .iter()
+                .filter_map(|input| match &input {
+                    InputType::Textbox(TextboxInput {
+                        buffer_id, filter_key: Some(key), ..
+                    }) => {
+                        let value = ctx.input.value(*buffer_id).trim().to_owned();
+                        if !value.is_empty() && !key.is_empty() {
+                            Some(Filter::new(key.to_owned(), value).with_type(search_mode.into()))
+                        } else {
+                            None
+                        }
+                    }
+                    _ => None,
+                })
+                .collect_vec()
+        };
 
         let stickers_supported = ctx.stickers_supported.into();
         let fold_case = self.inputs.fold_case();
@@ -210,8 +223,6 @@ impl SearchPane {
         } else {
             None
         };
-
-        let mut filter = filter.collect_vec();
 
         if filter.is_empty()
             && stickers_supported
@@ -275,13 +286,6 @@ impl SearchPane {
             // Search normally
             ctx.query().id(SEARCH).replace_id(SEARCH).target(PaneType::Search).query(
                 move |client| {
-                    let filter = filter
-                        .iter_mut()
-                        .map(|&mut (ref mut key, ref value, ref mut kind)| {
-                            Filter::new(std::mem::take(key), value).with_type((*kind).into())
-                        })
-                        .collect_vec();
-
                     let data = if fold_case {
                         client.search(&filter, strip_diacritics)
                     } else {
