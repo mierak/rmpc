@@ -68,6 +68,8 @@ should fix cases with `cache_dir` being set inside MPD's music directory
 - Added missing confirmation when deleting playlist/songs from playlist
 - Some very minor speedups in queue with very large queue sizes
 - `ScanStatus` not working
+- A harmless error about stickers not being supported will no longer show up when previewing a song
+in a browser pane for the first time will no longer show up
 
 ### Removed
 
