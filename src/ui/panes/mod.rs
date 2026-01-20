@@ -460,7 +460,7 @@ pub(crate) mod browser {
 
             let mut result = vec![info_group, tags_group];
 
-            let stickers = ctx.song_stickers(&self.file);
+            let stickers = ctx.song_stickers_if_supported(&self.file);
             if let Some(stickers) = stickers
                 && !stickers.is_empty()
             {

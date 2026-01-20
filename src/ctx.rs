@@ -301,6 +301,22 @@ impl Ctx {
         stickers
     }
 
+    /// Search for song stickers only if they are supported, does not trigger
+    /// check for reason.
+    pub(crate) fn song_stickers_if_supported(&self, uri: &str) -> Option<&HashMap<String, String>> {
+        if !matches!(self.stickers_supported, StickersSupport::Supported) {
+            return None;
+        }
+
+        let stickers = self.stickers.get(uri);
+
+        if stickers.is_none() {
+            self.stickers_to_fetch.borrow_mut().insert(uri.to_owned());
+        }
+
+        stickers
+    }
+
     pub(crate) fn set_song_stickers(
         &mut self,
         uri: String,
