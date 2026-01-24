@@ -154,7 +154,6 @@ pub struct ConfigFile {
     pub directories_sort: SortModeFile,
     pub cava: CavaFile,
     pub auto_open_downloads: bool,
-    #[serde(default = "defaults::duration_format")]
     pub duration_format: String,
 }
 
