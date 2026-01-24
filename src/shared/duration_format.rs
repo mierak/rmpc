@@ -1,3 +1,4 @@
+use anyhow::Result;
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -21,12 +22,12 @@ enum FormatPart {
 
 impl Default for DurationFormat {
     fn default() -> Self {
-        Self::parse("%m:%S")
+        Self::parse("%m:%S").expect("default duration format should be valid")
     }
 }
 
 impl DurationFormat {
-    pub fn parse(template: &str) -> Self {
+    pub fn parse(template: &str) -> Result<Self> {
         let mut parts = Vec::new();
         let mut literal = String::new();
         let mut chars = template.chars().peekable();
@@ -101,7 +102,14 @@ impl DurationFormat {
                         }
                         parts.push(FormatPart::TotalSeconds);
                     }
-                    Some(_) | None => literal.push('%'),
+                    Some(&ch) => {
+                        anyhow::bail!(
+                            "Invalid format token '%{ch}' in duration_format template. Valid tokens are: %d, %D, %h, %H, %m, %M, %s, %S, %t, %%"
+                        );
+                    }
+                    None => {
+                        anyhow::bail!("Trailing '%' at end of duration_format template");
+                    }
                 }
             } else {
                 literal.push(c);
@@ -112,7 +120,7 @@ impl DurationFormat {
             parts.push(FormatPart::Literal(literal));
         }
 
-        Self { parts }
+        Ok(Self { parts })
     }
 
     pub fn format(&self, total_seconds: u64) -> String {
@@ -187,7 +195,7 @@ mod tests {
 
     #[test]
     fn test_human_style_via_separator() {
-        let fmt = DurationFormat::parse("");
+        let fmt = DurationFormat::parse("").unwrap();
         assert_eq!(fmt.format_with_separator(45, Some(" ")), "0m 45s");
         assert_eq!(fmt.format_with_separator(85, Some(" ")), "1m 25s");
         assert_eq!(fmt.format_with_separator(3665, Some(" ")), "1h 1m 5s");
@@ -196,39 +204,46 @@ mod tests {
 
     #[test]
     fn test_custom_format_tokens() {
-        let classic = DurationFormat::parse("%M:%S");
+        let classic = DurationFormat::parse("%M:%S").unwrap();
         assert_eq!(classic.format(45), "00:45");
         assert_eq!(classic.format(85), "01:25");
 
-        let mixed = DurationFormat::parse("%h hours, %M mins");
+        let mixed = DurationFormat::parse("%h hours, %M mins").unwrap();
         assert_eq!(mixed.format(3665), "1 hours, 01 mins");
 
-        let unpadded = DurationFormat::parse("%m:%s");
+        let unpadded = DurationFormat::parse("%m:%s").unwrap();
         assert_eq!(unpadded.format(85), "1:25");
     }
 
     #[test]
     fn test_total_seconds_token() {
-        let total = DurationFormat::parse("%t seconds");
+        let total = DurationFormat::parse("%t seconds").unwrap();
         assert_eq!(total.format(90), "90 seconds");
         assert_eq!(total.format(3600), "3600 seconds");
     }
 
     #[test]
     fn test_literal_percent() {
-        let fmt = DurationFormat::parse("Usage: 100%%");
+        let fmt = DurationFormat::parse("Usage: 100%%").unwrap();
         assert_eq!(fmt.format(60), "Usage: 100%");
 
-        let fmt2 = DurationFormat::parse("%M%%");
+        let fmt2 = DurationFormat::parse("%M%%").unwrap();
         assert_eq!(fmt2.format(60), "01%");
     }
 
     #[test]
     fn test_zero_duration() {
-        let fmt = DurationFormat::parse("");
+        let fmt = DurationFormat::parse("").unwrap();
         assert_eq!(fmt.format_with_separator(0, Some(" ")), "0s");
 
-        let fmt2 = DurationFormat::parse("%M:%S");
+        let fmt2 = DurationFormat::parse("%M:%S").unwrap();
         assert_eq!(fmt2.format(0), "00:00");
+    }
+
+    #[test]
+    fn test_invalid_format_token() {
+        assert!(DurationFormat::parse("%z").is_err());
+        assert!(DurationFormat::parse("%M:%S%").is_err());
+        assert!(DurationFormat::parse("test %x test").is_err());
     }
 }

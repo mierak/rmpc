@@ -468,7 +468,7 @@ impl ConfigFile {
             reflect_changes_to_playlist: self.reflect_changes_to_playlist,
             cava: self.cava.into(),
             auto_open_downloads: self.auto_open_downloads,
-            duration_format: DurationFormat::parse(&self.duration_format),
+            duration_format: DurationFormat::parse(&self.duration_format)?,
         };
 
         if skip_album_art_check {
