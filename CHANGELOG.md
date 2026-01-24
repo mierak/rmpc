@@ -32,6 +32,7 @@ after starting a ytdlp download
 
 ### Changed
 
+- `duration_format` is now a string template and configurable. Use `"%m:%S"` for classic format, `"%M:%S"` for zero-padded minutes, or custom templates with tokens like `%d/%D` (days), `%h/%H` (hours), `%m/%M` (minutes), `%s/%S` (seconds), `%t` (total seconds)
 - **Breaking** Keybinds now only override the defaults. Meaning your configured keybinds are combined
 - **Breaking** `show_song_table_header` has been removed. The queue header is now in a separate `QueueHeader`
 pane. You will need to update your config to include it in your tabs.
