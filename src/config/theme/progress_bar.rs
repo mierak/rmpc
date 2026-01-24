@@ -27,12 +27,12 @@ pub struct ProgressBarConfig {
 }
 
 #[derive(Debug, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(default)]
 pub struct ProgressBarConfigFile {
     pub(super) symbols: Vec<String>,
     pub(super) track_style: Option<StyleFile>,
     pub(super) elapsed_style: Option<StyleFile>,
     pub(super) thumb_style: Option<StyleFile>,
-    #[serde(default = "super::defaults::bool::<false>")]
     pub(super) use_track_when_empty: bool,
 }
 
@@ -40,11 +40,11 @@ impl Default for ProgressBarConfigFile {
     fn default() -> Self {
         Self {
             symbols: vec![
-                "[".to_string(),
-                "━".to_string(),
-                "➤".to_string(),
+                "█".to_string(),
+                "█".to_string(),
+                "█".to_string(),
                 " ".to_string(),
-                "]".to_string(),
+                "█".to_string(),
             ],
             elapsed_style: Some(StyleFile {
                 fg: Some("blue".to_string()),
@@ -56,12 +56,8 @@ impl Default for ProgressBarConfigFile {
                 bg: None,
                 modifiers: None,
             }),
-            track_style: Some(StyleFile {
-                fg: Some("#1e2030".to_string()),
-                bg: None,
-                modifiers: None,
-            }),
-            use_track_when_empty: false,
+            track_style: None,
+            use_track_when_empty: true,
         }
     }
 }

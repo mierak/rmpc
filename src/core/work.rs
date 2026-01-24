@@ -10,7 +10,7 @@ use crate::{
         lrc::LrcIndex,
         macros::try_skip,
         mpd_query::MpdCommand as QueryCmd,
-        ytdlp::YtDlp,
+        ytdlp::{YtDlp, YtDlpDownloadError},
     },
 };
 
@@ -69,7 +69,12 @@ fn handle_work_request(
         }
         WorkRequest::YtDlpDownload { id, url } => {
             let Some(ytdlp) = ytdlp else {
-                anyhow::bail!("Youtube support requires 'cache_dir' to be configured")
+                return Ok(WorkDone::YtDlpDownloaded {
+                    id,
+                    result: Err(YtDlpDownloadError::InvalidConfig(
+                        "Youtube support requires 'cache_dir' to be configured",
+                    )),
+                });
             };
 
             let result = ytdlp.download_single(&url);

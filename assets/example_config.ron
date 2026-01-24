@@ -160,7 +160,7 @@
                                     pane: Pane(AlbumArt)
                                 ),
                                 (
-                                    size: "6",
+                                    size: "7",
                                     borders: "ALL",
                                     border_symbols: Inherited(parent: Rounded, top_left: "├", top_right: "┤",),
                                     border_title: [(kind: Text(" Lyrics "))],
@@ -184,7 +184,7 @@
                                         panes: [
                                             (
                                                 size: "1",
-                                                pane: Pane(Property(content: [], align: Left))
+                                                pane: Pane(Empty())
                                             ),
                                             (
                                                 size: "100%",
@@ -202,7 +202,7 @@
                                         panes: [
                                             (
                                                 size: "1",
-                                                pane: Pane(Property(content: [], align: Left))
+                                                pane: Pane(Empty())
                                             ),
                                             (
                                                 size: "100%",
@@ -279,4 +279,3 @@
         ),
     ],
 )
-

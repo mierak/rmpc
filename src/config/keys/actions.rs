@@ -488,13 +488,11 @@ pub enum AutoplayKind {
     None,
 }
 
-#[derive(Debug, serde::Serialize, serde::Deserialize, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Default, serde::Serialize, serde::Deserialize, Clone, Copy, PartialEq, Eq)]
+#[serde(default)]
 pub struct AddOpts {
-    #[serde(default)]
     pub autoplay: AutoplayKind,
-    #[serde(default)]
     pub all: bool,
-    #[serde(default)]
     pub position: Position,
 }
 

@@ -36,7 +36,7 @@ pub mod tabs;
 pub mod theme;
 
 pub use address::MpdAddress;
-pub use search::Search;
+pub use search::{FilterKindFile, Search};
 
 use self::{
     keys::{KeyConfig, KeyConfigFile},
@@ -109,91 +109,50 @@ pub enum ShowPlaylistsMode {
 
 #[allow(clippy::struct_excessive_bools)]
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[serde(default)]
 pub struct ConfigFile {
-    #[serde(default = "defaults::mpd_address")]
     pub address: String,
-    #[serde(default)]
     password: Option<String>,
-    #[serde(default)]
     cache_dir: Option<PathBuf>,
-    #[serde(default)]
     lyrics_dir: Option<String>,
-    #[serde(default = "defaults::i64::<0>")]
     lyrics_offset_ms: i64,
-    #[serde(default = "defaults::bool::<true>")]
     enable_lyrics_index: bool,
-    #[serde(default = "defaults::bool::<false>")]
     enable_lyrics_hot_reload: bool,
-    #[serde(default)]
     pub theme: Option<String>,
-    #[serde(default = "defaults::u8::<5>")]
     volume_step: u8,
-    #[serde(default = "defaults::u32::<30>")]
     pub max_fps: u32,
-    #[serde(default = "defaults::usize::<0>")]
     scrolloff: usize,
-    #[serde(default = "defaults::bool::<false>")]
     wrap_navigation: bool,
-    #[serde(default = "defaults::default_progress_update_interval_ms")]
     status_update_interval_ms: Option<u64>,
-    #[serde(default = "defaults::bool::<false>")]
     select_current_song_on_change: bool,
-    #[serde(default = "defaults::bool::<false>")]
     center_current_song_on_change: bool,
-    #[serde(default = "defaults::bool::<false>")]
     reflect_changes_to_playlist: bool,
-    #[serde(default)]
     rewind_to_start_sec: Option<u64>,
-    #[serde(default = "defaults::bool::<true>")]
     keep_state_on_song_change: bool,
-    #[serde(default = "defaults::u64::<10_000>")]
     mpd_read_timeout_ms: u64,
-    #[serde(default = "defaults::u64::<5_000>")]
     mpd_write_timeout_ms: u64,
-    #[serde(default)]
     mpd_idle_read_timeout_ms: Option<u64>,
-    #[serde(default = "defaults::bool::<true>")]
     enable_mouse: bool,
-    #[serde(default = "defaults::usize::<1>")]
     scroll_amount: usize,
-    #[serde(default = "defaults::bool::<true>")]
     pub enable_config_hot_reload: bool,
-    #[serde(default)]
     keybinds: KeyConfigFile,
-    #[serde(default = "defaults::u64::<1000>")]
     pub normal_timeout_ms: u64,
-    #[serde(default = "defaults::u64::<1000>")]
     pub insert_timeout_ms: u64,
     // Deprecated
-    #[serde(default)]
     image_method: Option<ImageMethodFile>,
-    #[serde(default)]
     album_art_max_size_px: Size,
-    #[serde(default)]
     pub album_art: AlbumArtConfigFile,
-    #[serde(default)]
     on_song_change: Option<Vec<String>>,
-    #[serde(default)]
     exec_on_song_change_at_start: bool,
-    #[serde(default)]
     on_resize: Option<Vec<String>>,
-    #[serde(default)]
     search: SearchFile,
-    #[serde(default)]
     artists: ArtistsFile,
-    #[serde(default)]
     tabs: TabsFile,
-    #[serde(default)]
     pub ignore_leading_the: bool,
-    #[serde(default)]
     pub browser_song_sort: Vec<SongPropertyFile>,
-    #[serde(default)]
     pub show_playlists_in_browser: ShowPlaylistsMode,
-    #[serde(default)]
     pub directories_sort: SortModeFile,
-    #[serde(default)]
     pub cava: CavaFile,
-    #[serde(default = "defaults::bool::<true>")]
     pub auto_open_downloads: bool,
     #[serde(default = "defaults::duration_format")]
     pub duration_format: String,
@@ -242,7 +201,7 @@ impl Default for ConfigFile {
             center_current_song_on_change: false,
             album_art_max_size_px: Size::default(),
             album_art: AlbumArtConfigFile {
-                disabled_protocols: defaults::disabled_album_art_protos(),
+                disabled_protocols: vec!["http://".to_string(), "https://".to_string()],
                 ..Default::default()
             },
             on_song_change: None,

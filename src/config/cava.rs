@@ -18,23 +18,32 @@ pub struct Cava {
     pub eq: Vec<f64>,
 }
 
-#[derive(Debug, Default, Clone, Serialize, Deserialize, PartialEq)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[serde(default)]
 pub struct CavaFile {
-    #[serde(default = "defaults::u16::<60>")]
     framerate: u16,
-    #[serde(default = "defaults::bool::<true>")]
     pub autosens: bool,
-    #[serde(default = "defaults::u16::<100>")]
     pub sensitivity: u16,
-    #[serde(default)]
     lower_cutoff_freq: Option<u16>,
-    #[serde(default)]
     higher_cutoff_freq: Option<u32>,
     input: CavaInputFile,
-    #[serde(default)]
     smoothing: CavaSmoothingFile,
-    #[serde(default)]
     eq: Vec<f64>,
+}
+
+impl Default for CavaFile {
+    fn default() -> Self {
+        Self {
+            framerate: 60,
+            autosens: true,
+            sensitivity: 100,
+            lower_cutoff_freq: None,
+            higher_cutoff_freq: None,
+            input: CavaInputFile::default(),
+            smoothing: CavaSmoothingFile::default(),
+            eq: vec![],
+        }
+    }
 }
 
 #[derive(Debug, Display, Default, Clone, Serialize, Deserialize, PartialEq, Eq)]

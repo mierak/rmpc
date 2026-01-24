@@ -1,9 +1,8 @@
-#![allow(dead_code)]
 #![allow(clippy::unnecessary_wraps)]
 
 use std::collections::HashMap;
 
-use super::theme::{Modifiers, ScrollbarConfigFile, StyleFile, properties::SongPropertyFile};
+use super::theme::{Modifiers, StyleFile, properties::SongPropertyFile};
 use crate::config::{
     tabs::{
         BorderTitlePosition,
@@ -21,18 +20,13 @@ use crate::config::{
             PropertyFile,
             PropertyKindFile,
             PropertyKindFileOrText,
+            ReplacementFile,
             StatusPropertyFile,
+            TransformFile,
         },
         volume_slider::VolumeSliderConfigFile,
     },
 };
-pub fn default_column_widths() -> Vec<u16> {
-    vec![20, 38, 42]
-}
-
-pub fn default_header_column_widths() -> Vec<u16> {
-    vec![30, 40, 30]
-}
 
 pub fn bool<const V: bool>() -> bool {
     V
@@ -42,56 +36,8 @@ pub fn u8<const V: u8>() -> u8 {
     V
 }
 
-pub fn u16<const V: u16>() -> u16 {
-    V
-}
-
-pub fn u32<const V: u32>() -> u32 {
-    V
-}
-
-pub fn u64<const V: u64>() -> u64 {
-    V
-}
-
 pub fn i32<const V: i32>() -> i32 {
     V
-}
-
-pub fn i64<const V: i64>() -> i64 {
-    V
-}
-
-pub fn usize<const V: usize>() -> usize {
-    V
-}
-
-pub fn default_bar_symbols() -> Vec<char> {
-    "▁▂▃▄▅▆▇█".chars().collect()
-}
-
-pub fn default_inverted_bar_symbols() -> Vec<char> {
-    "▔🮂🮃▀🮄🮅🮆█".chars().collect()
-}
-
-pub fn default_progress_update_interval_ms() -> Option<u64> {
-    Some(1000)
-}
-
-pub fn mpd_address() -> String {
-    "127.0.0.1:6600".to_string()
-}
-
-pub fn mpd_host() -> String {
-    "127.0.0.1".to_string()
-}
-
-pub fn mpd_port() -> String {
-    "6600".to_string()
-}
-
-pub fn disabled_album_art_protos() -> Vec<String> {
-    ["http://", "https://"].into_iter().map(|p| p.to_owned()).collect()
 }
 
 pub fn default_playing_label() -> String {
@@ -131,72 +77,8 @@ pub fn playlist_symbol() -> String {
     "P".to_owned()
 }
 
-pub fn default_tag_separator() -> String {
-    " | ".to_string()
-}
-
-pub fn current_item_style() -> Option<StyleFile> {
-    Some(StyleFile {
-        fg: Some("black".to_string()),
-        bg: Some("blue".to_string()),
-        modifiers: Some(Modifiers::Bold),
-    })
-}
-
-pub fn highlighted_item_style() -> Option<StyleFile> {
-    Some(StyleFile { fg: Some("blue".to_string()), bg: None, modifiers: Some(Modifiers::Bold) })
-}
-
-pub fn default_preview_label_style() -> StyleFile {
-    StyleFile { fg: Some("yellow".to_string()), bg: None, modifiers: None }
-}
-
-pub fn default_preview_metaga_group_heading_style() -> StyleFile {
-    StyleFile { fg: Some("yellow".to_string()), bg: None, modifiers: Some(Modifiers::Bold) }
-}
-
 pub fn default_thousands_separator() -> String {
     ",".to_string()
-}
-
-pub fn default_time_unit_separator() -> String {
-    ", ".to_string()
-}
-
-pub fn default_optional_time_unit_separator() -> Option<String> {
-    None
-}
-
-pub fn default_scrollbar() -> Option<ScrollbarConfigFile> {
-    Some(ScrollbarConfigFile::default())
-}
-
-pub fn default_trace_color() -> StyleFile {
-    StyleFile { fg: Some("magenta".to_string()), bg: Some("black".to_string()), modifiers: None }
-}
-
-pub fn default_debug_color() -> StyleFile {
-    StyleFile {
-        fg: Some("light_green".to_string()),
-        bg: Some("black".to_string()),
-        modifiers: None,
-    }
-}
-
-pub fn default_info_color() -> StyleFile {
-    StyleFile { fg: Some("blue".to_string()), bg: Some("black".to_string()), modifiers: None }
-}
-
-pub fn default_warn_color() -> StyleFile {
-    StyleFile { fg: Some("yellow".to_string()), bg: Some("black".to_string()), modifiers: None }
-}
-
-pub fn default_error_color() -> StyleFile {
-    StyleFile { fg: Some("red".to_string()), bg: Some("black".to_string()), modifiers: None }
-}
-
-pub fn default_status_bar_background_color() -> StyleFile {
-    StyleFile { fg: Some("black".to_string()), bg: Some("black".to_string()), modifiers: None }
 }
 
 pub fn rating_options() -> Vec<i32> {
@@ -457,124 +339,213 @@ pub fn components() -> HashMap<String, PaneOrSplitFile> {
             ],
         }),
         (
-            "states".to_string(),
+            "input_mode".to_string(),
             PaneOrSplitFile::Pane(PaneTypeFile::Property {
-                align: Alignment::Right,
+                align: Alignment::Center,
                 scroll_speed: 0,
-                content: vec![
-                    PropertyFile {
-                        kind: PropertyKindFileOrText::Text("[".to_string()),
-                        style: Some(StyleFile {
-                            fg: Some("blue".to_string()),
-                            bg: None,
-                            modifiers: Some(Modifiers::Bold),
+                content: vec![PropertyFile {
+                    kind: PropertyKindFileOrText::Transform(TransformFile::Replace {
+                        content: Box::new(PropertyFile {
+                            kind: PropertyKindFileOrText::Property(PropertyKindFile::Status(
+                                StatusPropertyFile::InputMode(),
+                            )),
+                            style: None,
+                            default: None,
                         }),
-                        default: None,
-                    },
-                    PropertyFile {
-                        kind: PropertyKindFileOrText::Property(PropertyKindFile::Status(
-                            StatusPropertyFile::RepeatV2 {
-                                on_label: "z".to_string(),
-                                off_label: "z".to_string(),
-                                on_style: Some(StyleFile {
-                                    fg: Some("yellow".to_string()),
-                                    bg: None,
-                                    modifiers: Some(Modifiers::Bold),
-                                }),
-                                off_style: Some(StyleFile {
-                                    fg: Some("blue".to_string()),
-                                    bg: None,
-                                    modifiers: Some(Modifiers::Dim),
-                                }),
+                        replacements: vec![
+                            ReplacementFile {
+                                r#match: "Normal".to_string(),
+                                replace: PropertyFile {
+                                    kind: PropertyKindFileOrText::Text(" NORMAL ".to_string()),
+                                    style: Some(StyleFile {
+                                        fg: Some("black".to_string()),
+                                        bg: Some("blue".to_string()),
+                                        modifiers: None,
+                                    }),
+                                    default: None,
+                                },
                             },
-                        )),
-                        style: None,
-                        default: None,
-                    },
-                    PropertyFile {
-                        kind: PropertyKindFileOrText::Property(PropertyKindFile::Status(
-                            StatusPropertyFile::RandomV2 {
-                                on_label: "x".to_string(),
-                                off_label: "x".to_string(),
-                                on_style: Some(StyleFile {
-                                    fg: Some("yellow".to_string()),
-                                    bg: None,
-                                    modifiers: Some(Modifiers::Bold),
-                                }),
-                                off_style: Some(StyleFile {
-                                    fg: Some("blue".to_string()),
-                                    bg: None,
-                                    modifiers: Some(Modifiers::Dim),
-                                }),
+                            ReplacementFile {
+                                r#match: "Insert".to_string(),
+                                replace: PropertyFile {
+                                    kind: PropertyKindFileOrText::Text(" INSERT ".to_string()),
+                                    style: Some(StyleFile {
+                                        fg: Some("black".to_string()),
+                                        bg: Some("green".to_string()),
+                                        modifiers: None,
+                                    }),
+                                    default: None,
+                                },
                             },
-                        )),
-                        style: None,
-                        default: None,
-                    },
-                    PropertyFile {
-                        kind: PropertyKindFileOrText::Property(PropertyKindFile::Status(
-                            StatusPropertyFile::ConsumeV2 {
-                                on_label: "c".to_string(),
-                                off_label: "c".to_string(),
-                                oneshot_label: "c".to_string(),
-                                on_style: Some(StyleFile {
-                                    fg: Some("yellow".to_string()),
-                                    bg: None,
-                                    modifiers: Some(Modifiers::Bold),
-                                }),
-                                off_style: Some(StyleFile {
-                                    fg: Some("blue".to_string()),
-                                    bg: None,
-                                    modifiers: Some(Modifiers::Dim),
-                                }),
-                                oneshot_style: Some(StyleFile {
-                                    fg: Some("red".to_string()),
-                                    bg: None,
-                                    modifiers: Some(Modifiers::Dim),
-                                }),
-                            },
-                        )),
-                        style: None,
-                        default: None,
-                    },
-                    PropertyFile {
-                        kind: PropertyKindFileOrText::Property(PropertyKindFile::Status(
-                            StatusPropertyFile::SingleV2 {
-                                on_label: "v".to_string(),
-                                off_label: "v".to_string(),
-                                oneshot_label: "v".to_string(),
-                                on_style: Some(StyleFile {
-                                    fg: Some("yellow".to_string()),
-                                    bg: None,
-                                    modifiers: Some(Modifiers::Bold),
-                                }),
-                                off_style: Some(StyleFile {
-                                    fg: Some("blue".to_string()),
-                                    bg: None,
-                                    modifiers: Some(Modifiers::Dim),
-                                }),
-                                oneshot_style: Some(StyleFile {
-                                    fg: Some("red".to_string()),
-                                    bg: None,
-                                    modifiers: Some(Modifiers::Bold),
-                                }),
-                            },
-                        )),
-                        style: None,
-                        default: None,
-                    },
-                    PropertyFile {
-                        kind: PropertyKindFileOrText::Text("]".to_string()),
-                        style: Some(StyleFile {
-                            fg: Some("blue".to_string()),
-                            bg: None,
-                            modifiers: Some(Modifiers::Bold),
-                        }),
-                        default: None,
-                    },
-                ],
+                        ],
+                    }),
+                    style: None,
+                    default: None,
+                }],
             }),
         ),
+        ("states".to_string(), PaneOrSplitFile::Split {
+            direction: DirectionFile::Horizontal,
+            borders: BordersFile::NONE,
+            panes: vec![
+                SubPaneFile {
+                    size: "1".to_string(),
+                    borders: BordersFile::NONE,
+                    border_title: Vec::new(),
+                    border_title_position: BorderTitlePosition::Top,
+                    border_title_alignment: Alignment::Left,
+                    border_symbols: BorderSymbolsFile::default(),
+                    pane: PaneOrSplitFile::Pane(PaneTypeFile::Empty()),
+                },
+                SubPaneFile {
+                    size: "100%".to_string(),
+                    borders: BordersFile::NONE,
+                    border_title: Vec::new(),
+                    border_title_position: BorderTitlePosition::Top,
+                    border_title_alignment: Alignment::Left,
+                    border_symbols: BorderSymbolsFile::default(),
+                    pane: PaneOrSplitFile::Pane(PaneTypeFile::Property {
+                        align: Alignment::Left,
+                        scroll_speed: 0,
+                        content: vec![PropertyFile {
+                            kind: PropertyKindFileOrText::Property(PropertyKindFile::Status(
+                                StatusPropertyFile::InputBuffer(),
+                            )),
+                            style: Some(StyleFile {
+                                fg: Some("blue".to_string()),
+                                bg: None,
+                                modifiers: None,
+                            }),
+                            default: None,
+                        }],
+                    }),
+                },
+                SubPaneFile {
+                    size: "6".to_string(),
+                    borders: BordersFile::NONE,
+                    border_title: Vec::new(),
+                    border_title_position: BorderTitlePosition::Top,
+                    border_title_alignment: Alignment::Left,
+                    border_symbols: BorderSymbolsFile::default(),
+                    pane: PaneOrSplitFile::Pane(PaneTypeFile::Property {
+                        align: Alignment::Right,
+                        scroll_speed: 0,
+                        content: vec![
+                            PropertyFile {
+                                kind: PropertyKindFileOrText::Text("[".to_string()),
+                                style: Some(StyleFile {
+                                    fg: Some("blue".to_string()),
+                                    bg: None,
+                                    modifiers: Some(Modifiers::Bold),
+                                }),
+                                default: None,
+                            },
+                            PropertyFile {
+                                kind: PropertyKindFileOrText::Property(PropertyKindFile::Status(
+                                    StatusPropertyFile::RepeatV2 {
+                                        on_label: "z".to_string(),
+                                        off_label: "z".to_string(),
+                                        on_style: Some(StyleFile {
+                                            fg: Some("yellow".to_string()),
+                                            bg: None,
+                                            modifiers: Some(Modifiers::Bold),
+                                        }),
+                                        off_style: Some(StyleFile {
+                                            fg: Some("blue".to_string()),
+                                            bg: None,
+                                            modifiers: Some(Modifiers::Dim),
+                                        }),
+                                    },
+                                )),
+                                style: None,
+                                default: None,
+                            },
+                            PropertyFile {
+                                kind: PropertyKindFileOrText::Property(PropertyKindFile::Status(
+                                    StatusPropertyFile::RandomV2 {
+                                        on_label: "x".to_string(),
+                                        off_label: "x".to_string(),
+                                        on_style: Some(StyleFile {
+                                            fg: Some("yellow".to_string()),
+                                            bg: None,
+                                            modifiers: Some(Modifiers::Bold),
+                                        }),
+                                        off_style: Some(StyleFile {
+                                            fg: Some("blue".to_string()),
+                                            bg: None,
+                                            modifiers: Some(Modifiers::Dim),
+                                        }),
+                                    },
+                                )),
+                                style: None,
+                                default: None,
+                            },
+                            PropertyFile {
+                                kind: PropertyKindFileOrText::Property(PropertyKindFile::Status(
+                                    StatusPropertyFile::ConsumeV2 {
+                                        on_label: "c".to_string(),
+                                        off_label: "c".to_string(),
+                                        oneshot_label: "c".to_string(),
+                                        on_style: Some(StyleFile {
+                                            fg: Some("yellow".to_string()),
+                                            bg: None,
+                                            modifiers: Some(Modifiers::Bold),
+                                        }),
+                                        off_style: Some(StyleFile {
+                                            fg: Some("blue".to_string()),
+                                            bg: None,
+                                            modifiers: Some(Modifiers::Dim),
+                                        }),
+                                        oneshot_style: Some(StyleFile {
+                                            fg: Some("red".to_string()),
+                                            bg: None,
+                                            modifiers: Some(Modifiers::Dim),
+                                        }),
+                                    },
+                                )),
+                                style: None,
+                                default: None,
+                            },
+                            PropertyFile {
+                                kind: PropertyKindFileOrText::Property(PropertyKindFile::Status(
+                                    StatusPropertyFile::SingleV2 {
+                                        on_label: "v".to_string(),
+                                        off_label: "v".to_string(),
+                                        oneshot_label: "v".to_string(),
+                                        on_style: Some(StyleFile {
+                                            fg: Some("yellow".to_string()),
+                                            bg: None,
+                                            modifiers: Some(Modifiers::Bold),
+                                        }),
+                                        off_style: Some(StyleFile {
+                                            fg: Some("blue".to_string()),
+                                            bg: None,
+                                            modifiers: Some(Modifiers::Dim),
+                                        }),
+                                        oneshot_style: Some(StyleFile {
+                                            fg: Some("red".to_string()),
+                                            bg: None,
+                                            modifiers: Some(Modifiers::Bold),
+                                        }),
+                                    },
+                                )),
+                                style: None,
+                                default: None,
+                            },
+                            PropertyFile {
+                                kind: PropertyKindFileOrText::Text("]".to_string()),
+                                style: Some(StyleFile {
+                                    fg: Some("blue".to_string()),
+                                    bg: None,
+                                    modifiers: Some(Modifiers::Bold),
+                                }),
+                                default: None,
+                            },
+                        ],
+                    }),
+                },
+            ],
+        }),
         ("header_left".to_string(), PaneOrSplitFile::Split {
             direction: DirectionFile::Vertical,
             borders: BordersFile::NONE,
@@ -644,6 +615,39 @@ pub fn components() -> HashMap<String, PaneOrSplitFile> {
                     border_title_alignment: Alignment::Left,
                     border_symbols: BorderSymbolsFile::default(),
                     pane: PaneOrSplitFile::Component("states".to_string()),
+                },
+            ],
+        }),
+        ("progress_bar".to_string(), PaneOrSplitFile::Split {
+            direction: DirectionFile::Horizontal,
+            borders: BordersFile::NONE,
+            panes: vec![
+                SubPaneFile {
+                    size: "1".to_string(),
+                    borders: BordersFile::NONE,
+                    border_title: Vec::new(),
+                    border_title_position: BorderTitlePosition::Top,
+                    border_title_alignment: Alignment::Left,
+                    border_symbols: BorderSymbolsFile::default(),
+                    pane: PaneOrSplitFile::Pane(PaneTypeFile::Empty()),
+                },
+                SubPaneFile {
+                    size: "100%".to_string(),
+                    borders: BordersFile::NONE,
+                    border_title: Vec::new(),
+                    border_title_position: BorderTitlePosition::Top,
+                    border_title_alignment: Alignment::Left,
+                    border_symbols: BorderSymbolsFile::default(),
+                    pane: PaneOrSplitFile::Pane(PaneTypeFile::ProgressBar),
+                },
+                SubPaneFile {
+                    size: "1".to_string(),
+                    borders: BordersFile::NONE,
+                    border_title: Vec::new(),
+                    border_title_position: BorderTitlePosition::Top,
+                    border_title_alignment: Alignment::Left,
+                    border_symbols: BorderSymbolsFile::default(),
+                    pane: PaneOrSplitFile::Pane(PaneTypeFile::Empty()),
                 },
             ],
         }),

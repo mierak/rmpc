@@ -101,6 +101,7 @@ pub enum PaneTypeFile {
         separator: Option<String>,
     },
     Cava,
+    Empty(),
 }
 
 #[derive(Debug, Clone, Hash, Eq, PartialEq, strum::Display, strum::EnumDiscriminants)]
@@ -137,13 +138,14 @@ pub enum PaneType {
         separator: Option<String>,
     },
     Cava,
+    Empty,
 }
 
-pub const PANES_ALLOWED_IN_BOTH_TAB_AND_LAYOUT: [PaneTypeDiscriminants; 1] =
-    [PaneTypeDiscriminants::Property];
+pub const PANES_ALLOWED_IN_BOTH_TAB_AND_LAYOUT: [PaneTypeDiscriminants; 2] =
+    [PaneTypeDiscriminants::Property, PaneTypeDiscriminants::Empty];
 
 #[cfg(debug_assertions)]
-pub const UNFOSUSABLE_TABS: [PaneTypeDiscriminants; 11] = [
+pub const UNFOSUSABLE_TABS: [PaneTypeDiscriminants; 12] = [
     PaneTypeDiscriminants::AlbumArt,
     PaneTypeDiscriminants::Lyrics,
     PaneTypeDiscriminants::ProgressBar,
@@ -155,10 +157,11 @@ pub const UNFOSUSABLE_TABS: [PaneTypeDiscriminants; 11] = [
     PaneTypeDiscriminants::Property,
     PaneTypeDiscriminants::Cava,
     PaneTypeDiscriminants::QueueHeader,
+    PaneTypeDiscriminants::Empty,
 ];
 
 #[cfg(not(debug_assertions))]
-pub const UNFOSUSABLE_TABS: [PaneTypeDiscriminants; 10] = [
+pub const UNFOSUSABLE_TABS: [PaneTypeDiscriminants; 11] = [
     PaneTypeDiscriminants::AlbumArt,
     PaneTypeDiscriminants::Lyrics,
     PaneTypeDiscriminants::ProgressBar,
@@ -169,6 +172,7 @@ pub const UNFOSUSABLE_TABS: [PaneTypeDiscriminants; 10] = [
     PaneTypeDiscriminants::Property,
     PaneTypeDiscriminants::Cava,
     PaneTypeDiscriminants::QueueHeader,
+    PaneTypeDiscriminants::Empty,
 ];
 
 impl Pane {
@@ -219,6 +223,7 @@ impl TryFrom<PaneTypeFile> for PaneType {
                 PaneType::Browser { root_tag: tag, separator }
             }
             PaneTypeFile::Cava => PaneType::Cava,
+            PaneTypeFile::Empty() => PaneType::Empty,
         })
     }
 }
@@ -405,44 +410,83 @@ impl Default for PaneOrSplitFile {
                 },
                 SubPaneFile {
                     size: "3".to_string(),
-                    borders: BordersFile::ALL,
-                    border_title: vec![
-                        PropertyFile {
-                            kind: PropertyKindFileOrText::Text(" ".to_string()),
-                            style: None,
-                            default: None,
-                        },
-                        PropertyFile {
-                            kind: PropertyKindFileOrText::Property(PropertyKindFile::Status(
-                                StatusPropertyFile::QueueLength {
-                                    thousands_separator: defaults::default_thousands_separator(),
-                                },
-                            )),
-                            style: None,
-                            default: None,
-                        },
-                        PropertyFile {
-                            kind: PropertyKindFileOrText::Text(" songs / ".to_string()),
-                            style: None,
-                            default: None,
-                        },
-                        PropertyFile {
-                            kind: PropertyKindFileOrText::Property(PropertyKindFile::Status(
-                                StatusPropertyFile::QueueTimeTotal { separator: None },
-                            )),
-                            style: None,
-                            default: None,
-                        },
-                        PropertyFile {
-                            kind: PropertyKindFileOrText::Text(" total time ".to_string()),
-                            style: None,
-                            default: None,
-                        },
-                    ],
+                    borders: BordersFile::NONE,
                     border_title_position: BorderTitlePosition::Top,
-                    border_title_alignment: Alignment::Right,
-                    border_symbols: BorderSymbolsFile::Rounded,
-                    pane: PaneOrSplitFile::Pane(PaneTypeFile::ProgressBar),
+                    border_title_alignment: Alignment::Left,
+                    border_title: Vec::new(),
+                    border_symbols: BorderSymbolsFile::default(),
+                    pane: PaneOrSplitFile::Split {
+                        direction: DirectionFile::Horizontal,
+                        borders: BordersFile::NONE,
+                        panes: vec![
+                            SubPaneFile {
+                                size: "12".to_string(),
+                                borders: BordersFile::ALL,
+                                border_title: Vec::new(),
+                                border_title_position: BorderTitlePosition::Top,
+                                border_title_alignment: Alignment::Left,
+                                border_symbols: BorderSymbolsFile::Inherited(BorderSetInherited {
+                                    parent: Box::new(BorderSymbolsFile::Rounded),
+                                    top_right: Some("┬".to_string()),
+                                    bottom_right: Some("┴".to_string()),
+                                    ..Default::default()
+                                }),
+                                pane: PaneOrSplitFile::Component("input_mode".to_string()),
+                            },
+                            SubPaneFile {
+                                size: "100%".to_string(),
+                                borders: BordersFile::TOP
+                                    | BordersFile::BOTTOM
+                                    | BordersFile::RIGHT,
+                                border_title_alignment: Alignment::Right,
+                                border_symbols: BorderSymbolsFile::Rounded,
+                                border_title_position: BorderTitlePosition::Top,
+                                border_title: vec![
+                                    PropertyFile {
+                                        kind: PropertyKindFileOrText::Text(" ".to_string()),
+                                        style: None,
+                                        default: None,
+                                    },
+                                    PropertyFile {
+                                        kind: PropertyKindFileOrText::Property(
+                                            PropertyKindFile::Status(
+                                                StatusPropertyFile::QueueLength {
+                                                    thousands_separator:
+                                                        defaults::default_thousands_separator(),
+                                                },
+                                            ),
+                                        ),
+                                        style: None,
+                                        default: None,
+                                    },
+                                    PropertyFile {
+                                        kind: PropertyKindFileOrText::Text(" songs / ".to_string()),
+                                        style: None,
+                                        default: None,
+                                    },
+                                    PropertyFile {
+                                        kind: PropertyKindFileOrText::Property(
+                                            PropertyKindFile::Status(
+                                                StatusPropertyFile::QueueTimeTotal {
+                                                    separator: None,
+                                                },
+                                            ),
+                                        ),
+                                        style: None,
+                                        default: None,
+                                    },
+                                    PropertyFile {
+                                        kind: PropertyKindFileOrText::Text(
+                                            " total time ".to_string(),
+                                        ),
+                                        style: None,
+                                        default: None,
+                                    },
+                                ],
+                                pane: PaneOrSplitFile::Component("progress_bar".to_string()),
+                            },
+                        ],
+                    },
                 },
             ],
         }
@@ -475,18 +519,14 @@ pub enum BorderTitlePosition {
     Bottom,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[derive(Debug, Default, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(default)]
 pub struct SubPaneFile {
     pub size: String,
-    #[serde(default)]
     pub borders: BordersFile,
-    #[serde(default)]
     pub border_title: Vec<PropertyFile<PropertyKindFile>>,
-    #[serde(default)]
     pub border_title_position: BorderTitlePosition,
-    #[serde(default)]
     pub border_title_alignment: Alignment,
-    #[serde(default)]
     pub border_symbols: BorderSymbolsFile,
     pub pane: PaneOrSplitFile,
 }
@@ -730,7 +770,7 @@ impl Default for TabsFile {
                                     },
                                     SubPaneFile {
                                         pane: PaneOrSplitFile::Pane(PaneTypeFile::Lyrics),
-                                        size: "6".to_string(),
+                                        size: "7".to_string(),
                                         border_title: vec![PropertyFile {
                                             kind: PropertyKindFileOrText::Text(
                                                 " Lyrics ".to_string(),
@@ -784,11 +824,7 @@ impl Default for TabsFile {
                                             panes: vec![
                                                 SubPaneFile {
                                                     pane: PaneOrSplitFile::Pane(
-                                                        PaneTypeFile::Property {
-                                                            content: vec![],
-                                                            align: Alignment::default(),
-                                                            scroll_speed: 0,
-                                                        },
+                                                        PaneTypeFile::Empty(),
                                                     ),
                                                     size: "1".to_string(),
                                                     borders: BordersFile::NONE,
@@ -826,11 +862,7 @@ impl Default for TabsFile {
                                             panes: vec![
                                                 SubPaneFile {
                                                     pane: PaneOrSplitFile::Pane(
-                                                        PaneTypeFile::Property {
-                                                            content: vec![],
-                                                            align: Alignment::default(),
-                                                            scroll_speed: 0,
-                                                        },
+                                                        PaneTypeFile::Empty(),
                                                     ),
                                                     size: "1".to_string(),
                                                     borders: BordersFile::NONE,

@@ -8,7 +8,7 @@ use ratatui::{
 use strum::{FromRepr, IntoStaticStr, VariantNames};
 
 use crate::{
-    config::Search,
+    config::{FilterKindFile, Search},
     ctx::Ctx,
     mpd::mpd_client::{FilterKind, StickerFilter},
     ui::{
@@ -24,6 +24,7 @@ pub const RATING_MODE_KEY: &str = "rating";
 pub const RATING_VALUE_KEY: &str = "rating_value";
 pub const RESET_BUTTON_KEY: &str = "reset";
 pub const SEARCH_BUTTON_KEY: &str = "search_button";
+pub const CUSTOM_QUERY_KEY: &str = "custom_query";
 pub const LIKE_KEY: &str = "like";
 
 #[derive(derive_more::Debug)]
@@ -58,6 +59,7 @@ impl InputGroups {
         initial_fold_case: bool,
         initial_strip_diacritics: bool,
         search_button: bool,
+        custom_query: bool,
         stickers_supported: bool,
         strip_diacritics_supported: bool,
         text_style: Style,
@@ -74,6 +76,19 @@ impl InputGroups {
                 label: format!(" {:<18}:", tag.label),
                 initial_value: None,
                 buffer_id: BufferId::new(),
+            }));
+        }
+
+        if custom_query {
+            inputs.push(InputType::Separator);
+            let buffer_id = BufferId::new();
+            ctx.input.create_buffer(buffer_id, None);
+            inputs.push(InputType::Textbox(TextboxInput {
+                key: CUSTOM_QUERY_KEY,
+                filter_key: None,
+                label: format!(" {:<18}:", "Query"),
+                initial_value: None,
+                buffer_id,
             }));
         }
 
@@ -161,6 +176,10 @@ impl InputGroups {
 
     pub fn rating_value(&self, ctx: &Ctx) -> String {
         self.textbox_value(RATING_VALUE_KEY, ctx).unwrap_or_default()
+    }
+
+    pub fn custom_query(&self, ctx: &Ctx) -> Option<String> {
+        self.textbox_value(CUSTOM_QUERY_KEY, ctx)
     }
 
     pub fn is_rating_filter_active(&self) -> bool {
@@ -403,10 +422,14 @@ pub(super) enum SearchMode {
     Contains,
     #[strum(serialize = "Exact")]
     Exact,
+    #[strum(serialize = "Not exact")]
+    NotExact,
     #[strum(serialize = "Starts with")]
     StartsWith,
     #[strum(serialize = "Regex")]
     Regex,
+    #[strum(serialize = "Not regex")]
+    NotRegex,
 }
 
 #[derive(Debug, Default, Clone, Copy, IntoStaticStr, VariantNames, FromRepr)]
@@ -442,17 +465,21 @@ impl From<SearchMode> for FilterKind {
             SearchMode::StartsWith => FilterKind::StartsWith,
             SearchMode::Contains => FilterKind::Contains,
             SearchMode::Regex => FilterKind::Regex,
+            SearchMode::NotExact => FilterKind::NotExact,
+            SearchMode::NotRegex => FilterKind::NotRegex,
         }
     }
 }
 
-impl From<FilterKind> for SearchMode {
-    fn from(value: FilterKind) -> Self {
+impl From<FilterKindFile> for SearchMode {
+    fn from(value: FilterKindFile) -> Self {
         match value {
-            FilterKind::Exact => SearchMode::Exact,
-            FilterKind::StartsWith => SearchMode::StartsWith,
-            FilterKind::Contains => SearchMode::Contains,
-            FilterKind::Regex => SearchMode::Regex,
+            FilterKindFile::Exact => SearchMode::Exact,
+            FilterKindFile::StartsWith => SearchMode::StartsWith,
+            FilterKindFile::Contains => SearchMode::Contains,
+            FilterKindFile::Regex => SearchMode::Regex,
+            FilterKindFile::NotExact => SearchMode::NotExact,
+            FilterKindFile::NotRegex => SearchMode::NotRegex,
         }
     }
 }

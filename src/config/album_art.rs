@@ -4,20 +4,28 @@ use strum::Display;
 use super::Size;
 use crate::{mpd::mpd_client::AlbumArtOrder, shared::terminal::ImageBackend};
 
-#[derive(Debug, Default, Serialize, Deserialize, PartialEq, Eq, Clone)]
+#[derive(Debug, Serialize, Deserialize, PartialEq, Eq, Clone)]
+#[serde(default)]
 pub struct AlbumArtConfigFile {
-    #[serde(default)]
     pub method: ImageMethodFile,
-    #[serde(default)]
     pub order: AlbumArtOrderFile,
-    #[serde(default)]
     pub max_size_px: Size,
-    #[serde(default = "super::defaults::disabled_album_art_protos")]
     pub disabled_protocols: Vec<String>,
-    #[serde(default)]
     pub vertical_align: VerticalAlignFile,
-    #[serde(default)]
     pub horizontal_align: HorizontalAlignFile,
+}
+
+impl Default for AlbumArtConfigFile {
+    fn default() -> Self {
+        Self {
+            method: ImageMethodFile::default(),
+            order: AlbumArtOrderFile::default(),
+            max_size_px: Size::default(),
+            disabled_protocols: vec!["http://".to_string(), "https://".to_string()],
+            vertical_align: VerticalAlignFile::default(),
+            horizontal_align: HorizontalAlignFile::default(),
+        }
+    }
 }
 
 #[derive(Debug, Default, Clone)]

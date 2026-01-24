@@ -1,4 +1,4 @@
-use std::{borrow::Cow, ops::Range};
+use std::ops::Range;
 
 use ratatui::{
     style::{Style, Stylize},
@@ -40,11 +40,13 @@ impl InputBuffer {
     pub(super) fn set_value(&mut self, new_value: String) {
         self.cursor = new_value.len();
         self.value = new_value;
+        self.visible_slice = 0..0;
     }
 
     pub(super) fn clear(&mut self) {
         self.value.clear();
         self.cursor = 0;
+        self.visible_slice = 0..0;
     }
 
     pub fn as_spans(
@@ -57,74 +59,84 @@ impl InputBuffer {
         let value = &self.value;
         let value_len = value.len();
         let cursor = self.cursor;
-        let mut visible_slice = self.visible_slice.clone();
 
         self.available_columns = available_width.into();
 
-        // make space for the prefix and the block symbol if active
-        let mut space_left = self
+        // Reserve width for prefix and caret block
+        let reserved_for_prefix = prefix.map_or(0, |p| p.width() + 1 /* +1 space */);
+        let reserved_for_caret = (is_active && self.cursor == value_len) as usize;
+        let cols = self
             .available_columns
-            .saturating_sub(is_active as usize)
-            .saturating_sub(prefix.map_or(0, |p| p.width() + 1 /* +1 for space after */));
+            .saturating_sub(reserved_for_prefix)
+            .saturating_sub(reserved_for_caret);
 
-        if space_left == 0 {
+        if cols == 0 {
             self.visible_slice = 0..0;
             return Vec::new();
         }
 
-        if !visible_slice.contains(&cursor) {
-            // Resize or initial render happened, simply snapping to end is fine as this
-            // should not happen very often and a "jump" here is ok.
-            visible_slice.end = cursor;
-            visible_slice.start = cursor;
+        let mut start = snap_to_grapheme_start(value, self.visible_slice.start.min(value_len));
+        let mut end = fill_to_end(value, start, cols);
 
-            let graphemes = value.grapheme_indices(true).rev();
-            for (i, g) in graphemes {
-                let width = g.width();
-                if width <= space_left {
-                    space_left = space_left.saturating_sub(width);
-                    visible_slice.start = i;
-                } else {
+        if cursor < start {
+            // Snap start to cursor if it is before the start and simply fill to the end of
+            // the available space
+            start = snap_to_grapheme_start(value, cursor);
+            end = fill_to_end(value, start, cols);
+        } else if cursor >= end {
+            // Snap end to after the grapheme at the cursor and fill to available space to
+            // the left
+            let target_end = next_grapheme_end(value, cursor);
+            let mut remaining = cols;
+            let mut new_start = target_end;
+
+            for (i, g) in value.grapheme_indices(true).rev().skip_while(|(i, _)| *i >= target_end) {
+                let w = g.width();
+                if w > remaining {
+                    break;
+                }
+                remaining = remaining.saturating_sub(w);
+                new_start = i;
+                if remaining == 0 {
                     break;
                 }
             }
+
+            start = new_start;
+            end = target_end;
         }
 
-        let mut current_string = String::new();
-        let mut result = vec![];
+        let mut result = Vec::new();
         if let Some(p) = prefix {
             result.push(Span::styled(p, style));
             result.push(Span::styled(" ", style));
         }
+
+        let mut buf = String::new();
         for (idx, g) in value
             .grapheme_indices(true)
-            .skip_while(|(i, _)| *i < visible_slice.start)
-            .take_while(|(i, _)| *i < visible_slice.end)
+            .skip_while(|(i, _)| *i < start)
+            .take_while(|(i, _)| *i < end)
         {
             if idx == cursor {
-                if !current_string.is_empty() {
-                    result.push(Span::styled(std::mem::take(&mut current_string), style));
+                if !buf.is_empty() {
+                    result.push(Span::styled(std::mem::take(&mut buf), style));
                 }
-                result.push(Span::styled(Cow::Owned(g.to_owned()), style).reversed());
+                result.push(Span::styled(g.to_owned(), style).reversed());
             } else {
-                current_string.push_str(g);
+                buf.push_str(g);
             }
         }
-
-        if !current_string.is_empty() {
-            result.push(Span::styled(current_string, style));
+        if !buf.is_empty() {
+            result.push(Span::styled(buf, style));
         }
 
-        if is_active {
-            result.push(Span::styled(
-                "█",
-                if cursor == value_len { style } else { style.reversed() },
-            ));
+        if is_active && cursor == value_len {
+            result.push(Span::styled("█", style));
         }
 
-        self.visible_slice = visible_slice;
-
-        return result;
+        self.visible_slice = start..end;
+        result
     }
 
     pub fn handle_input(&mut self, ev: Option<InputEvent>) -> InputResultEvent {
@@ -346,6 +358,36 @@ impl InputBuffer {
     }
 }
 
+#[inline]
+fn snap_to_grapheme_start(value: &str, pos: usize) -> usize {
+    value.grapheme_indices(true).take_while(|(i, _)| *i <= pos).last().map_or(0, |(i, _)| i)
+}
+
+#[inline]
+fn next_grapheme_end(value: &str, pos: usize) -> usize {
+    let value_len = value.len();
+    if pos >= value_len {
+        return value_len;
+    }
+    value.grapheme_indices(true).find(|(i, _)| *i > pos).map_or(value_len, |(i, g)| i + g.len())
+}
+
+fn fill_to_end(value: &str, start: usize, available_cols: usize) -> usize {
+    let mut used = 0usize;
+    let mut end = start;
+    for (i, g) in value.grapheme_indices(true).skip_while(|(i, _)| *i < start) {
+        let w = g.width();
+        if w > available_cols.saturating_sub(used) {
+            break;
+        }
+        used += w;
+        end = i + g.len();
+        if used >= available_cols {
+            break;
+        }
+    }
+    end
+}
 #[cfg(test)]
 mod test {
     use super::*;
