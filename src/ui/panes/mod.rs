@@ -1008,11 +1008,10 @@ impl Property<PropertyKind> {
                     )))
                 }
                 StatusProperty::QueueTimeTotal { separator } => {
-                    let secs = ctx.cached_queue_time_total.as_secs();
-                    let formatted = ctx
-                        .config
-                        .duration_format
-                        .format_with_separator(secs, separator.as_deref());
+                    let formatted = match separator {
+                        Some(sep) => ctx.cached_queue_time_total.format_to_duration(sep),
+                        None => ctx.cached_queue_time_total.to_string(),
+                    };
                     Some(Either::Left(Span::styled(formatted, style)))
                 }
                 StatusProperty::QueueTimeRemaining { separator } => {
@@ -1032,10 +1031,10 @@ impl Property<PropertyKind> {
                             }
                         },
                     );
-                    let formatted = ctx
-                        .config
-                        .duration_format
-                        .format_with_separator(remaining_time.as_secs(), separator.as_deref());
+                    let formatted = match separator {
+                        Some(sep) => remaining_time.format_to_duration(sep),
+                        None => remaining_time.to_string(),
+                    };
                     Some(Either::Left(Span::styled(formatted, style)))
                 }
                 StatusProperty::ActiveTab => {

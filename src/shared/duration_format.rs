@@ -167,40 +167,11 @@ impl DurationFormat {
 
         result
     }
-
-    pub fn format_with_separator(&self, total_seconds: u64, separator: Option<&str>) -> String {
-        if let Some(sep) = separator {
-            if total_seconds == 0 {
-                return "0s".to_string();
-            }
-            let days = total_seconds / 86400;
-            let hours = (total_seconds / 3600) % 24;
-            let minutes = (total_seconds / 60) % 60;
-            let seconds = total_seconds % 60;
-            return if days > 0 {
-                format!("{days}d{sep}{hours}h{sep}{minutes}m{sep}{seconds}s")
-            } else if hours > 0 {
-                format!("{hours}h{sep}{minutes}m{sep}{seconds}s")
-            } else {
-                format!("{minutes}m{sep}{seconds}s")
-            };
-        }
-        self.format(total_seconds)
-    }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-
-    #[test]
-    fn test_human_style_via_separator() {
-        let fmt = DurationFormat::parse("").unwrap();
-        assert_eq!(fmt.format_with_separator(45, Some(" ")), "0m 45s");
-        assert_eq!(fmt.format_with_separator(85, Some(" ")), "1m 25s");
-        assert_eq!(fmt.format_with_separator(3665, Some(" ")), "1h 1m 5s");
-        assert_eq!(fmt.format_with_separator(95, Some(", ")), "1m, 35s");
-    }
 
     #[test]
     fn test_custom_format_tokens() {
@@ -233,9 +204,6 @@ mod tests {
 
     #[test]
     fn test_zero_duration() {
-        let fmt = DurationFormat::parse("").unwrap();
-        assert_eq!(fmt.format_with_separator(0, Some(" ")), "0s");
-
         let fmt2 = DurationFormat::parse("%M:%S").unwrap();
         assert_eq!(fmt2.format(0), "00:00");
     }
