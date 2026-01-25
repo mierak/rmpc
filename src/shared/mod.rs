@@ -1,5 +1,6 @@
 pub mod cmp;
 pub mod dependencies;
+pub mod duration_format;
 pub mod env;
 pub mod events;
 pub mod exit_code;

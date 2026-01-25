@@ -47,7 +47,7 @@ use crate::{
         tabs::{SizedPaneOrSplit, Tab, TabName},
         utils::tilde_expand_path,
     },
-    shared::{lrc::LrcOffset, terminal::TERMINAL},
+    shared::{duration_format::DurationFormat, lrc::LrcOffset, terminal::TERMINAL},
     tmux,
 };
 
@@ -96,6 +96,7 @@ pub struct Config {
     pub directories_sort: Arc<SortOptions>,
     pub cava: Cava,
     pub auto_open_downloads: bool,
+    pub duration_format: DurationFormat,
 }
 
 #[derive(Debug, Default, Clone, Copy, Serialize, Deserialize, PartialEq)]
@@ -153,6 +154,7 @@ pub struct ConfigFile {
     pub directories_sort: SortModeFile,
     pub cava: CavaFile,
     pub auto_open_downloads: bool,
+    pub duration_format: String,
 }
 
 #[derive(Debug, Serialize, Deserialize, Copy, Clone, PartialEq, Eq)]
@@ -221,6 +223,7 @@ impl Default for ConfigFile {
             cava: CavaFile::default(),
             show_playlists_in_browser: ShowPlaylistsMode::default(),
             auto_open_downloads: true,
+            duration_format: "%m:%S".to_string(),
         }
     }
 }
@@ -465,6 +468,7 @@ impl ConfigFile {
             reflect_changes_to_playlist: self.reflect_changes_to_playlist,
             cava: self.cava.into(),
             auto_open_downloads: self.auto_open_downloads,
+            duration_format: DurationFormat::parse(&self.duration_format)?,
         };
 
         if skip_album_art_check {

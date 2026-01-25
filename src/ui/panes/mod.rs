@@ -408,7 +408,7 @@ pub(crate) mod browser {
                         start_of_line_spacer.clone(),
                         Span::styled("Duration", key_style),
                         separator.clone(),
-                        Span::from(duration.as_secs().to_string()),
+                        Span::from(ctx.config.duration_format.format(duration.as_secs())),
                     ])
                     .into(),
                 );
