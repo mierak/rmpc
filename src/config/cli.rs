@@ -471,28 +471,6 @@ pub enum OnOffOneshot {
 }
 
 impl Args {
-    #[must_use]
-    pub fn config_path(&self) -> PathBuf {
-        if let Some(path) = &self.config {
-            return path.to_owned();
-        }
-        let mut path = PathBuf::new();
-        if let Ok(dir) = std::env::var("XDG_CONFIG_HOME") {
-            path.push(dir);
-        } else if let Ok(home) = std::env::var("HOME") {
-            path.push(home);
-            path.push(".config");
-        } else {
-            return path;
-        }
-        path.push(env!("CARGO_CRATE_NAME"));
-        #[cfg(debug_assertions)]
-        path.push("config.debug.ron");
-        #[cfg(not(debug_assertions))]
-        path.push("config.ron");
-        path
-    }
-
     /// Split a shell-like command line into tokens (argv).
     ///
     /// Supports single `'...'` and double `"..."` quotes and backslash escapes.

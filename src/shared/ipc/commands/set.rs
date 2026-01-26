@@ -5,7 +5,11 @@ use serde::{Deserialize, Serialize};
 use crate::{
     AppEvent,
     WorkRequest,
-    config::{Config, ConfigFile, theme::UiConfigFile},
+    config::{
+        Config,
+        ConfigFile,
+        theme::{UiConfig, UiConfigFile},
+    },
     shared::ipc::{IpcStream, SocketCommandExecute},
 };
 
@@ -28,7 +32,7 @@ impl SocketCommandExecute for SetIpcCommand {
     ) -> Result<()> {
         match self {
             SetIpcCommand::Config(config) => {
-                let config = Box::new(config.into_config(None, None, None, None, true)?);
+                let config = Box::new(config.into_config(UiConfig::default(), None, None, true)?);
                 Ok(event_tx.send(AppEvent::ConfigChanged { config, keep_old_theme: true })?)
             }
             SetIpcCommand::Theme(theme) => {

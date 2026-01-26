@@ -10,7 +10,7 @@ use ratatui::{Terminal, backend::TestBackend};
 use rstest::fixture;
 
 use crate::{
-    config::{Config, ConfigFile, tabs::TabName},
+    config::{Config, tabs::TabName},
     core::scheduler::Scheduler,
     ctx::{Ctx, StickersSupport},
     mpd::{commands::Status, version::Version},
@@ -59,9 +59,7 @@ pub fn ctx(
     work_request_channel: (Sender<WorkRequest>, Receiver<WorkRequest>),
     client_request_channel: (Sender<ClientRequest>, Receiver<ClientRequest>),
 ) -> Ctx {
-    let config = ConfigFile::default()
-        .into_config(None, None, None, None, true)
-        .expect("Test default config to convert correctly");
+    let config = Config::default();
 
     let scheduler = Scheduler::new((app_event_channel.0.clone(), unbounded().0));
     let key_resolver = KeyResolver::new(&config);

@@ -15,7 +15,20 @@ use notify_debouncer_full::{
     },
 };
 
-use crate::{AppEvent, config::ConfigFile, shared::macros::try_skip};
+use crate::{
+    AppEvent,
+    config::theme::UiConfig,
+    shared::{
+        config_read::{
+            ConfigReadError,
+            find_first_existing_path,
+            read_config_file,
+            read_theme_file,
+        },
+        macros::try_skip,
+        paths::theme_paths,
+    },
+};
 
 pub const ERROR_CONFIG_MODAL_ID: &str = "config_error_modal";
 
@@ -64,10 +77,70 @@ pub(crate) fn init(
 
                 log::debug!(event:?; "File event");
 
-                let Ok(config) = ConfigFile::read(&config_path).inspect_err(|err| {
+                let config = match read_config_file(&config_path) {
+                    Ok(cfg) => cfg,
+                    Err(err) => {
+                        try_skip!(
+                            event_tx.send(AppEvent::InfoModal {
+                                message: vec![
+                                    "Error: Failed to read config file".to_string(),
+                                    "Caused by:".to_string(),
+                                    format!("  {err}"),
+                                ],
+                                replacement_id: Some(ERROR_CONFIG_MODAL_ID.into()),
+                                title: None,
+                                size: None,
+                            }),
+                            "Failed to send info modal request"
+                        );
+                        continue;
+                    }
+                };
+
+                let theme = match &config.theme {
+                    Some(theme_name) => {
+                        let theme_paths = theme_paths(None, &config_path, theme_name);
+                        let chosen_theme_path = find_first_existing_path(theme_paths);
+
+                        let result = if let Some(theme_path) = chosen_theme_path {
+                            read_theme_file(&theme_path).and_then(|theme| {
+                                UiConfig::try_from(theme).map_err(ConfigReadError::Conversion)
+                            })
+                        } else {
+                            Err(ConfigReadError::ThemeNotFound)
+                        };
+                        match result {
+                            Ok(theme) => theme,
+                            Err(err) => {
+                                try_skip!(
+                                    event_tx.send(AppEvent::InfoModal {
+                                        message: vec![
+                                            "Error: Failed to read theme file".to_string(),
+                                            "Caused by:".to_string(),
+                                            format!("  {err}"),
+                                        ],
+                                        replacement_id: Some(ERROR_CONFIG_MODAL_ID.into()),
+                                        title: None,
+                                        size: None,
+                                    }),
+                                    "Failed to send info modal request"
+                                );
+                                continue;
+                            }
+                        }
+                    }
+                    // No theme set in the config file, this is OK, use the default theme
+                    None => UiConfig::default(),
+                };
+
+                let Ok(config) = config.into_config(theme, None, None, true).inspect_err(|err| {
                     try_skip!(
                         event_tx.send(AppEvent::InfoModal {
-                            message: vec![err.to_string()],
+                            message: vec![
+                                "Error: Failed to convert config file".to_string(),
+                                "Caused by:".to_string(),
+                                format!("  {err}"),
+                            ],
                             replacement_id: Some(ERROR_CONFIG_MODAL_ID.into()),
                             title: None,
                             size: None,
@@ -78,22 +151,8 @@ pub(crate) fn init(
                     continue;
                 };
 
-                let Ok(config) = config
-                    .into_config(Some(&config_path), None, None, None, true)
-                    .inspect_err(|err| {
-                        try_skip!(
-                            event_tx.send(AppEvent::InfoModal {
-                                message: vec![err.to_string()],
-                                replacement_id: Some(ERROR_CONFIG_MODAL_ID.into()),
-                                title: None,
-                                size: None,
-                            }),
-                            "Failed to send info modal request"
-                        );
-                    })
-                else {
-                    continue;
-                };
+                // Persist the current theme name for future file events to only trigger when
+                // the currently active theme changes
                 theme_name = config.theme_name.as_ref().map(|c| format!("{c}.ron"));
 
                 try_skip!(

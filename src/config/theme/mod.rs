@@ -47,7 +47,7 @@ use super::{
 
 const DEFAULT_ART: &[u8; 58599] = include_bytes!("../../../assets/default.jpg");
 
-#[derive(derive_more::Debug, Default, Clone)]
+#[derive(derive_more::Debug, Clone)]
 pub struct UiConfig {
     pub draw_borders: bool,
     pub background_color: Option<Color>,
@@ -81,6 +81,14 @@ pub struct UiConfig {
     pub lyrics: LyricsConfig,
     pub cava: CavaTheme,
     pub border_symbol_sets: BorderSetLib,
+}
+
+impl Default for UiConfig {
+    fn default() -> Self {
+        UiConfigFile::default()
+            .try_into()
+            .expect("Default UiConfigFile should convert successfully")
+    }
 }
 
 #[derive(Debug, Serialize, Deserialize, PartialEq, Eq)]
