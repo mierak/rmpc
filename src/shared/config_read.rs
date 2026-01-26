@@ -78,10 +78,17 @@ pub fn read_config_for_debuginfo(
 
 pub struct ConfigResult {
     pub config: Config,
-    pub config_path: PathBuf,
+    pub config_path: Option<PathBuf>,
 }
 
 pub fn read_config_and_theme(args: &mut Args) -> Result<ConfigResult, ConfigReadError> {
+    if args.clean {
+        return Ok(ConfigResult {
+            config: Config::default_with_album_art_check()?,
+            config_path: None,
+        });
+    }
+
     let config_paths = config_paths(args.config.as_deref());
     if config_paths.is_empty() {
         return Err(ConfigReadError::NoConfigPaths);
@@ -114,7 +121,7 @@ pub fn read_config_and_theme(args: &mut Args) -> Result<ConfigResult, ConfigRead
         config: config
             .into_config(theme, args.address.take(), args.password.take(), false)
             .map_err(ConfigReadError::Conversion)?,
-        config_path: chosen_config_path,
+        config_path: Some(chosen_config_path),
     })
 }
 
