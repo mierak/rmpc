@@ -51,6 +51,9 @@ configured with the new `album_art.order` option
 - The queue table should now be more performant for a very large number of items
 - Default keybinds have been updated. This will not affect you if have a properly setup config file.
 - Default theme has been updated. This will not affect you if have a properly setup config file.
+- Improved how config and theme files are read. Config file will now properly try all available paths
+instead of just the first one. When theme file is not found it will now correctly present an error
+instead of silently falling back to the default theme.
 
 ### Fixed
 

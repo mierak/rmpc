@@ -10,9 +10,9 @@ use switch_tab::SwitchTabCommand;
 use tmux::TmuxHookCommand;
 
 use super::SocketCommand;
-use crate::config::{
-    ConfigFile,
-    cli::{RemoteCmd, SetCommand},
+use crate::{
+    config::cli::{RemoteCmd, SetCommand},
+    shared::config_read::read_config_file,
 };
 
 pub(super) mod index_lrc;
@@ -53,7 +53,7 @@ impl TryFrom<&RemoteCmd> for SocketCommand {
                 )?))))
             }
             RemoteCmd::Set { command: SetCommand::Config { path } } => {
-                let file = ConfigFile::read(&PathBuf::from(&path))
+                let file = read_config_file(&PathBuf::from(&path))
                     .with_context(|| format!("Failed to open config file {path}"))?;
                 Ok(SocketCommand::Set(Box::new(SetIpcCommand::Config(file))))
             }

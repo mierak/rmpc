@@ -1,6 +1,5 @@
 use std::path::PathBuf;
 
-use anyhow::Result;
 use serde::{Deserialize, Serialize};
 
 use super::{Config, ConfigFile, MpdAddress, address::MpdPassword, utils::tilde_expand};
@@ -26,12 +25,18 @@ impl Default for CliConfigFile {
     }
 }
 
-#[derive(Debug, Default, Clone)]
+#[derive(Debug, Clone)]
 pub struct CliConfig {
     pub address: MpdAddress,
     pub password: Option<MpdPassword>,
     pub cache_dir: Option<PathBuf>,
     pub lyrics_dir: Option<String>,
+}
+
+impl Default for CliConfig {
+    fn default() -> Self {
+        CliConfigFile::default().into_config(None, None)
+    }
 }
 
 impl From<ConfigFile> for CliConfigFile {
@@ -68,14 +73,6 @@ impl From<&Config> for CliConfig {
 }
 
 impl CliConfigFile {
-    pub fn read(path: &PathBuf) -> Result<Self> {
-        let file = std::fs::File::open(path)?;
-        let read = std::io::BufReader::new(file);
-        let config: CliConfigFile = ron::de::from_reader(read)?;
-
-        Ok(config)
-    }
-
     pub fn into_config(
         self,
         address_cli: Option<String>,
