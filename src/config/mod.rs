@@ -255,6 +255,10 @@ impl Config {
             )
             .expect("Default config should always convert")
     }
+
+    pub fn default_with_album_art_check() -> Result<Config> {
+        ConfigFile::default().into_config(UiConfig::default(), None, None, false)
+    }
 }
 
 impl ConfigFile {

@@ -16,6 +16,9 @@ pub struct Args {
     pub config: Option<PathBuf>,
     #[arg(short, long, value_hint = ValueHint::AnyPath, value_name = "FILE")]
     pub theme: Option<PathBuf>,
+    #[arg(long, exclusive = true)]
+    /// Skip user config and start with defaults, must be the only argument
+    pub clean: bool,
     #[command(subcommand)]
     pub command: Option<Command>,
     #[arg(short, long)]

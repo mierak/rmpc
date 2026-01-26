@@ -26,6 +26,7 @@ use crate::{
     shared::{
         config_read::{
             ConfigReadError,
+            ConfigResult,
             find_first_existing_path,
             read_cli_config,
             read_config_and_theme,
@@ -334,8 +335,7 @@ fn main() -> Result<()> {
                 .name("dependency_check".to_string())
                 .spawn(|| DEPENDENCIES.iter().for_each(|d| d.log()))?;
 
-            let (config, config_path) = read_config_and_theme(&mut args)
-                .map(|result| (result.config, Some(result.config_path)))
+            let ConfigResult { config, config_path } = read_config_and_theme(&mut args)
                 .unwrap_or_else(|err| {
                     if let ConfigReadError::ConfigNotFound = err {
                         // Config not being found is not considered an error. But the user should
@@ -363,7 +363,7 @@ fn main() -> Result<()> {
                         );
                     }
 
-                    (Config::default_cli(&mut args), None)
+                    ConfigResult { config: Config::default_cli(&mut args), config_path: None }
                 });
 
             config.validate()?;
