@@ -18,6 +18,8 @@ use crate::config::{
 pub struct AlignedArea {
     pub area: Rect,
     pub size_px: Size,
+    pub cell_width_px: f64,
+    pub cell_height_px: f64,
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -40,21 +42,41 @@ pub fn create_aligned_area(
     // Validate areas, sizes
     if image_size_px.0 == 0 || image_size_px.1 == 0 {
         log::warn!(available_area_cells:?, max_size_px:?; "Invalid image size");
-        return AlignedArea { area: available_area_cells, size_px: Size { width: 0, height: 0 } };
+        return AlignedArea {
+            area: available_area_cells,
+            size_px: Size { width: 0, height: 0 },
+            cell_width_px: 0.0,
+            cell_height_px: 0.0,
+        };
     }
     if max_size_px.width == 0 || max_size_px.height == 0 {
         log::warn!(available_area_cells:?, max_size_px:?; "Max size is zero, cannot render image");
-        return AlignedArea { area: available_area_cells, size_px: Size { width: 0, height: 0 } };
+        return AlignedArea {
+            area: available_area_cells,
+            size_px: Size { width: 0, height: 0 },
+            cell_width_px: 0.0,
+            cell_height_px: 0.0,
+        };
     }
     if available_area_cells.width == 0 || available_area_cells.height == 0 {
         log::warn!(available_area_cells:?, max_size_px:?; "Available area is empty, cannot render image");
-        return AlignedArea { area: available_area_cells, size_px: Size { width: 0, height: 0 } };
+        return AlignedArea {
+            area: available_area_cells,
+            size_px: Size { width: 0, height: 0 },
+            cell_width_px: 0.0,
+            cell_height_px: 0.0,
+        };
     }
 
     // Query terminal size and calculate cell size in pixels
     let Ok(window_size) = crossterm::terminal::window_size() else {
         log::warn!(available_area_cells:?, max_size_px:?; "Failed to query terminal size");
-        return AlignedArea { area: available_area_cells, size_px: max_size_px };
+        return AlignedArea {
+            area: available_area_cells,
+            size_px: max_size_px,
+            cell_width_px: 0.0,
+            cell_height_px: 0.0,
+        };
     };
 
     if window_size.width == 0
@@ -63,94 +85,77 @@ pub fn create_aligned_area(
         || window_size.columns == 0
     {
         log::warn!(available_area_cells:?, max_size_px:?; "Terminal returned invalid size");
-        return AlignedArea { area: available_area_cells, size_px: max_size_px };
+        return AlignedArea {
+            area: available_area_cells,
+            size_px: max_size_px,
+            cell_width_px: 0.0,
+            cell_height_px: 0.0,
+        };
     }
 
     let cell_width = window_size.width as f64 / window_size.columns as f64;
     let cell_height = window_size.height as f64 / window_size.rows as f64;
     log::debug!(window_size:?, cell_width:?, cell_height:?; "Terminal size");
 
-    // Convert available area to pixel space
-    let area_size_px = SizePx {
+    // Convert available area to pixel space and build pixel bounds by clamping to
+    // max_size_px
+    let area_px = SizePx {
         width: available_area_cells.width as f64 * cell_width,
         height: available_area_cells.height as f64 * cell_height,
     };
-    let img_size_px = SizePx { width: image_size_px.0 as f64, height: image_size_px.1 as f64 };
-    log::debug!(img_size_px:?, area_size_px:?, available_cells:? = available_area_cells; "Image and area sizes");
-
-    // Scale the image to fit into available area while preserving aspect ratio
-    let scale_w = area_size_px.width / img_size_px.width;
-    let scale_h = area_size_px.height / img_size_px.height;
-    let scale = scale_w.min(scale_h);
-    log::debug!(scale_w, scale_h, scale; "Image scale factor");
-
-    let mut used_size_px =
-        SizePx { width: img_size_px.width * scale, height: img_size_px.height * scale };
-
-    let clamp_factor_w = max_size_px.width as f64 / used_size_px.width;
-    let clamp_factor_h = max_size_px.height as f64 / used_size_px.height;
-    let clamp_factor = clamp_factor_w.min(clamp_factor_h);
-    if clamp_factor < 1.0 {
-        used_size_px.width *= clamp_factor;
-        used_size_px.height *= clamp_factor;
-    }
-
-    // Calculate cells needed to display the image
-    let mut used_size_cell = Size {
-        width: (used_size_px.width / cell_width).ceil() as u16,
-        height: (used_size_px.height / cell_height).ceil() as u16,
+    let bounds_px = SizePx {
+        width: area_px.width.min(max_size_px.width as f64),
+        height: area_px.height.min(max_size_px.height as f64),
     };
-    log::debug!(
-        used_size_px:?,
-        used_size_cell:?,
-        w = (used_size_px.width / cell_width),
-        h = (used_size_px.height / cell_height);
-        "Used size in pixels and cells before clamping");
 
-    // Due to rounding, we may exceed available area, clamp again.
-    if used_size_cell.width > available_area_cells.width {
-        used_size_cell.width = available_area_cells.width;
+    let img_px = SizePx { width: image_size_px.0 as f64, height: image_size_px.1 as f64 };
+    log::debug!(img_px:?, area_px:?, bounds_px:?, available_cells:? = available_area_cells; "Image and bounds");
 
-        used_size_px.width = used_size_cell.width as f64 * cell_width;
-        used_size_px.height = used_size_px.width * (img_size_px.height / img_size_px.width);
-        used_size_cell.height = (used_size_px.height / cell_height).ceil() as u16;
-    }
-    if used_size_cell.height > available_area_cells.height {
-        used_size_cell.height = available_area_cells.height;
+    // Fit image into the pixel bounds while preserving aspect ratio
+    let used_px = {
+        let scale = (bounds_px.width / img_px.width).min(bounds_px.height / img_px.height);
+        SizePx { width: img_px.width * scale, height: img_px.height * scale }
+    };
+    log::debug!(used_px:?; "Used size in pixels");
 
-        used_size_px.height = used_size_cell.height as f64 * cell_height;
-        used_size_px.width = used_size_px.height * (img_size_px.width / img_size_px.height);
-        used_size_cell.width = (used_size_px.width / cell_width).ceil() as u16;
-    }
+    // Convert to cell units (ceil to ensure the allocated cell box can contain the
+    // used_px) Clamp to available area to guard against any floating-point edge
+    // cases
+    let mut used_cells = Size {
+        width: (used_px.width / cell_width).ceil() as u16,
+        height: (used_px.height / cell_height).ceil() as u16,
+    };
+    used_cells.width = used_cells.width.min(available_area_cells.width).max(1);
+    used_cells.height = used_cells.height.min(available_area_cells.height).max(1);
 
-    log::debug!(used_size_px:?, used_size_cell:?; "Used size in pixels and cells");
+    log::debug!(used_px:?, used_cells:?; "Used size in pixels and cells");
 
-    // Calculate offsets for alignment
     let x = match halign {
         HorizontalAlign::Left => available_area_cells.x,
         HorizontalAlign::Center => {
-            let offset = available_area_cells.width.saturating_sub(used_size_cell.width) / 2;
+            let offset = available_area_cells.width.saturating_sub(used_cells.width) / 2;
             available_area_cells.x + offset
         }
         HorizontalAlign::Right => {
-            available_area_cells.x + available_area_cells.width.saturating_sub(used_size_cell.width)
+            available_area_cells.x + available_area_cells.width.saturating_sub(used_cells.width)
         }
     };
     let y = match valign {
         VerticalAlign::Top => available_area_cells.y,
         VerticalAlign::Center => {
-            let offset = available_area_cells.height.saturating_sub(used_size_cell.height) / 2;
+            let offset = available_area_cells.height.saturating_sub(used_cells.height) / 2;
             available_area_cells.y + offset
         }
         VerticalAlign::Bottom => {
-            available_area_cells.y
-                + available_area_cells.height.saturating_sub(used_size_cell.height)
+            available_area_cells.y + available_area_cells.height.saturating_sub(used_cells.height)
         }
     };
 
     let result = AlignedArea {
-        area: Rect::new(x, y, used_size_cell.width, used_size_cell.height),
-        size_px: Size { width: used_size_px.width as u16, height: used_size_px.height as u16 },
+        area: Rect::new(x, y, used_cells.width, used_cells.height),
+        size_px: Size { width: used_px.width as u16, height: used_px.height as u16 },
+        cell_width_px: cell_width,
+        cell_height_px: cell_height,
     };
     log::debug!(result:?, available_area_cells:?, cell_width, cell_height, image_size_px:?, max_size_px:?, window_size:?; "Aligned area");
 

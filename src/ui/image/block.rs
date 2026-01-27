@@ -50,43 +50,48 @@ impl Backend for Block {
 
         let img_buffer = img.to_rgba8();
         let area = &resized_area.area;
-        let size_px = &resized_area.size_px;
-
-        let cell_width = (f64::from(size_px.width) / f64::from(area.width)) as u32;
-        let cell_height = (f64::from(size_px.height) / (f64::from(area.height) * 2.0)) as u32;
 
         let (img_width, img_height) = img_buffer.dimensions();
+        let cell_width = resized_area.cell_width_px;
+        let cell_height = resized_area.cell_height_px / 2.0;
 
         for term_y in 0..area.height {
             queue!(w, MoveTo(area.x, area.y + term_y))?;
 
-            let top_pixel_row = u32::from(term_y) * 2 * cell_height;
-            let bottom_pixel_row = top_pixel_row + cell_height;
-            let is_last_term_row = term_y == area.height - 1;
-
             for term_x in 0..area.width {
-                let pixel_x = u32::from(term_x) * cell_width;
+                let pixel_x = term_x as f64 * cell_width;
 
-                let top_pixel =
-                    get_pixel_safe(&img_buffer, pixel_x, top_pixel_row, img_width, img_height);
-                let bottom_pixel =
-                    get_pixel_safe(&img_buffer, pixel_x, bottom_pixel_row, img_width, img_height);
+                let top_pixel_row = term_y as f64 * 2.0 * cell_height;
+                let bottom_pixel_row = top_pixel_row + cell_height;
+
+                let top_pixel = average_region_pixel(
+                    &img_buffer,
+                    pixel_x as u32,
+                    top_pixel_row as u32,
+                    cell_width as u32,
+                    cell_height as u32,
+                    img_width,
+                    img_height,
+                );
+                let bottom_pixel = average_region_pixel(
+                    &img_buffer,
+                    pixel_x as u32,
+                    bottom_pixel_row as u32,
+                    cell_width as u32,
+                    cell_height as u32,
+                    img_width,
+                    img_height,
+                );
 
                 let top_color = color_from_pixel(top_pixel);
                 let bottom_color = color_from_pixel(bottom_pixel);
 
-                if is_last_term_row {
-                    // Last row - only show top pixel, bottom is empty
-                    queue!(w, SetForegroundColor(top_color), Print(UPPER_HALF_BLOCK))?;
-                } else {
-                    // Normal rows - both pixels, use lower half block with fg/bg
-                    queue!(
-                        w,
-                        SetForegroundColor(bottom_color),
-                        SetBackgroundColor(top_color),
-                        Print(LOWER_HALF_BLOCK)
-                    )?;
-                }
+                queue!(
+                    w,
+                    SetForegroundColor(bottom_color),
+                    SetBackgroundColor(top_color),
+                    Print(LOWER_HALF_BLOCK)
+                )?;
             }
 
             queue!(w, ResetColor)?;
@@ -110,8 +115,53 @@ impl Backend for Block {
     }
 }
 
-const UPPER_HALF_BLOCK: &str = "\u{2580}";
 const LOWER_HALF_BLOCK: &str = "\u{2584}";
+
+#[inline]
+fn average_region_pixel(
+    img: &image::RgbaImage,
+    x: u32,
+    y: u32,
+    w: u32,
+    h: u32,
+    width: u32,
+    height: u32,
+) -> image::Rgba<u8> {
+    let x_end = x.saturating_add(w).min(width);
+    let y_end = y.saturating_add(h).min(height);
+
+    if x_end <= x || y_end <= y {
+        return image::Rgba([0, 0, 0, 255]);
+    }
+
+    let mut sr: u64 = 0;
+    let mut sg: u64 = 0;
+    let mut sb: u64 = 0;
+    let mut sa: u64 = 0;
+    let mut count: u64 = 0;
+
+    for yy in y..y_end {
+        for xx in x..x_end {
+            let pixel = get_pixel_safe(img, xx, yy, width, height);
+            sr += pixel[0] as u64;
+            sg += pixel[1] as u64;
+            sb += pixel[2] as u64;
+            sa += pixel[3] as u64;
+            count += 1;
+        }
+    }
+
+    if count == 0 {
+        image::Rgba([0, 0, 0, 255])
+    } else {
+        image::Rgba([
+            (sr / count) as u8,
+            (sg / count) as u8,
+            (sb / count) as u8,
+            (sa / count) as u8,
+        ])
+    }
+}
 
 #[inline]
 fn get_pixel_safe(
