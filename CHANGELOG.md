@@ -36,15 +36,15 @@ after starting a ytdlp download
 
 - `duration_format` is now a string template and configurable for song durations. Use `"%m:%S"` for classic format, `"%M:%S"` for zero-padded minutes, or custom templates with tokens like `%d/%D` (days), `%h/%H` (hours), `%m/%M` (minutes), `%s/%S` (seconds), `%t` (total seconds)
 - **Breaking** Keybinds now only override the defaults. Meaning your configured keybinds are combined
+with the default ones. Set `clear` to true to keep the old behavior.
 - **Breaking** `show_song_table_header` has been removed. The queue header is now in a separate `QueueHeader`
 pane. You will need to update your config to include it in your tabs.
-with the default ones. Set `clear` to true to keep the old behavior.
 - **Breaking** `draw_borders` has been deprecated. The `Tabs` pane is no longer affected by this, use the
+borders configuration on the pane itself instead. This now only affects borders in the browser panes
+and this will be romeved in the future as well.
 - **Breaking** `current_item_style` and `highlighted_item_style` now merge on top of the item's style
 instead of having defaults,
 specify all the style properties (fg, bg, modifiers) to keep the old look
-borders configuration on the pane itself instead. This now only affects borders in the browser panes
-and this will be romeved in the future as well.
 - `Queue` pane no longer has empty space on the sides
 - Moved docs to a new [repository](https://github.com/rmpc-org/rmpc-org.github.io) and [domain](https://rmpc.mierak.dev/)
 - Rmpc now checks for embedded image first and cover image in a file second by default, this can be
