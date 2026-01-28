@@ -27,6 +27,8 @@ use search::SearchPane;
 use strum::{Display, IntoDiscriminant};
 use tabs::TabsPane;
 use tag_browser::TagBrowserPane;
+use unicode_segmentation::UnicodeSegmentation;
+use unicode_width::UnicodeWidthStr;
 use volume::VolumePane;
 
 #[cfg(debug_assertions)]
@@ -598,97 +600,60 @@ impl Song {
         return false;
     }
 
-    fn default_as_line_ellipsized<'song, 'stickers: 'song>(
+    fn default_as_line<'song, 'stickers: 'song>(
         &'song self,
         format: &Property<SongProperty>,
-        max_len: usize,
-        symbols: &SymbolsConfig,
         tag_separator: &str,
         strategy: TagResolutionStrategy,
         ctx: &'stickers Ctx,
     ) -> Option<Line<'song>> {
-        format.default.as_ref().and_then(|f| {
-            self.as_line_ellipsized(f.as_ref(), max_len, symbols, tag_separator, strategy, ctx)
-        })
+        format.default.as_ref().and_then(|f| self.as_line(f.as_ref(), tag_separator, strategy, ctx))
     }
 
-    pub fn as_line_ellipsized<'song, 'stickers: 'song>(
+    pub fn as_line<'song, 'stickers: 'song>(
         &'song self,
         format: &Property<SongProperty>,
-        max_len: usize,
-        symbols: &SymbolsConfig,
         tag_separator: &str,
         strategy: TagResolutionStrategy,
         ctx: &'stickers Ctx,
     ) -> Option<Line<'song>> {
         let style = format.style.unwrap_or_default();
         match &format.kind {
-            PropertyKindOrText::Text(value) => {
-                Some(Line::styled((*value).ellipsize(max_len, symbols).to_string(), style))
-            }
+            PropertyKindOrText::Text(value) => Some(Line::styled(value.clone(), style)),
             PropertyKindOrText::Sticker(key) => ctx
                 .song_stickers(&self.file)
                 .and_then(|s| s.get(key))
-                .map(|sticker| Line::styled(sticker.ellipsize(max_len, symbols), style))
+                .map(|sticker| Line::styled(sticker, style))
                 .or_else(|| {
                     format.default.as_ref().and_then(|format| {
-                        self.as_line_ellipsized(
-                            format.as_ref(),
-                            max_len,
-                            symbols,
-                            tag_separator,
-                            strategy,
-                            ctx,
-                        )
+                        self.as_line(format.as_ref(), tag_separator, strategy, ctx)
                     })
                 }),
             PropertyKindOrText::Property(property) => {
                 self.format(property, tag_separator, strategy).map_or_else(
-                    || {
-                        self.default_as_line_ellipsized(
-                            format,
-                            max_len,
-                            symbols,
-                            tag_separator,
-                            strategy,
-                            ctx,
-                        )
-                    },
-                    |v| Some(Line::styled(v.ellipsize(max_len, symbols).into_owned(), style)),
+                    || self.default_as_line(format, tag_separator, strategy, ctx),
+                    |v| Some(Line::styled(v, style)),
                 )
             }
             PropertyKindOrText::Group(group) => {
                 let mut buf = Line::default().style(style);
                 for grformat in group {
-                    if let Some(res) = self.as_line_ellipsized(
-                        grformat,
-                        max_len,
-                        symbols,
-                        tag_separator,
-                        strategy,
-                        ctx,
-                    ) {
+                    if let Some(res) = self.as_line(grformat, tag_separator, strategy, ctx) {
                         for span in res.spans {
                             let span_style = span.style;
                             buf.push_span(span.style(res.style).patch_style(span_style));
                         }
                     } else {
-                        return format.default.as_ref().and_then(|format| {
-                            self.as_line_ellipsized(
-                                format,
-                                max_len,
-                                symbols,
-                                tag_separator,
-                                strategy,
-                                ctx,
-                            )
-                        });
+                        return format
+                            .default
+                            .as_ref()
+                            .and_then(|format| self.as_line(format, tag_separator, strategy, ctx));
                     }
                 }
                 return Some(buf);
             }
             PropertyKindOrText::Transform(Transform::Replace { content, replacements }) => self
-                .as_line_ellipsized(content, max_len, symbols, tag_separator, strategy, ctx)
+                .as_line(content, tag_separator, strategy, ctx)
                 .and_then(|line| {
                     let mut content = String::new();
                     for span in &line.spans {
@@ -696,45 +661,25 @@ impl Song {
                     }
 
                     if let Some(replacement) = replacements.get(&content) {
-                        return self
-                            .as_line_ellipsized(
-                                replacement,
-                                max_len,
-                                symbols,
-                                tag_separator,
-                                strategy,
-                                ctx,
-                            )
-                            .or_else(|| {
+                        return self.as_line(replacement, tag_separator, strategy, ctx).or_else(
+                            || {
                                 replacement.default.as_ref().and_then(|format| {
-                                    self.as_line_ellipsized(
-                                        format,
-                                        max_len,
-                                        symbols,
-                                        tag_separator,
-                                        strategy,
-                                        ctx,
-                                    )
+                                    self.as_line(format, tag_separator, strategy, ctx)
                                 })
-                            });
+                            },
+                        );
                     }
 
                     Some(line)
                 })
                 .or_else(|| {
-                    format.default.as_ref().and_then(|format| {
-                        self.as_line_ellipsized(
-                            format,
-                            max_len,
-                            symbols,
-                            tag_separator,
-                            strategy,
-                            ctx,
-                        )
-                    })
+                    format
+                        .default
+                        .as_ref()
+                        .and_then(|format| self.as_line(format, tag_separator, strategy, ctx))
                 }),
             PropertyKindOrText::Transform(Transform::Truncate { content, length, from_start }) => {
-                self.as_line_ellipsized(content, max_len, symbols, tag_separator, strategy, ctx)
+                self.as_line(content, tag_separator, strategy, ctx)
                     .map(|mut line| {
                         let mut buf = VecDeque::new();
                         let mut remaining_len = *length;
@@ -760,19 +705,80 @@ impl Song {
                         line
                     })
                     .or_else(|| {
-                        format.default.as_ref().and_then(|format| {
-                            self.as_line_ellipsized(
-                                format,
-                                max_len,
-                                symbols,
-                                tag_separator,
-                                strategy,
-                                ctx,
-                            )
-                        })
+                        format
+                            .default
+                            .as_ref()
+                            .and_then(|format| self.as_line(format, tag_separator, strategy, ctx))
                     })
             }
         }
+    }
+
+    pub fn as_line_ellipsized<'song, 'stickers: 'song>(
+        &'song self,
+        format: &Property<SongProperty>,
+        max_len: usize,
+        symbols: &SymbolsConfig,
+        tag_separator: &str,
+        strategy: TagResolutionStrategy,
+        ctx: &'stickers Ctx,
+    ) -> Option<Line<'song>> {
+        let mut line = self.as_line(format, tag_separator, strategy, ctx)?;
+
+        let mut remaining = max_len;
+        let mut idx = 0;
+
+        let ellipsis_width = symbols.ellipsis.width();
+        while remaining > 0 {
+            let Some(span) = line.spans.get_mut(idx) else {
+                break;
+            };
+
+            let sw = span.width();
+
+            if sw < remaining {
+                remaining -= sw;
+                idx += 1;
+                continue;
+            }
+
+            if sw == remaining {
+                line.spans.truncate(idx + 1);
+                break;
+            }
+
+            if remaining < ellipsis_width {
+                // No space even for the configured ellipsis, just default the whole line to "…"
+                span.content = Cow::Borrowed("…");
+                line.spans.truncate(idx + 1);
+                break;
+            }
+
+            let target = remaining - ellipsis_width;
+
+            let mut owned = std::mem::take(&mut span.content).into_owned();
+
+            let mut acc = 0;
+            let mut cut_at_byte = 0;
+
+            for (i, g) in owned.grapheme_indices(true) {
+                let gw = g.width();
+                if acc + gw > target {
+                    cut_at_byte = i;
+                    break;
+                }
+                acc += gw;
+                cut_at_byte = i + g.len();
+            }
+
+            owned.truncate(cut_at_byte);
+            owned.push_str(&symbols.ellipsis);
+            span.content = Cow::Owned(owned);
+            line.spans.truncate(idx + 1);
+            break;
+        }
+
+        Some(line)
     }
 }
 
@@ -1269,58 +1275,6 @@ impl SizedPaneOrSplit {
         }
 
         Ok(())
-    }
-}
-
-pub(crate) trait StringExt {
-    fn ellipsize(&self, max_len: usize, symbols: &SymbolsConfig) -> Cow<'_, str>;
-}
-
-impl StringExt for Cow<'_, str> {
-    fn ellipsize(&self, max_len: usize, symbols: &SymbolsConfig) -> Cow<'_, str> {
-        if self.chars().count() > max_len {
-            Cow::Owned(format!(
-                "{}{}",
-                self.chars()
-                    .take(max_len.saturating_sub(symbols.ellipsis.chars().count()))
-                    .collect::<String>(),
-                symbols.ellipsis,
-            ))
-        } else {
-            Cow::Borrowed(self)
-        }
-    }
-}
-
-impl StringExt for &str {
-    fn ellipsize(&self, max_len: usize, symbols: &SymbolsConfig) -> Cow<'_, str> {
-        if self.chars().count() > max_len {
-            Cow::Owned(format!(
-                "{}{}",
-                self.chars()
-                    .take(max_len.saturating_sub(symbols.ellipsis.chars().count()))
-                    .collect::<String>(),
-                symbols.ellipsis,
-            ))
-        } else {
-            Cow::Borrowed(self)
-        }
-    }
-}
-
-impl StringExt for String {
-    fn ellipsize(&self, max_len: usize, symbols: &SymbolsConfig) -> Cow<'_, str> {
-        if self.chars().count() > max_len {
-            Cow::Owned(format!(
-                "{}{}",
-                self.chars()
-                    .take(max_len.saturating_sub(symbols.ellipsis.chars().count()))
-                    .collect::<String>(),
-                symbols.ellipsis,
-            ))
-        } else {
-            Cow::Borrowed(self)
-        }
     }
 }
 
