@@ -55,6 +55,7 @@ configured with the new `album_art.order` option
 - Improved how config and theme files are read. Config file will now properly try all available paths
 instead of just the first one. When theme file is not found it will now correctly present an error
 instead of silently falling back to the default theme.
+- Improved rendering of the `Block` backend, it should now be less noisy
 
 ### Fixed
 
@@ -76,6 +77,7 @@ should fix cases with `cache_dir` being set inside MPD's music directory
 - A harmless error about stickers not being supported will no longer show up when previewing a song
 in a browser pane for the first time will no longer show up
 - Ellipsis in Queue now properly works on the fully constructed property instead of on its parts
+- Fixed the `Block` image backend being cut off a bit
 
 ### Removed
 
