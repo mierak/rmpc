@@ -115,6 +115,7 @@ impl Ueberzug {
             .join(format!("ueberzug-{}.pid", std::process::id()))
             .to_string_lossy()
             .into_owned();
+        let _ = std::fs::create_dir_all(std::env::temp_dir().join("rmpc"));
 
         let mut daemon =
             UeberzugDaemon { pid: None, pid_file: pid_file_path, ueberzug_process: None, layer };

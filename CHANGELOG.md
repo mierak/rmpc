@@ -78,6 +78,7 @@ should fix cases with `cache_dir` being set inside MPD's music directory
 in a browser pane for the first time will no longer show up
 - Ellipsis in Queue now properly works on the fully constructed property instead of on its parts
 - Fixed the `Block` image backend being cut off a bit
+- ueberzug image backend failing on first start
 
 ### Removed
 
