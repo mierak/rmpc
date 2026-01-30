@@ -6,6 +6,7 @@ use derive_more::{Deref, Display, Into};
 use itertools::Itertools;
 use ratatui::{
     layout::Direction,
+    style::{Color, Style},
     widgets::{Borders, TitlePosition},
 };
 use serde::{Deserialize, Serialize};
@@ -22,8 +23,11 @@ use crate::{
     config::{
         defaults,
         theme::{
+            ConfigColor,
+            StyleFile,
             borders::{BorderSetInherited, BorderSetLib, BorderSymbols, BorderSymbolsFile},
             properties::{Alignment, PropertyKindFileOrText, StatusPropertyFile},
+            style::ToConfigOr,
         },
     },
     shared::id::{self, Id},
@@ -334,7 +338,10 @@ impl Default for PaneOrSplitFile {
             panes: vec![
                 SubPaneFile {
                     size: "4".to_string(),
+                    background_color: None,
                     borders: BordersFile::NONE,
+                    border_style: None,
+                    border_active_style: None,
                     border_title: Vec::new(),
                     border_title_position: BorderTitlePosition::Top,
                     border_title_alignment: Alignment::Left,
@@ -345,7 +352,10 @@ impl Default for PaneOrSplitFile {
                         panes: vec![
                             SubPaneFile {
                                 size: "35".to_string(),
+                                background_color: None,
                                 borders: BordersFile::LEFT | BordersFile::TOP | BordersFile::BOTTOM,
+                                border_style: None,
+                                border_active_style: None,
                                 border_title: Vec::new(),
                                 border_title_position: BorderTitlePosition::Top,
                                 border_title_alignment: Alignment::Left,
@@ -358,7 +368,10 @@ impl Default for PaneOrSplitFile {
                             },
                             SubPaneFile {
                                 size: "100%".to_string(),
+                                background_color: None,
                                 borders: BordersFile::ALL,
+                                border_style: None,
+                                border_active_style: None,
                                 border_title: Vec::new(),
                                 border_title_position: BorderTitlePosition::Top,
                                 border_title_alignment: Alignment::Left,
@@ -374,9 +387,12 @@ impl Default for PaneOrSplitFile {
                             },
                             SubPaneFile {
                                 size: "35".to_string(),
+                                background_color: None,
                                 borders: BordersFile::RIGHT
                                     | BordersFile::TOP
                                     | BordersFile::BOTTOM,
+                                border_style: None,
+                                border_active_style: None,
                                 border_title: Vec::new(),
                                 border_title_position: BorderTitlePosition::Top,
                                 border_title_alignment: Alignment::Left,
@@ -392,7 +408,10 @@ impl Default for PaneOrSplitFile {
                 },
                 SubPaneFile {
                     size: "2".to_string(),
+                    background_color: None,
                     borders: BordersFile::LEFT | BordersFile::RIGHT | BordersFile::BOTTOM,
+                    border_style: None,
+                    border_active_style: None,
                     border_title: Vec::new(),
                     border_title_position: BorderTitlePosition::Top,
                     border_title_alignment: Alignment::Left,
@@ -401,7 +420,10 @@ impl Default for PaneOrSplitFile {
                 },
                 SubPaneFile {
                     size: "100%".to_string(),
+                    background_color: None,
                     borders: BordersFile::NONE,
+                    border_style: None,
+                    border_active_style: None,
                     border_title: Vec::new(),
                     border_title_position: BorderTitlePosition::Top,
                     border_title_alignment: Alignment::Left,
@@ -410,7 +432,10 @@ impl Default for PaneOrSplitFile {
                 },
                 SubPaneFile {
                     size: "3".to_string(),
+                    background_color: None,
                     borders: BordersFile::NONE,
+                    border_style: None,
+                    border_active_style: None,
                     border_title_position: BorderTitlePosition::Top,
                     border_title_alignment: Alignment::Left,
                     border_title: Vec::new(),
@@ -421,7 +446,10 @@ impl Default for PaneOrSplitFile {
                         panes: vec![
                             SubPaneFile {
                                 size: "12".to_string(),
+                                background_color: None,
                                 borders: BordersFile::ALL,
+                                border_style: None,
+                                border_active_style: None,
                                 border_title: Vec::new(),
                                 border_title_position: BorderTitlePosition::Top,
                                 border_title_alignment: Alignment::Left,
@@ -435,9 +463,12 @@ impl Default for PaneOrSplitFile {
                             },
                             SubPaneFile {
                                 size: "100%".to_string(),
+                                background_color: None,
                                 borders: BordersFile::TOP
                                     | BordersFile::BOTTOM
                                     | BordersFile::RIGHT,
+                                border_style: None,
+                                border_active_style: None,
                                 border_title_alignment: Alignment::Right,
                                 border_symbols: BorderSymbolsFile::Rounded,
                                 border_title_position: BorderTitlePosition::Top,
@@ -523,7 +554,10 @@ pub enum BorderTitlePosition {
 #[serde(default)]
 pub struct SubPaneFile {
     pub size: String,
+    pub background_color: Option<String>,
     pub borders: BordersFile,
+    pub border_style: Option<StyleFile>,
+    pub border_active_style: Option<StyleFile>,
     pub border_title: Vec<PropertyFile<PropertyKindFile>>,
     pub border_title_position: BorderTitlePosition,
     pub border_title_alignment: Alignment,
@@ -534,7 +568,10 @@ pub struct SubPaneFile {
 #[derive(Debug, Clone)]
 pub struct Pane {
     pub pane: PaneType,
+    pub background_color: Option<Color>,
     pub borders: Borders,
+    pub border_style: Option<Style>,
+    pub border_active_style: Option<Style>,
     pub border_title: Vec<Property<PropertyKind>>,
     pub border_title_position: TitlePosition,
     pub border_title_alignment: ratatui::layout::Alignment,
@@ -546,7 +583,9 @@ pub struct Pane {
 pub enum SizedPaneOrSplit {
     Pane(Pane),
     Split {
+        background_color: Option<Color>,
         borders: Borders,
+        border_style: Option<Style>,
         border_title: Vec<Property<PropertyKind>>,
         border_title_position: TitlePosition,
         border_title_alignment: ratatui::layout::Alignment,
@@ -559,9 +598,11 @@ pub enum SizedPaneOrSplit {
 impl Default for SizedPaneOrSplit {
     fn default() -> Self {
         Self::Split {
+            background_color: None,
             direction: Direction::Horizontal,
             panes: Vec::new(),
             borders: Borders::NONE,
+            border_style: None,
             border_title: Vec::new(),
             border_title_position: TitlePosition::Top,
             border_title_alignment: ratatui::layout::Alignment::Left,
@@ -595,7 +636,10 @@ impl PaneOrSplitFile {
     )]
     pub fn convert_recursive(
         &self,
+        bg_col: Option<Color>,
         b: Borders,
+        b_style: Option<Style>,
+        b_active_style: Option<Style>,
         b_title: Vec<Property<PropertyKind>>,
         b_pos: TitlePosition,
         b_alignment: ratatui::layout::Alignment,
@@ -606,7 +650,10 @@ impl PaneOrSplitFile {
         Ok(match self {
             PaneOrSplitFile::Pane(pane_type_file) => SizedPaneOrSplit::Pane(Pane {
                 pane: pane_type_file.clone().try_into()?,
+                background_color: bg_col,
                 borders: b,
+                border_style: b_style,
+                border_active_style: b_active_style,
                 border_title: b_title,
                 border_title_position: b_pos,
                 border_title_alignment: b_alignment,
@@ -618,7 +665,10 @@ impl PaneOrSplitFile {
             PaneOrSplitFile::Component(name) => match library.get(name) {
                 Some(SizedPaneOrSplit::Pane(pane)) => {
                     let mut v = pane.clone();
+                    v.background_color = bg_col;
                     v.borders = b;
+                    v.border_style = b_style;
+                    v.border_active_style = b_active_style;
                     v.border_title.clone_from(&b_title);
                     v.border_symbols = b_symbols;
                     v.border_title_alignment = b_alignment;
@@ -626,15 +676,19 @@ impl PaneOrSplitFile {
                     SizedPaneOrSplit::Pane(v)
                 }
                 Some(SizedPaneOrSplit::Split {
+                    background_color: _,
                     borders,
                     direction,
                     panes,
                     border_title: _,
+                    border_style: _,
                     border_title_position: _,
                     border_title_alignment: _,
                     border_symbols: _,
                 }) => SizedPaneOrSplit::Split {
+                    background_color: bg_col,
                     borders: *borders | b,
+                    border_style: b_style,
                     border_title: b_title,
                     border_title_position: b_pos,
                     border_title_alignment: b_alignment,
@@ -646,7 +700,9 @@ impl PaneOrSplitFile {
             },
             PaneOrSplitFile::Split { direction, borders, panes } => SizedPaneOrSplit::Split {
                 direction: direction.into(),
+                background_color: bg_col,
                 borders: Into::<Borders>::into(*borders) | b,
+                border_style: b_style,
                 border_title: b_title,
                 border_title_position: b_pos,
                 border_title_alignment: b_alignment,
@@ -662,7 +718,23 @@ impl PaneOrSplitFile {
                             .cloned()
                             .map(Property::try_from)
                             .try_collect()?;
+                        let b_style = sub_pane
+                            .border_style
+                            .as_ref()
+                            .map(|s| s.to_config_or(None, None))
+                            .transpose()?;
+                        let b_active_style = sub_pane
+                            .border_active_style
+                            .as_ref()
+                            .map(|s| s.to_config_or(None, None))
+                            .transpose()?;
 
+                        let background_color = sub_pane
+                            .background_color
+                            .as_ref()
+                            .map(|c| c.as_bytes().try_into())
+                            .transpose()?
+                            .map(|c: ConfigColor| c.into());
                         let b_pos = match sub_pane.border_title_position {
                             BorderTitlePosition::Top => TitlePosition::Top,
                             BorderTitlePosition::Bottom => TitlePosition::Bottom,
@@ -671,7 +743,10 @@ impl PaneOrSplitFile {
                         let b_symbols =
                             sub_pane.border_symbols.clone().into_symbols(border_set_library)?;
                         let pane = sub_pane.pane.convert_recursive(
+                            background_color,
                             borders,
+                            b_style,
+                            b_active_style,
                             b_title,
                             b_pos,
                             b_alignment,
@@ -693,7 +768,10 @@ impl PaneOrSplitFile {
         border_set_library: &BorderSetLib,
     ) -> Result<SizedPaneOrSplit, PaneConversionError> {
         self.convert_recursive(
+            None,
             Borders::NONE,
+            None,
+            None,
             Vec::new(),
             TitlePosition::default(),
             ratatui::layout::Alignment::default(),
@@ -748,7 +826,10 @@ impl Default for TabsFile {
                     panes: vec![
                         SubPaneFile {
                             size: "35%".to_string(),
+                            background_color: None,
                             borders: BordersFile::NONE,
+                            border_style: None,
+                            border_active_style: None,
                             border_title: Vec::new(),
                             border_title_position: BorderTitlePosition::Top,
                             border_title_alignment: Alignment::Left,
@@ -759,10 +840,13 @@ impl Default for TabsFile {
                                 panes: vec![
                                     SubPaneFile {
                                         pane: PaneOrSplitFile::Pane(PaneTypeFile::AlbumArt),
+                                        background_color: None,
                                         size: "100%".to_string(),
                                         borders: BordersFile::TOP
                                             | BordersFile::LEFT
                                             | BordersFile::RIGHT,
+                                        border_style: None,
+                                        border_active_style: None,
                                         border_title_position: BorderTitlePosition::Top,
                                         border_title_alignment: Alignment::Left,
                                         border_symbols: BorderSymbolsFile::Rounded,
@@ -770,6 +854,7 @@ impl Default for TabsFile {
                                     },
                                     SubPaneFile {
                                         pane: PaneOrSplitFile::Pane(PaneTypeFile::Lyrics),
+                                        background_color: None,
                                         size: "7".to_string(),
                                         border_title: vec![PropertyFile {
                                             kind: PropertyKindFileOrText::Text(
@@ -779,6 +864,8 @@ impl Default for TabsFile {
                                             default: None,
                                         }],
                                         borders: BordersFile::ALL,
+                                        border_style: None,
+                                        border_active_style: None,
                                         border_title_position: BorderTitlePosition::Top,
                                         border_title_alignment: Alignment::Right,
                                         border_symbols: BorderSymbolsFile::Inherited(
@@ -795,7 +882,10 @@ impl Default for TabsFile {
                         },
                         SubPaneFile {
                             size: "65%".to_string(),
+                            background_color: None,
                             borders: BordersFile::NONE,
+                            border_style: None,
+                            border_active_style: None,
                             border_title: Vec::new(),
                             border_title_position: BorderTitlePosition::Top,
                             border_title_alignment: Alignment::Left,
@@ -806,7 +896,10 @@ impl Default for TabsFile {
                                 panes: vec![
                                     SubPaneFile {
                                         size: "3".to_string(),
+                                        background_color: None,
                                         borders: BordersFile::ALL,
+                                        border_style: None,
+                                        border_active_style: None,
                                         border_title: Vec::new(),
                                         border_title_position: BorderTitlePosition::Top,
                                         border_title_alignment: Alignment::Left,
@@ -826,8 +919,11 @@ impl Default for TabsFile {
                                                     pane: PaneOrSplitFile::Pane(
                                                         PaneTypeFile::Empty(),
                                                     ),
+                                                    background_color: None,
                                                     size: "1".to_string(),
                                                     borders: BordersFile::NONE,
+                                                    border_style: None,
+                                                    border_active_style: None,
                                                     border_title: Vec::new(),
                                                     border_title_position: BorderTitlePosition::Top,
                                                     border_title_alignment: Alignment::Left,
@@ -835,7 +931,10 @@ impl Default for TabsFile {
                                                 },
                                                 SubPaneFile {
                                                     size: "100%".to_string(),
+                                                    background_color: None,
                                                     borders: BordersFile::NONE,
+                                                    border_style: None,
+                                                    border_active_style: None,
                                                     border_title: Vec::new(),
                                                     border_title_position: BorderTitlePosition::Top,
                                                     border_title_alignment: Alignment::Left,
@@ -849,9 +948,12 @@ impl Default for TabsFile {
                                     },
                                     SubPaneFile {
                                         size: "100%".to_string(),
+                                        background_color: None,
                                         borders: BordersFile::LEFT
                                             | BordersFile::RIGHT
                                             | BordersFile::BOTTOM,
+                                        border_style: None,
+                                        border_active_style: None,
                                         border_title: Vec::new(),
                                         border_title_position: BorderTitlePosition::Top,
                                         border_title_alignment: Alignment::Left,
@@ -864,8 +966,11 @@ impl Default for TabsFile {
                                                     pane: PaneOrSplitFile::Pane(
                                                         PaneTypeFile::Empty(),
                                                     ),
+                                                    background_color: None,
                                                     size: "1".to_string(),
                                                     borders: BordersFile::NONE,
+                                                    border_style: None,
+                                                    border_active_style: None,
                                                     border_title: Vec::new(),
                                                     border_title_position: BorderTitlePosition::Top,
                                                     border_title_alignment: Alignment::Left,
@@ -873,7 +978,10 @@ impl Default for TabsFile {
                                                 },
                                                 SubPaneFile {
                                                     size: "100%".to_string(),
+                                                    background_color: None,
                                                     borders: BordersFile::NONE,
+                                                    border_style: None,
+                                                    border_active_style: None,
                                                     border_title: Vec::new(),
                                                     border_title_position: BorderTitlePosition::Top,
                                                     border_title_alignment: Alignment::Left,
@@ -901,7 +1009,10 @@ impl Default for TabsFile {
                     direction: DirectionFile::Vertical,
                     panes: vec![SubPaneFile {
                         size: "100%".to_string(),
+                        background_color: None,
                         borders: BordersFile::ALL,
+                        border_style: None,
+                        border_active_style: None,
                         border_title: Vec::new(),
                         border_title_position: BorderTitlePosition::Top,
                         border_title_alignment: Alignment::Left,
@@ -918,7 +1029,10 @@ impl Default for TabsFile {
                     direction: DirectionFile::Vertical,
                     panes: vec![SubPaneFile {
                         size: "100%".to_string(),
+                        background_color: None,
                         borders: BordersFile::ALL,
+                        border_style: None,
+                        border_active_style: None,
                         border_title: Vec::new(),
                         border_title_position: BorderTitlePosition::Top,
                         border_title_alignment: Alignment::Left,
@@ -935,7 +1049,10 @@ impl Default for TabsFile {
                     direction: DirectionFile::Vertical,
                     panes: vec![SubPaneFile {
                         size: "100%".to_string(),
+                        background_color: None,
                         borders: BordersFile::ALL,
+                        border_style: None,
+                        border_active_style: None,
                         border_title: Vec::new(),
                         border_title_position: BorderTitlePosition::Top,
                         border_title_alignment: Alignment::Left,
@@ -952,7 +1069,10 @@ impl Default for TabsFile {
                     direction: DirectionFile::Vertical,
                     panes: vec![SubPaneFile {
                         size: "100%".to_string(),
+                        background_color: None,
                         borders: BordersFile::ALL,
+                        border_style: None,
+                        border_active_style: None,
                         border_title: Vec::new(),
                         border_title_position: BorderTitlePosition::Top,
                         border_title_alignment: Alignment::Left,
@@ -969,7 +1089,10 @@ impl Default for TabsFile {
                     direction: DirectionFile::Vertical,
                     panes: vec![SubPaneFile {
                         size: "100%".to_string(),
+                        background_color: None,
                         borders: BordersFile::ALL,
+                        border_style: None,
+                        border_active_style: None,
                         border_title: Vec::new(),
                         border_title_position: BorderTitlePosition::Top,
                         border_title_alignment: Alignment::Left,
@@ -986,7 +1109,10 @@ impl Default for TabsFile {
                     direction: DirectionFile::Vertical,
                     panes: vec![SubPaneFile {
                         size: "100%".to_string(),
+                        background_color: None,
                         borders: BordersFile::ALL,
+                        border_style: None,
+                        border_active_style: None,
                         border_title: Vec::new(),
                         border_title_position: BorderTitlePosition::Top,
                         border_title_alignment: Alignment::Left,
@@ -1003,7 +1129,10 @@ impl Default for TabsFile {
                     direction: DirectionFile::Vertical,
                     panes: vec![SubPaneFile {
                         size: "100%".to_string(),
+                        background_color: None,
                         borders: BordersFile::ALL,
+                        border_style: None,
+                        border_active_style: None,
                         border_title: Vec::new(),
                         border_title_position: BorderTitlePosition::Top,
                         border_title_alignment: Alignment::Left,

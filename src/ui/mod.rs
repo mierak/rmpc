@@ -128,7 +128,7 @@ impl<'ui> Ui<'ui> {
     pub fn change_tab(&mut self, new_tab: TabName, ctx: &mut Ctx) -> Result<()> {
         self.layout.for_each_pane(
             self.area,
-            &mut |pane, _, _, _| {
+            &mut |pane, _, _, _, _| {
                 match self.panes.get_mut(&pane.pane, ctx)? {
                     Panes::TabContent => {
                         active_tab_call!(self, ctx, on_hide(ctx))?;
@@ -145,7 +145,7 @@ impl<'ui> Ui<'ui> {
 
         self.layout.for_each_pane(
             self.area,
-            &mut |pane, pane_area, _, _| {
+            &mut |pane, pane_area, _, _, _| {
                 match self.panes.get_mut(&pane.pane, ctx)? {
                     Panes::TabContent => {
                         active_tab_call!(self, ctx, before_show(pane_area, ctx))?;
@@ -168,7 +168,7 @@ impl<'ui> Ui<'ui> {
         self.layout.for_each_pane_custom_data(
             self.area,
             &mut *frame,
-            &mut |pane, pane_area, block, block_area, frame| {
+            &mut |pane, pane_area, block, block_area, bg_color, frame| {
                 match self.panes.get_mut(&pane.pane, ctx)? {
                     Panes::TabContent => {
                         active_tab_call!(self, ctx, render(frame, pane_area, ctx))?;
@@ -177,11 +177,25 @@ impl<'ui> Ui<'ui> {
                         pane_call!(pane_instance, render(frame, pane_area, ctx))?;
                     }
                 }
-                frame.render_widget(block.border_style(ctx.config.as_border_style()), block_area);
+                if let Some(bg_color) = bg_color {
+                    frame.render_widget(
+                        Block::default().style(Style::default().bg(bg_color)),
+                        pane_area,
+                    );
+                }
+                let border_style =
+                    pane.border_style.unwrap_or_else(|| ctx.config.as_border_style());
+                frame.render_widget(block.border_style(border_style), block_area);
                 Ok(())
             },
-            &mut |block, block_area, frame| {
-                frame.render_widget(block.border_style(ctx.config.as_border_style()), block_area);
+            &mut |block, block_area, background_color, frame| {
+                if let Some(bg_color) = background_color {
+                    frame.render_widget(
+                        Block::default().style(Style::default().bg(bg_color)),
+                        block.inner(block_area),
+                    );
+                }
+                frame.render_widget(block, block_area);
                 Ok(())
             },
             ctx,
@@ -207,7 +221,7 @@ impl<'ui> Ui<'ui> {
 
         self.layout.for_each_pane(
             self.area,
-            &mut |pane, _, _, _| {
+            &mut |pane, _, _, _, _| {
                 match self.panes.get_mut(&pane.pane, ctx)? {
                     Panes::TabContent => {
                         active_tab_call!(self, ctx, handle_mouse_event(event, ctx))?;
@@ -757,7 +771,7 @@ impl<'ui> Ui<'ui> {
 
         self.layout.for_each_pane(
             self.area,
-            &mut |pane, pane_area, _, _| {
+            &mut |pane, pane_area, _, _, _| {
                 match self.panes.get_mut(&pane.pane, ctx)? {
                     Panes::TabContent => {
                         active_tab_call!(self, ctx, before_show(pane_area, ctx))?;
@@ -828,7 +842,7 @@ impl<'ui> Ui<'ui> {
 
         self.layout.for_each_pane(
             self.area,
-            &mut |pane, pane_area, _, _| {
+            &mut |pane, pane_area, _, _, _| {
                 match self.panes.get_mut(&pane.pane, ctx)? {
                     Panes::TabContent => {
                         active_tab_call!(self, ctx, resize(pane_area, ctx))?;
@@ -857,7 +871,7 @@ impl<'ui> Ui<'ui> {
                 // might not be visible after the change
                 self.layout.for_each_pane(
                     self.area,
-                    &mut |pane, _, _, _| {
+                    &mut |pane, _, _, _, _| {
                         match self.panes.get_mut(&pane.pane, ctx)? {
                             Panes::TabContent => {
                                 active_tab_call!(self, ctx, on_hide(ctx))?;

@@ -255,7 +255,10 @@ pub fn components() -> HashMap<String, PaneOrSplitFile> {
             panes: vec![
                 SubPaneFile {
                     size: "1".to_string(),
+                    background_color: None,
                     borders: BordersFile::NONE,
+                    border_style: None,
+                    border_active_style: None,
                     border_title: Vec::new(),
                     border_title_position: BorderTitlePosition::Top,
                     border_title_alignment: Alignment::Left,
@@ -272,7 +275,10 @@ pub fn components() -> HashMap<String, PaneOrSplitFile> {
                 },
                 SubPaneFile {
                     size: "100%".to_string(),
+                    background_color: None,
                     borders: BordersFile::NONE,
+                    border_style: None,
+                    border_active_style: None,
                     border_title: Vec::new(),
                     border_title_position: BorderTitlePosition::Top,
                     border_title_alignment: Alignment::Left,
@@ -294,7 +300,10 @@ pub fn components() -> HashMap<String, PaneOrSplitFile> {
                 },
                 SubPaneFile {
                     size: "3".to_string(),
+                    background_color: None,
                     borders: BordersFile::NONE,
+                    border_style: None,
+                    border_active_style: None,
                     border_title: Vec::new(),
                     border_title_position: BorderTitlePosition::Top,
                     border_title_alignment: Alignment::Left,
@@ -317,7 +326,10 @@ pub fn components() -> HashMap<String, PaneOrSplitFile> {
                 },
                 SubPaneFile {
                     size: "2".to_string(),
+                    background_color: None,
                     borders: BordersFile::NONE,
+                    border_style: None,
+                    border_active_style: None,
                     border_title: Vec::new(),
                     border_title_position: BorderTitlePosition::Top,
                     border_title_alignment: Alignment::Left,
@@ -390,7 +402,10 @@ pub fn components() -> HashMap<String, PaneOrSplitFile> {
             panes: vec![
                 SubPaneFile {
                     size: "1".to_string(),
+                    background_color: None,
                     borders: BordersFile::NONE,
+                    border_style: None,
+                    border_active_style: None,
                     border_title: Vec::new(),
                     border_title_position: BorderTitlePosition::Top,
                     border_title_alignment: Alignment::Left,
@@ -399,7 +414,10 @@ pub fn components() -> HashMap<String, PaneOrSplitFile> {
                 },
                 SubPaneFile {
                     size: "100%".to_string(),
+                    background_color: None,
                     borders: BordersFile::NONE,
+                    border_style: None,
+                    border_active_style: None,
                     border_title: Vec::new(),
                     border_title_position: BorderTitlePosition::Top,
                     border_title_alignment: Alignment::Left,
@@ -422,7 +440,10 @@ pub fn components() -> HashMap<String, PaneOrSplitFile> {
                 },
                 SubPaneFile {
                     size: "6".to_string(),
+                    background_color: None,
                     borders: BordersFile::NONE,
+                    border_style: None,
+                    border_active_style: None,
                     border_title: Vec::new(),
                     border_title_position: BorderTitlePosition::Top,
                     border_title_alignment: Alignment::Left,
@@ -552,7 +573,10 @@ pub fn components() -> HashMap<String, PaneOrSplitFile> {
             panes: vec![
                 SubPaneFile {
                     size: "1".to_string(),
+                    background_color: None,
                     borders: BordersFile::NONE,
+                    border_style: None,
+                    border_active_style: None,
                     border_title: Vec::new(),
                     border_title_position: BorderTitlePosition::Top,
                     border_title_alignment: Alignment::Left,
@@ -561,7 +585,10 @@ pub fn components() -> HashMap<String, PaneOrSplitFile> {
                 },
                 SubPaneFile {
                     size: "1".to_string(),
+                    background_color: None,
                     borders: BordersFile::NONE,
+                    border_style: None,
+                    border_active_style: None,
                     border_title: Vec::new(),
                     border_title_position: BorderTitlePosition::Top,
                     border_title_alignment: Alignment::Left,
@@ -576,7 +603,10 @@ pub fn components() -> HashMap<String, PaneOrSplitFile> {
             panes: vec![
                 SubPaneFile {
                     size: "1".to_string(),
+                    background_color: None,
                     borders: BordersFile::NONE,
+                    border_style: None,
+                    border_active_style: None,
                     border_title: Vec::new(),
                     border_title_position: BorderTitlePosition::Top,
                     border_title_alignment: Alignment::Left,
@@ -585,7 +615,10 @@ pub fn components() -> HashMap<String, PaneOrSplitFile> {
                 },
                 SubPaneFile {
                     size: "1".to_string(),
+                    background_color: None,
                     borders: BordersFile::NONE,
+                    border_style: None,
+                    border_active_style: None,
                     border_title: Vec::new(),
                     border_title_position: BorderTitlePosition::Top,
                     border_title_alignment: Alignment::Left,
@@ -600,7 +633,10 @@ pub fn components() -> HashMap<String, PaneOrSplitFile> {
             panes: vec![
                 SubPaneFile {
                     size: "1".to_string(),
+                    background_color: None,
                     borders: BordersFile::NONE,
+                    border_style: None,
+                    border_active_style: None,
                     border_title: Vec::new(),
                     border_title_position: BorderTitlePosition::Top,
                     border_title_alignment: Alignment::Left,
@@ -609,7 +645,10 @@ pub fn components() -> HashMap<String, PaneOrSplitFile> {
                 },
                 SubPaneFile {
                     size: "1".to_string(),
+                    background_color: None,
                     borders: BordersFile::NONE,
+                    border_style: None,
+                    border_active_style: None,
                     border_title: Vec::new(),
                     border_title_position: BorderTitlePosition::Top,
                     border_title_alignment: Alignment::Left,
@@ -624,7 +663,10 @@ pub fn components() -> HashMap<String, PaneOrSplitFile> {
             panes: vec![
                 SubPaneFile {
                     size: "1".to_string(),
+                    background_color: None,
                     borders: BordersFile::NONE,
+                    border_style: None,
+                    border_active_style: None,
                     border_title: Vec::new(),
                     border_title_position: BorderTitlePosition::Top,
                     border_title_alignment: Alignment::Left,
@@ -633,7 +675,10 @@ pub fn components() -> HashMap<String, PaneOrSplitFile> {
                 },
                 SubPaneFile {
                     size: "100%".to_string(),
+                    background_color: None,
                     borders: BordersFile::NONE,
+                    border_style: None,
+                    border_active_style: None,
                     border_title: Vec::new(),
                     border_title_position: BorderTitlePosition::Top,
                     border_title_alignment: Alignment::Left,
@@ -642,7 +687,10 @@ pub fn components() -> HashMap<String, PaneOrSplitFile> {
                 },
                 SubPaneFile {
                     size: "1".to_string(),
+                    background_color: None,
                     borders: BordersFile::NONE,
+                    border_style: None,
+                    border_active_style: None,
                     border_title: Vec::new(),
                     border_title_position: BorderTitlePosition::Top,
                     border_title_alignment: Alignment::Left,

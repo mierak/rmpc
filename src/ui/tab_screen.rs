@@ -2,7 +2,7 @@ use std::{collections::HashMap, time::Instant};
 
 use anyhow::{Context, Result};
 use itertools::Itertools;
-use ratatui::{Frame, layout::Rect};
+use ratatui::{Frame, layout::Rect, style::Style, widgets::Block};
 
 use super::{Pane as _, PaneContainer, Panes, panes::pane_call};
 use crate::{
@@ -71,7 +71,7 @@ impl TabScreen {
         self.panes.for_each_pane_custom_data(
             area,
             frame,
-            &mut |pane, area, block, block_area, frame| {
+            &mut |pane, area, block, block_area, bg_color, frame| {
                 let pane_data = self
                     .pane_data
                     .entry(pane.id)
@@ -79,18 +79,28 @@ impl TabScreen {
                 pane_data.area = area;
                 pane_data.block_area = block_area;
                 let block = block.border_style(if focused.is_some_and(|p| p.id == pane.id) {
-                    ctx.config.as_focused_border_style()
+                    pane.border_active_style.unwrap_or_else(|| ctx.config.as_focused_border_style())
                 } else {
-                    ctx.config.as_border_style()
+                    pane.border_style.unwrap_or_else(|| ctx.config.as_border_style())
                 });
+                if let Some(bg_color) = bg_color {
+                    frame
+                        .render_widget(Block::default().style(Style::default().bg(bg_color)), area);
+                }
 
                 let mut pane_instance = pane_container.get_mut(&pane.pane, ctx)?;
                 pane_call!(pane_instance, render(frame, area, ctx))?;
                 frame.render_widget(block, block_area);
                 Ok(())
             },
-            &mut |block, block_area, frame| {
-                frame.render_widget(block.border_style(ctx.config.as_border_style()), block_area);
+            &mut |block, block_area, background_color, frame| {
+                if let Some(bg_color) = background_color {
+                    frame.render_widget(
+                        Block::default().style(Style::default().bg(bg_color)),
+                        block.inner(block_area),
+                    );
+                }
+                frame.render_widget(block, block_area);
                 Ok(())
             },
             ctx,
@@ -253,7 +263,7 @@ impl TabScreen {
     ) -> Result<()> {
         self.panes.for_each_pane(
             area,
-            &mut |pane, pane_area, _, block_area| {
+            &mut |pane, pane_area, _, block_area, _| {
                 let pane_data = self
                     .pane_data
                     .entry(pane.id)
@@ -295,7 +305,7 @@ impl TabScreen {
     ) -> Result<()> {
         self.panes.for_each_pane(
             area,
-            &mut |pane, pane_area, _, block_area| {
+            &mut |pane, pane_area, _, block_area, _| {
                 let pane_data = self
                     .pane_data
                     .entry(pane.id)

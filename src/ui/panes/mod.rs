@@ -20,6 +20,7 @@ use ratatui::{
     Frame,
     layout::Layout,
     prelude::Rect,
+    style::Color,
     text::{Line, Span},
     widgets::Block,
 };
@@ -1182,17 +1183,17 @@ impl SizedPaneOrSplit {
     pub fn for_each_pane(
         &self,
         area: Rect,
-        pane_callback: &mut impl FnMut(&ConfigPane, Rect, Block, Rect) -> Result<()>,
+        pane_callback: &mut impl FnMut(&ConfigPane, Rect, Block, Rect, Option<Color>) -> Result<()>,
         ctx: &Ctx,
     ) -> Result<()> {
         self.for_each_pane_custom_data(
             area,
             (),
-            &mut |pane, pane_area, block, block_area, ()| {
-                pane_callback(pane, pane_area, block, block_area)?;
+            &mut |pane, pane_area, block, block_area, background_color, ()| {
+                pane_callback(pane, pane_area, block, block_area, background_color)?;
                 Ok(())
             },
-            &mut |_, _, ()| Ok(()),
+            &mut |_, _, _, ()| Ok(()),
             ctx,
         )
     }
@@ -1201,8 +1202,15 @@ impl SizedPaneOrSplit {
         &self,
         area: Rect,
         mut custom_data: T,
-        pane_callback: &mut impl FnMut(&ConfigPane, Rect, Block, Rect, &mut T) -> Result<()>,
-        split_callback: &mut impl FnMut(Block, Rect, &mut T) -> Result<()>,
+        pane_callback: &mut impl FnMut(
+            &ConfigPane,
+            Rect,
+            Block,
+            Rect,
+            Option<Color>,
+            &mut T,
+        ) -> Result<()>,
+        split_callback: &mut impl FnMut(Block, Rect, Option<Color>, &mut T) -> Result<()>,
         ctx: &Ctx,
     ) -> Result<()> {
         let mut stack = vec![(self, area)];
@@ -1214,9 +1222,10 @@ impl SizedPaneOrSplit {
                     let mut block = Block::default()
                         .borders(pane.borders)
                         .border_set((&pane.border_symbols).into());
+                    let bg_color = pane.background_color;
                     if pane.border_title.is_empty() {
                         let pane_area = block.inner(area);
-                        pane_callback(pane, pane_area, block, area, &mut custom_data)?;
+                        pane_callback(pane, pane_area, block, area, bg_color, &mut custom_data)?;
                     } else {
                         let templs = PropertyTemplates::new(&pane.border_title);
                         let title = templs.format(song, ctx, &ctx.config);
@@ -1227,13 +1236,15 @@ impl SizedPaneOrSplit {
                             .title_alignment(pane.border_title_alignment);
 
                         let pane_area = block.inner(area);
-                        pane_callback(pane, pane_area, block, area, &mut custom_data)?;
+                        pane_callback(pane, pane_area, block, area, bg_color, &mut custom_data)?;
                     }
                 }
                 SizedPaneOrSplit::Split {
                     direction,
                     panes,
+                    background_color,
                     borders,
+                    border_style,
                     border_title,
                     border_title_position,
                     border_title_alignment,
@@ -1245,13 +1256,16 @@ impl SizedPaneOrSplit {
                     };
                     let constraints =
                         panes.iter().map(|pane| pane.size.into_constraint(parent_other_size));
-                    let mut block =
-                        Block::default().borders(*borders).border_set(border_symbols.into());
+                    let border_style = border_style.unwrap_or_else(|| ctx.config.as_border_style());
+                    let mut block = Block::default()
+                        .borders(*borders)
+                        .border_style(border_style)
+                        .border_set(border_symbols.into());
 
                     if border_title.is_empty() {
                         let pane_areas = block.inner(area);
                         let areas = Layout::new(*direction, constraints).split(pane_areas);
-                        split_callback(block, area, &mut custom_data)?;
+                        split_callback(block, area, *background_color, &mut custom_data)?;
                         stack.extend(
                             areas.iter().enumerate().map(|(idx, area)| (&panes[idx].pane, *area)),
                         );
@@ -1265,7 +1279,7 @@ impl SizedPaneOrSplit {
 
                         let pane_areas = block.inner(area);
                         let areas = Layout::new(*direction, constraints).split(pane_areas);
-                        split_callback(block, area, &mut custom_data)?;
+                        split_callback(block, area, *background_color, &mut custom_data)?;
                         stack.extend(
                             areas.iter().enumerate().map(|(idx, area)| (&panes[idx].pane, *area)),
                         );
