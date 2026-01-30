@@ -60,7 +60,7 @@ impl Pane for LyricsPane {
 
         let rows = area.height;
         let areas = Layout::vertical((0..rows).map(|_| Constraint::Length(1))).split(area);
-        let middle_row = rows / 2;
+        let middle_row = rows.saturating_sub(1) / 2;
 
         let default_style = Style::default().fg(ctx.config.theme.text_color.unwrap_or_default());
 
