@@ -31,10 +31,13 @@ after starting a ytdlp download
 - Added `Added()` and `LastModified()` song properties
 - Added `NotExact` and `NotRegex` search options
 - Added `--clean` aragument
+- Added `background_color` to pane configs
 
 ### Changed
 
-- `duration_format` is now a string template and configurable for song durations. Use `"%m:%S"` for classic format, `"%M:%S"` for zero-padded minutes, or custom templates with tokens like `%d/%D` (days), `%h/%H` (hours), `%m/%M` (minutes), `%s/%S` (seconds), `%t` (total seconds)
+- `duration_format` is now a string template and configurable for song durations. Use `"%m:%S"` for
+classic format, `"%M:%S"` for zero-padded minutes, or custom templates with tokens like `%d/%D` (days),
+`%h/%H` (hours), `%m/%M` (minutes), `%s/%S` (seconds), `%t` (total seconds)
 - **Breaking** Keybinds now only override the defaults. Meaning your configured keybinds are combined
 with the default ones. Set `clear` to true to keep the old behavior.
 - **Breaking** `show_song_table_header` has been removed. The queue header is now in a separate `QueueHeader`

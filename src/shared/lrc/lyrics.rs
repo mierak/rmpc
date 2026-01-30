@@ -337,7 +337,7 @@ mod tests {
 [offset: +0]
 
 [00:01.86]line with dot before hundredths
-[00:04.73]line with colon before hundredths
+[00:04:73]line with colon before hundredths
 [00:11.24]
 [11:16.91]line with long time";
 
