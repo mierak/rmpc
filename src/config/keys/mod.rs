@@ -38,14 +38,19 @@ pub struct KeyConfig {
     pub queue: HashMap<KeySequence, QueueActions>,
 }
 
+// It is important here that the deserialization does not put in filled key maps
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
-#[serde(default)]
 pub struct KeyConfigFile {
+    #[serde(default)]
     pub clear: bool,
+    #[serde(default)]
     pub global: HashMap<KeySequence, GlobalActionFile>,
+    #[serde(default)]
     pub navigation: HashMap<KeySequence, CommonActionFile>,
     #[cfg(debug_assertions)]
+    #[serde(default)]
     pub logs: HashMap<KeySequence, LogsActionsFile>,
+    #[serde(default)]
     pub queue: HashMap<KeySequence, QueueActionsFile>,
 }
 
