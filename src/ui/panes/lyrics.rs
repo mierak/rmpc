@@ -60,7 +60,7 @@ impl Pane for LyricsPane {
 
         let rows = area.height;
         let areas = Layout::vertical((0..rows).map(|_| Constraint::Length(1))).split(area);
-        let middle_row = rows / 2;
+        let middle_row = rows.saturating_sub(1) / 2;
 
         let default_style = Style::default().fg(ctx.config.theme.text_color.unwrap_or_default());
 
@@ -72,7 +72,6 @@ impl Pane for LyricsPane {
 
         let timestamp = ctx.config.theme.lyrics.timestamp;
 
-        let mut current_area = middle_row as usize;
         let Some(current_line) = lrc.lines.get(current_line_idx) else {
             return Ok(());
         };
@@ -81,7 +80,15 @@ impl Pane for LyricsPane {
         } else {
             &current_line.content
         };
-        for l in textwrap::wrap(formatted_line, area.width as usize) {
+
+        let wrapped_lines = textwrap::wrap(formatted_line, area.width as usize);
+        let wrapped_lines_length = wrapped_lines.len();
+
+        let active_lyric_start_row =
+            (middle_row as usize).saturating_sub(wrapped_lines_length.saturating_sub(1));
+        let mut current_area = active_lyric_start_row;
+
+        for l in wrapped_lines {
             let Some(area) = areas.get(current_area) else {
                 break;
             };
@@ -91,7 +98,7 @@ impl Pane for LyricsPane {
         }
 
         let mut before_lyrics_cursor = current_line_idx;
-        let mut before_area_cursor = middle_row as usize;
+        let mut before_area_cursor = active_lyric_start_row as usize;
         while before_lyrics_cursor > 0 && before_area_cursor > 0 {
             before_lyrics_cursor -= 1;
             let Some(line) = lrc.lines.get(before_lyrics_cursor) else {
