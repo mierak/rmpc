@@ -59,6 +59,7 @@ configured with the new `album_art.order` option
 instead of just the first one. When theme file is not found it will now correctly present an error
 instead of silently falling back to the default theme.
 - Improved rendering of the `Block` backend, it should now be less noisy
+- Synchronized lyrics now prefer showing more future lyrics rather than more past lyrics
 
 ### Fixed
 
