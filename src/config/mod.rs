@@ -89,6 +89,7 @@ pub struct Config {
     pub directories_sort: Arc<SortOptions>,
     pub cava: Cava,
     pub auto_open_downloads: bool,
+    pub extra_yt_dlp_args: Vec<String>,
     pub duration_format: DurationFormat,
 }
 
@@ -154,6 +155,7 @@ pub struct ConfigFile {
     pub show_playlists_in_browser: ShowPlaylistsMode,
     pub directories_sort: SortModeFile,
     pub cava: CavaFile,
+    pub extra_yt_dlp_args: Vec<String>,
     pub auto_open_downloads: bool,
     pub duration_format: String,
 }
@@ -223,6 +225,7 @@ impl Default for ConfigFile {
             reflect_changes_to_playlist: false,
             cava: CavaFile::default(),
             show_playlists_in_browser: ShowPlaylistsMode::default(),
+            extra_yt_dlp_args: Vec::new(),
             auto_open_downloads: true,
             duration_format: "%m:%S".to_string(),
         }
@@ -364,6 +367,7 @@ impl ConfigFile {
             keep_state_on_song_change: self.keep_state_on_song_change,
             reflect_changes_to_playlist: self.reflect_changes_to_playlist,
             cava: self.cava.into(),
+            extra_yt_dlp_args: self.extra_yt_dlp_args,
             auto_open_downloads: self.auto_open_downloads,
             duration_format: DurationFormat::parse(&self.duration_format)?,
         };

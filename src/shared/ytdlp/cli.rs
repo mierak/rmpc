@@ -28,7 +28,7 @@ pub fn init_and_download(
         println!("Downloading '{url}'");
     }
 
-    let ytdlp = YtDlp::new(cache_dir.clone());
+    let ytdlp = YtDlp::new(cache_dir.clone(), &config.extra_yt_dlp_args);
     let resolved = YtDlpContent::from_str(url)?;
 
     match resolved {
