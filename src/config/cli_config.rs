@@ -12,6 +12,7 @@ pub struct CliConfigFile {
     password: Option<String>,
     cache_dir: Option<PathBuf>,
     lyrics_dir: Option<String>,
+    extra_yt_dlp_args: Vec<String>,
 }
 
 impl Default for CliConfigFile {
@@ -21,6 +22,7 @@ impl Default for CliConfigFile {
             password: None,
             cache_dir: None,
             lyrics_dir: None,
+            extra_yt_dlp_args: Vec::new(),
         }
     }
 }
@@ -31,6 +33,7 @@ pub struct CliConfig {
     pub password: Option<MpdPassword>,
     pub cache_dir: Option<PathBuf>,
     pub lyrics_dir: Option<String>,
+    pub extra_yt_dlp_args: Vec<String>,
 }
 
 impl Default for CliConfig {
@@ -46,6 +49,7 @@ impl From<ConfigFile> for CliConfigFile {
             password: value.password,
             cache_dir: value.cache_dir,
             lyrics_dir: value.lyrics_dir,
+            extra_yt_dlp_args: value.extra_yt_dlp_args,
         }
     }
 }
@@ -57,6 +61,7 @@ impl From<Config> for CliConfig {
             password: value.password,
             cache_dir: value.cache_dir,
             lyrics_dir: value.lyrics_dir,
+            extra_yt_dlp_args: value.extra_yt_dlp_args,
         }
     }
 }
@@ -68,6 +73,7 @@ impl From<&Config> for CliConfig {
             password: value.password.clone(),
             cache_dir: value.cache_dir.clone(),
             lyrics_dir: value.lyrics_dir.clone(),
+            extra_yt_dlp_args: value.extra_yt_dlp_args.clone(),
         }
     }
 }
@@ -89,6 +95,7 @@ impl CliConfigFile {
             }),
             address,
             password,
+            extra_yt_dlp_args: self.extra_yt_dlp_args,
         }
     }
 }

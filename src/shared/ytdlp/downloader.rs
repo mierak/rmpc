@@ -9,6 +9,7 @@ use crate::shared::ytdlp::{
 
 pub struct YtDlp {
     pub cache_dir: PathBuf,
+    pub extra_args: Vec<String>,
 }
 
 #[derive(Debug)]
@@ -54,8 +55,8 @@ pub struct YtDlpSearchItem {
 }
 
 impl YtDlp {
-    pub fn new(cache_dir: PathBuf) -> Self {
-        Self { cache_dir }
+    pub fn new(cache_dir: PathBuf, extra_args: &[String]) -> Self {
+        Self { cache_dir, extra_args: extra_args.to_vec() }
     }
 
     pub fn search(
@@ -106,6 +107,11 @@ impl YtDlp {
         command.arg("bestaudio");
         command.arg("--convert-thumbnails");
         command.arg("jpg");
+
+        for arg in &self.extra_args {
+            command.arg(arg);
+        }
+
         command.arg("--output");
         command.arg(cache);
         command.arg(id.to_url());
