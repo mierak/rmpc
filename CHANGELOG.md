@@ -6,6 +6,8 @@ All notable changes to this project will be documented in this file.
 
 ### Added
 
+- `extra_yt_dlp_args` to pass in more things to yt-dlp if required
+
 ### Changed
 
 ### Fixed
