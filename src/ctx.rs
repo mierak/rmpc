@@ -97,7 +97,7 @@ impl Ctx {
         } else {
             StickersSupport::Unsupported
         };
-        log::info!(supported_commands:? = supported_commands; "Supported commands by server");
+        log::debug!(supported_commands:? = supported_commands; "Supported commands by server");
 
         let status = client.get_status()?;
         let queue = client.playlist_info()?.unwrap_or_default();
@@ -108,7 +108,7 @@ impl Ctx {
             status_warn!("Album art is disabled because it is not supported by MPD");
         }
 
-        log::info!(config:? = config; "Resolved config");
+        log::trace!(config:? = config; "Resolved config");
 
         let key_resolver = KeyResolver::new(&config);
 

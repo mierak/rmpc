@@ -8,7 +8,7 @@ use super::ToDescription;
 use crate::{
     config::{tabs::TabName, utils::tilde_expand},
     mpd::{QueuePosition, commands::Song},
-    shared::{macros::status_warn, song_ext::SongsExt},
+    shared::{args, macros::status_warn, song_ext::SongsExt},
 };
 
 // Global actions
@@ -57,6 +57,7 @@ pub enum GlobalAction {
         description: Option<String>,
     },
     ExternalCommand {
+        prompt: bool,
         command: Arc<Vec<String>>,
         description: Option<String>,
     },
@@ -157,6 +158,7 @@ impl From<GlobalActionFile> for GlobalAction {
             GlobalActionFile::SearchTab => GlobalAction::SwitchToTab("Search".into()),
             GlobalActionFile::ExternalCommand { command, description } => {
                 GlobalAction::ExternalCommand {
+                    prompt: command.iter().any(|cmd| args::contains_placeholder_args(cmd)),
                     command: Arc::new(
                         command.into_iter().map(|v| tilde_expand(&v).into_owned()).collect_vec(),
                     ),

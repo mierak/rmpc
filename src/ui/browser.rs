@@ -15,6 +15,7 @@ use crate::{
     ctx::{Ctx, LIKE_STICKER, RATING_STICKER},
     mpd::{client::Client, commands::Song, mpd_client::MpdClient},
     shared::{
+        args,
         keys::ActionEvent,
         macros::{modal, status_info, status_warn},
         mouse_event::{MouseEvent, MouseEventKind, calculate_scrollbar_position},
@@ -99,6 +100,7 @@ where
         &self,
         item: T,
     ) -> impl FnOnce(&mut Client<'_>) -> Result<Vec<Song>> + Send + Sync + Clone + 'static;
+
     fn list_songs_in_items(
         &self,
         all: bool,
@@ -215,33 +217,26 @@ where
 
         let config = &ctx.config;
         match &action {
-            GlobalAction::ExternalCommand { command, .. }
-                if !self.stack().current().marked().is_empty() =>
-            {
-                let marked_items: Vec<_> = self
-                    .stack()
-                    .current()
-                    .marked_items()
-                    .map(|item| self.list_songs_in_item(item.clone()))
-                    .collect();
+            GlobalAction::ExternalCommand { command, prompt, .. } => {
+                let list_songs = self.list_songs_in_items(false);
                 let command = std::sync::Arc::clone(command);
-                ctx.query().id(EXTERNAL_COMMAND).query(move |client| {
-                    let songs: Vec<_> = marked_items
-                        .into_iter()
-                        .map(|item| (item)(client))
-                        .flatten_ok()
-                        .try_collect()?;
-                    Ok(MpdQueryResult::ExternalCommand(command, songs))
-                });
-            }
-            GlobalAction::ExternalCommand { command, .. } => {
-                if let Some(selected) = self.stack().current().selected() {
-                    let selected = selected.clone();
-                    let songs = self.list_songs_in_item(selected);
-                    let command = std::sync::Arc::clone(command);
+                if *prompt {
+                    let command = command.clone();
+                    modal!(
+                        ctx,
+                        InputModal::new(ctx).title("Enter arguments").on_confirm(|ctx, value| {
+                            let args = args::split_command_line(value)?;
+                            ctx.query().id(EXTERNAL_COMMAND).query(move |client| {
+                                let songs = (list_songs)(client)?;
+                                Ok(MpdQueryResult::ExternalCommand(command, args, songs))
+                            });
+                            Ok(())
+                        },)
+                    );
+                } else {
                     ctx.query().id(EXTERNAL_COMMAND).query(move |client| {
-                        let songs = (songs)(client)?;
-                        Ok(MpdQueryResult::ExternalCommand(command, songs))
+                        let songs = (list_songs)(client)?;
+                        Ok(MpdQueryResult::ExternalCommand(command, Vec::new(), songs))
                     });
                 }
             }

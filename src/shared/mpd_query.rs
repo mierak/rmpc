@@ -92,7 +92,7 @@ pub(crate) enum MpdQueryResult {
     Volume(Volume),
     Outputs(Vec<PartitionedOutput>),
     Decoders(Vec<Decoder>),
-    ExternalCommand(Arc<Vec<String>>, Vec<Song>),
+    ExternalCommand(Arc<Vec<String>>, Vec<String>, Vec<Song>),
     SongStickers(HashMap<String, HashMap<String, String>>),
     Any(Box<dyn Any + Send + Sync>),
 }

@@ -31,6 +31,7 @@ use crate::{
     ctx::{Ctx, LIKE_STICKER, RATING_STICKER},
     mpd::{QueuePosition, client::Client, commands::Song, mpd_client::MpdClient},
     shared::{
+        args,
         ext::{btreeset_ranges::BTreeSetRanges, rect::RectExt},
         keys::ActionEvent,
         macros::{modal, status_error, status_info, status_warn},
@@ -1143,10 +1144,24 @@ impl Pane for QueuePane {
             }
         } else if let Some(action) = event.claim_global() {
             match action {
-                GlobalAction::ExternalCommand { command, .. } => {
+                GlobalAction::ExternalCommand { command, prompt, .. } => {
                     let songs =
                         create_env(ctx, self.items(false).map(|(_, song)| song.file.as_str()));
-                    run_external(command.clone(), songs);
+                    if *prompt {
+                        let command = command.clone();
+                        modal!(
+                            ctx,
+                            InputModal::new(ctx).title("Enter arguments").on_confirm(
+                                move |_ctx, value| {
+                                    let args = args::split_command_line(value)?;
+                                    run_external(command, args, songs);
+                                    Ok(())
+                                },
+                            )
+                        );
+                    } else {
+                        run_external(command.clone(), Vec::new(), songs);
+                    }
                 }
                 _ => {
                     event.abandon();
