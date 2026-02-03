@@ -93,7 +93,7 @@ fn main_task<B: Backend + std::io::Write>(
         && let Some(command) = &ctx.config.on_song_change
     {
         let env = create_env(&ctx, std::iter::empty());
-        run_external(command.clone(), env);
+        run_external(command.clone(), Vec::new(), env);
     }
 
     // Listen to changes to lyrics when enabled
@@ -543,7 +543,7 @@ fn main_task<B: Backend + std::io::Write>(
                                         ));
                                     }
 
-                                    run_external(command.clone(), env);
+                                    run_external(command.clone(), Vec::new(), env);
                                 }
                                 song_changed = true;
                                 ctx.song_played = Some(Duration::ZERO);
@@ -574,10 +574,10 @@ fn main_task<B: Backend + std::io::Write>(
                         (
                             EXTERNAL_COMMAND,
                             None,
-                            MpdQueryResult::ExternalCommand(command, songs),
+                            MpdQueryResult::ExternalCommand(command, args, songs),
                         ) => {
                             let songs = songs.iter().map(|s| s.file.as_str());
-                            run_external(command, create_env(&ctx, songs));
+                            run_external(command, args, create_env(&ctx, songs));
                         }
                         (id, target, data) => {
                             if let Err(err) = ui.on_command_finished(id, target, data, &mut ctx) {
@@ -612,7 +612,7 @@ fn main_task<B: Backend + std::io::Write>(
                         env.push(("COLS".to_owned(), columns.to_string()));
                         env.push(("ROWS".to_owned(), rows.to_string()));
                         log::debug!("Executing on resize");
-                        run_external(cmd, env);
+                        run_external(cmd, Vec::new(), env);
                     }
                     if let Err(err) = terminal.clear() {
                         log::error!(error:? = err; "Failed to clear terminal after a resize");

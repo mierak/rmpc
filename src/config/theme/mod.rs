@@ -354,7 +354,7 @@ fn convert_components(
         last_size = remaining;
     }
 
-    log::debug!(result:?; "Converted components");
+    log::trace!(result:?; "Converted components");
 
     Ok(result)
 }

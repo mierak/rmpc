@@ -18,6 +18,7 @@ use crate::{
         version::Version,
     },
     shared::{
+        args,
         ext::duration::DurationExt,
         lrc::{LrcIndex, get_lrc_path},
         macros::status_error,
@@ -497,7 +498,11 @@ impl From<Provider> for YtDlpHost {
     }
 }
 
-pub fn run_external_blocking<'a, E>(command: &[String], envs: E) -> Result<()>
+pub fn run_external_blocking<'a, E>(
+    command: &[String],
+    command_args: &[String],
+    envs: E,
+) -> Result<()>
 where
     E: IntoIterator<Item = (&'a str, &'a str)> + std::fmt::Debug,
 {
@@ -505,15 +510,30 @@ where
         bail!("Invalid command: {command:?}");
     };
 
+    let (mut used_count, cmd) = args::replace_arg_placeholder(cmd, command_args)?;
     let mut cmd = std::process::Command::new(cmd);
-    cmd.args(args);
+
+    for arg in args {
+        if used_count > command_args.len() {
+            bail!("Not enough arguments provided for command");
+        }
+
+        let (arg_used_count, arg) =
+            args::replace_arg_placeholder(arg, &command_args[used_count..])?;
+        used_count += arg_used_count;
+        cmd.arg(arg);
+    }
+
+    if used_count < command_args.len() {
+        bail!("Too many arguments provided for command");
+    }
 
     for (key, val) in envs {
         cmd.env(key, val);
     }
 
-    log::debug!(command:?; "Running external command");
-    log::trace!(command:?, envs:? = cmd.get_envs(); "Running external command");
+    log::debug!(cmd:? = cmd.get_program(), args:? = cmd.get_args(); "Running external command");
+    log::trace!(cmd:?, envs:? = cmd.get_envs(); "Running external command");
 
     let out = match cmd.output() {
         Ok(out) => out,
@@ -536,6 +556,7 @@ where
 
 pub fn run_external<K: Into<String>, V: Into<String>>(
     command: Arc<Vec<String>>,
+    command_args: Vec<String>,
     envs: Vec<(K, V)>,
 ) {
     let envs = envs.into_iter().map(|(k, v)| (k.into(), v.into())).collect_vec();
@@ -543,6 +564,7 @@ pub fn run_external<K: Into<String>, V: Into<String>>(
     std::thread::spawn(move || {
         if let Err(err) = run_external_blocking(
             command.as_slice(),
+            &command_args,
             envs.iter().map(|(k, v)| (k.as_str(), v.as_str())),
         ) {
             status_error!("{}", err);

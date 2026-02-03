@@ -31,6 +31,7 @@ use crate::{
         version::Version,
     },
     shared::{
+        args,
         keys::ActionEvent,
         macros::{modal, status_error, status_info, status_warn},
         mouse_event::{MouseEvent, MouseEventKind, calculate_scrollbar_position},
@@ -38,7 +39,7 @@ use crate::{
     },
     ui::{
         UiEvent,
-        dirstack::Dir,
+        dirstack::{Dir, DirStackItem},
         input::InputResultEvent,
         modals::{
             input_modal::InputModal,
@@ -319,9 +320,24 @@ impl SearchPane {
     fn handle_search_phase_action(&mut self, event: &mut ActionEvent, ctx: &mut Ctx) -> Result<()> {
         let config = &ctx.config;
         if let Some(action) = event.claim_global() {
-            if let GlobalAction::ExternalCommand { command, .. } = action {
+            if let GlobalAction::ExternalCommand { command, prompt, .. } = action {
                 let songs = self.songs_dir.items.iter().map(|song| song.file.as_str());
-                run_external(command.clone(), create_env(ctx, songs));
+                let env = create_env(ctx, songs);
+                if *prompt {
+                    let command = command.clone();
+                    modal!(
+                        ctx,
+                        InputModal::new(ctx).title("Enter arguments").on_confirm(
+                            move |_ctx, value| {
+                                let args = args::split_command_line(value)?;
+                                run_external(command.clone(), args, env);
+                                Ok(())
+                            },
+                        )
+                    );
+                } else {
+                    run_external(command.clone(), Vec::new(), env);
+                }
             } else {
                 event.abandon();
             }
@@ -494,15 +510,24 @@ impl SearchPane {
         };
         if let Some(action) = event.claim_global() {
             match action {
-                GlobalAction::ExternalCommand { command, .. }
-                    if !self.songs_dir.marked().is_empty() =>
-                {
-                    let songs = self.songs_dir.marked_items().map(|song| song.file.as_str());
-                    run_external(command.clone(), create_env(ctx, songs));
-                }
-                GlobalAction::ExternalCommand { command, .. } => {
-                    let selected = self.songs_dir.selected().map(|s| s.file.as_str());
-                    run_external(command.clone(), create_env(ctx, selected));
+                GlobalAction::ExternalCommand { command, prompt, .. } => {
+                    let songs = self.items(false).map(|(_, song)| song.as_path());
+                    let env = create_env(ctx, songs);
+                    if *prompt {
+                        let command = command.clone();
+                        modal!(
+                            ctx,
+                            InputModal::new(ctx).title("Enter arguments").on_confirm(
+                                move |_ctx, value| {
+                                    let args = args::split_command_line(value)?;
+                                    run_external(command.clone(), args, env);
+                                    Ok(())
+                                },
+                            )
+                        );
+                    } else {
+                        run_external(command.clone(), Vec::new(), env);
+                    }
                 }
                 _ => {
                     event.abandon();

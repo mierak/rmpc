@@ -43,6 +43,7 @@ use crate::{
         version::Version,
     },
     shared::{
+        args,
         events::{Level, WorkRequest},
         id::Id,
         keys::ActionEvent,
@@ -352,7 +353,7 @@ impl<'ui> Ui<'ui> {
                 GlobalAction::CommandMode => {
                     let modal =
                         InputModal::new(ctx).title("Execute a command").on_confirm(|ctx, value| {
-                            match Args::parse_cli_line(value) {
+                            match args::parse_cli_line(value) {
                                 Ok(Args {
                                     command:
                                         Some(Command::SearchYt {
@@ -615,8 +616,29 @@ impl<'ui> Ui<'ui> {
                 GlobalAction::SeekBack => {}
                 GlobalAction::SeekForward => {}
                 GlobalAction::SeekToStart => {}
-                GlobalAction::ExternalCommand { command, .. } => {
-                    run_external(command.clone(), create_env(ctx, std::iter::empty::<&str>()));
+                GlobalAction::ExternalCommand { command, prompt, .. } => {
+                    if *prompt {
+                        let command = command.clone();
+                        modal!(
+                            ctx,
+                            InputModal::new(ctx).title("Enter arguments").on_confirm(
+                                |ctx, value| {
+                                    run_external(
+                                        command,
+                                        args::split_command_line(value)?,
+                                        create_env(ctx, std::iter::empty::<&str>()),
+                                    );
+                                    Ok(())
+                                },
+                            )
+                        );
+                    } else {
+                        run_external(
+                            command.clone(),
+                            Vec::new(),
+                            create_env(ctx, std::iter::empty::<&str>()),
+                        );
+                    }
                 }
                 GlobalAction::Quit => return Ok(KeyHandleResult::Quit),
                 GlobalAction::ShowHelp => {
