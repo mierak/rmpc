@@ -1,3 +1,6 @@
 /target
 **.ron
 !assets/**.ron
+# Nix
+/.direnv
+result
