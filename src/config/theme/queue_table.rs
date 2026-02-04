@@ -80,6 +80,7 @@ pub struct SongTableColumnFile {
     pub(super) width: Option<String>,
     /// Text alignment of the text in the column
     pub(super) alignment: Option<Alignment>,
+    pub(super) scroll_speed: Option<u64>,
 }
 
 #[derive(Debug, Clone)]
@@ -88,6 +89,7 @@ pub struct SongTableColumn {
     pub label: Property<SongProperty>,
     pub width: PercentOrLength,
     pub alignment: Alignment,
+    pub scroll_speed: Option<u64>,
 }
 
 #[derive(Debug)]
@@ -118,6 +120,7 @@ impl Default for QueueTableColumnsFile {
                 width_percent: None,
                 width: Some("20%".to_string()),
                 alignment: None,
+                scroll_speed: None,
             },
             SongTableColumnFile {
                 prop: PropertyFile {
@@ -138,6 +141,7 @@ impl Default for QueueTableColumnsFile {
                 width_percent: None,
                 width: Some("35%".to_string()),
                 alignment: None,
+                scroll_speed: None,
             },
             SongTableColumnFile {
                 prop: PropertyFile {
@@ -166,6 +170,7 @@ impl Default for QueueTableColumnsFile {
                 width_percent: None,
                 width: Some("30%".to_string()),
                 alignment: None,
+                scroll_speed: None,
             },
             SongTableColumnFile {
                 prop: PropertyFile {
@@ -186,6 +191,7 @@ impl Default for QueueTableColumnsFile {
                 width_percent: None,
                 width: Some("15%".to_string()),
                 alignment: Some(Alignment::Right),
+                scroll_speed: None,
             },
         ])
     }
@@ -249,6 +255,7 @@ impl TryFrom<QueueTableColumnsFile> for QueueTableColumns {
                                 "Invalid width config. Song table column width must be specified",
                             )?,
                         alignment: v.alignment.unwrap_or(Alignment::Left),
+                        scroll_speed: v.scroll_speed,
                     })
                 })
                 .try_collect()?,

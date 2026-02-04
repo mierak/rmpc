@@ -715,6 +715,83 @@ impl Song {
         }
     }
 
+    pub fn as_line_scrolling<'song, 'stickers: 'song>(
+        &'song self,
+        format: &Property<SongProperty>,
+        max_len: usize,
+        tag_separator: &str,
+        strategy: TagResolutionStrategy,
+        scroll_speed: u64,
+        ctx: &'stickers Ctx,
+    ) -> Option<Line<'song>> {
+        let mut line = self.as_line(format, tag_separator, strategy, ctx)?;
+        let line_len = line.width();
+
+        if line_len <= max_len || scroll_speed == 0 {
+            return Some(line);
+        }
+
+        let line_len = (line_len + 3) as u64;
+        let elapsed_ms = ctx.status.elapsed.as_millis() as u64;
+        let cols_to_offset = ((elapsed_ms * scroll_speed) / 1000) % line_len;
+
+        if cols_to_offset == 0 {
+            return Some(line);
+        }
+
+        line.spans.push(Span::from(" | "));
+
+        let mut already_offset = 0;
+        while already_offset < cols_to_offset as usize {
+            let Some(span) = line.spans.get_mut(0) else {
+                break;
+            };
+
+            let sw = span.width();
+
+            if sw == 0 {
+                break;
+            }
+
+            // Span is smaller than the required offset, simply move it to the end of the
+            // line
+            if already_offset + sw <= cols_to_offset as usize {
+                already_offset += sw;
+                let span = line.spans.remove(0);
+                line.spans.push(span);
+                continue;
+            }
+
+            // Need to cut part of this span and move the cut part to the end of the line
+            let target = (cols_to_offset as usize).saturating_sub(already_offset);
+
+            let mut owned = std::mem::take(&mut span.content).into_owned();
+            let span_style = span.style;
+            let mut new_span_content = String::new();
+
+            let mut acc = 0;
+            let mut cut_at_byte = 0;
+
+            for (i, g) in owned.grapheme_indices(true) {
+                let gw = g.width();
+                if acc + gw > target {
+                    cut_at_byte = i;
+                    break;
+                }
+                acc += gw;
+                cut_at_byte = i + g.len();
+                new_span_content.push_str(g);
+            }
+
+            owned.drain(0..cut_at_byte);
+            span.content = Cow::Owned(owned);
+            line.spans.push(Span::styled(new_span_content, span_style));
+            break;
+        }
+
+        Some(line)
+    }
+
     pub fn as_line_ellipsized<'song, 'stickers: 'song>(
         &'song self,
         format: &Property<SongProperty>,
