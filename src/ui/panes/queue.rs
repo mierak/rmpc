@@ -302,18 +302,29 @@ impl Pane for QueuePane {
                     if is_marked && i == 0 {
                         max_len = max_len.saturating_sub(marker_symbol_len);
                     }
+                    let format = &formats[i];
 
-                    let mut line = song
-                        .as_line_ellipsized(
-                            &formats[i].prop,
+                    let mut line = if let Some(speed) = format.scroll_speed {
+                        song.as_line_scrolling(
+                            &format.prop,
+                            max_len,
+                            &config.theme.format_tag_separator,
+                            config.theme.multiple_tag_resolution_strategy,
+                            speed,
+                            ctx,
+                        )
+                    } else {
+                        song.as_line_ellipsized(
+                            &format.prop,
                             max_len,
                             &config.theme.symbols,
                             &config.theme.format_tag_separator,
                             config.theme.multiple_tag_resolution_strategy,
                             ctx,
                         )
-                        .unwrap_or_default()
-                        .alignment(formats[i].alignment.into());
+                    }
+                    .unwrap_or_default()
+                    .alignment(formats[i].alignment.into());
 
                     if is_marked && i == 0 {
                         let marker_span = Span::styled(

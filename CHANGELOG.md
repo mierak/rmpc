@@ -9,6 +9,7 @@ All notable changes to this project will be documented in this file.
 - `extra_yt_dlp_args` to pass in more things to yt-dlp if required
 - **Breaking** `ExternalCommand` can now have arguments supplied at runtime. This will break your existing
 keybinds if they contained either `{` or `}`. You will now need to escape these by doubling them up: `{{` and `}}`.
+- `scroll_speed` to `song_table_format`
 
 ### Changed
 
