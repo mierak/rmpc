@@ -36,11 +36,9 @@ impl Widget for ScrollingLine<'_> {
 
         // +3 for the spaces and pipes
         let line_len = line_len + 3;
-        let mut elapsed_sec = self.progress.as_secs();
-        if self.progress.subsec_millis() > 500 {
-            elapsed_sec += 1;
-        }
-        let cols_to_offset = (elapsed_sec * self.scroll_speed) % line_len;
+        let elapsed_ms = self.progress.as_millis() as u64;
+        let cols_to_offset = ((elapsed_ms * self.scroll_speed) / 1000) % line_len;
+
         let mut acc = 0;
 
         let mut res = String::new();
