@@ -79,6 +79,7 @@ pub fn read_config_for_debuginfo(
 pub struct ConfigResult {
     pub config: Config,
     pub config_path: Option<PathBuf>,
+    pub theme_path: Option<PathBuf>,
 }
 
 pub fn read_config_and_theme(args: &mut Args) -> Result<ConfigResult, ConfigReadError> {
@@ -86,6 +87,7 @@ pub fn read_config_and_theme(args: &mut Args) -> Result<ConfigResult, ConfigRead
         return Ok(ConfigResult {
             config: Config::default_with_album_art_check()?,
             config_path: None,
+            theme_path: None,
         });
     }
 
@@ -100,19 +102,20 @@ pub fn read_config_and_theme(args: &mut Args) -> Result<ConfigResult, ConfigRead
 
     let config = read_config_file(&chosen_config_path)?;
 
-    let theme = match &config.theme {
+    let (theme_path, theme) = match &config.theme {
         Some(theme_name) => {
             let theme_paths = theme_paths(args.theme.as_deref(), &chosen_config_path, theme_name);
             let chosen_theme_path = find_first_existing_path(theme_paths);
 
             if let Some(theme_path) = chosen_theme_path {
-                read_theme_file(&theme_path)?
+                let theme = read_theme_file(&theme_path)?;
+                (Some(theme_path), theme)
             } else {
                 return Err(ConfigReadError::ThemeNotFound);
             }
         }
         // No theme set in the config file, this is OK, use the default theme
-        None => UiConfigFile::default(),
+        None => (None, UiConfigFile::default()),
     };
 
     let theme = theme.try_into().map_err(ConfigReadError::Conversion)?;
@@ -122,6 +125,7 @@ pub fn read_config_and_theme(args: &mut Args) -> Result<ConfigResult, ConfigRead
             .into_config(theme, args.address.take(), args.password.take(), false)
             .map_err(ConfigReadError::Conversion)?,
         config_path: Some(chosen_config_path),
+        theme_path,
     })
 }
 

@@ -335,7 +335,7 @@ fn main() -> Result<()> {
                 .name("dependency_check".to_string())
                 .spawn(|| DEPENDENCIES.iter().for_each(|d| d.log()))?;
 
-            let ConfigResult { config, config_path } = read_config_and_theme(&mut args)
+            let ConfigResult { config, config_path, theme_path } = read_config_and_theme(&mut args)
                 .unwrap_or_else(|err| {
                     if let ConfigReadError::ConfigNotFound = err {
                         // Config not being found is not considered an error. But the user should
@@ -363,7 +363,11 @@ fn main() -> Result<()> {
                         );
                     }
 
-                    ConfigResult { config: Config::default_cli(&mut args), config_path: None }
+                    ConfigResult {
+                        config: Config::default_cli(&mut args),
+                        config_path: None,
+                        theme_path: None,
+                    }
                 });
 
             config.validate()?;
@@ -418,12 +422,8 @@ fn main() -> Result<()> {
 
             let _config_watcher_guard = if let Some(config_path) = config_path {
                 ctx.config.enable_config_hot_reload.then_some(
-                    core::config_watcher::init(
-                        config_path,
-                        ctx.config.theme_name.as_ref().map(|n| format!("{n}.ron",)),
-                        event_tx.clone(),
-                    )
-                    .inspect_err(|e| log::warn!("Failed to initialize config watcher: {e}")),
+                    core::config_watcher::init(config_path, theme_path, event_tx.clone())
+                        .inspect_err(|e| log::warn!("Failed to initialize config watcher: {e}")),
                 )
             } else {
                 log::warn!("No config file was detected, not watching config for changes");

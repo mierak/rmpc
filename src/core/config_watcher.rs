@@ -35,7 +35,7 @@ pub const ERROR_CONFIG_MODAL_ID: &str = "config_error_modal";
 #[must_use = "Returns a drop guard for the config directory watcher"]
 pub(crate) fn init(
     config_path: PathBuf,
-    theme_name: Option<String>,
+    theme_name: Option<PathBuf>,
     event_tx: Sender<AppEvent>,
 ) -> Result<Debouncer<RecommendedWatcher, RecommendedCache>> {
     if !config_path.exists() {
@@ -50,6 +50,7 @@ pub(crate) fn init(
         .parent()
         .with_context(|| format!("Invalid config directory {}", config_path.display()))?
         .to_owned();
+    let config_directory2 = config_directory.clone();
 
     let mut theme_name = theme_name;
     let mut watcher = new_debouncer(
@@ -97,20 +98,23 @@ pub(crate) fn init(
                     }
                 };
 
-                let theme = match &config.theme {
+                let (theme_path, theme) = match &config.theme {
                     Some(theme_name) => {
                         let theme_paths = theme_paths(None, &config_path, theme_name);
                         let chosen_theme_path = find_first_existing_path(theme_paths);
 
                         let result = if let Some(theme_path) = chosen_theme_path {
-                            read_theme_file(&theme_path).and_then(|theme| {
-                                UiConfig::try_from(theme).map_err(ConfigReadError::Conversion)
-                            })
+                            read_theme_file(&theme_path)
+                                .and_then(|theme| {
+                                    UiConfig::try_from(theme).map_err(ConfigReadError::Conversion)
+                                })
+                                .map(|theme| (Some(theme_path), theme))
                         } else {
                             Err(ConfigReadError::ThemeNotFound)
                         };
+
                         match result {
-                            Ok(theme) => theme,
+                            Ok((theme_path, theme)) => (theme_path, theme),
                             Err(err) => {
                                 try_skip!(
                                     event_tx.send(AppEvent::InfoModal {
@@ -130,7 +134,7 @@ pub(crate) fn init(
                         }
                     }
                     // No theme set in the config file, this is OK, use the default theme
-                    None => UiConfig::default(),
+                    None => (None, UiConfig::default()),
                 };
 
                 let Ok(config) = config.into_config(theme, None, None, true).inspect_err(|err| {
@@ -153,7 +157,13 @@ pub(crate) fn init(
 
                 // Persist the current theme name for future file events to only trigger when
                 // the currently active theme changes
-                theme_name = config.theme_name.as_ref().map(|c| format!("{c}.ron"));
+                if let Some(theme_path) = theme_path
+                    && let Ok(path) = theme_path.strip_prefix(&config_directory2)
+                {
+                    theme_name = Some(path.to_owned());
+                } else {
+                    theme_name = None;
+                }
 
                 try_skip!(
                     event_tx.send(AppEvent::UiEvent(crate::ui::UiAppEvent::PopConfigErrorModal)),
