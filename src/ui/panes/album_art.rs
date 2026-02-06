@@ -4,10 +4,11 @@ use ratatui::{Frame, layout::Rect};
 use super::Pane;
 use crate::{
     MpdQueryResult,
-    config::{album_art::ImageMethod, tabs::PaneType},
     ctx::Ctx,
-    mpd::mpd_client::MpdClient,
-    shared::keys::ActionEvent,
+    shared::{
+        album_art::{self, ALBUM_ART},
+        keys::ActionEvent,
+    },
     ui::{UiEvent, image::facade::AlbumArtFacade},
 };
 
@@ -18,40 +19,9 @@ pub struct AlbumArtPane {
     fetch_needed: bool,
 }
 
-const ALBUM_ART: &str = "album_art";
-
 impl AlbumArtPane {
     pub fn new(ctx: &Ctx) -> Self {
         Self { album_art: AlbumArtFacade::new(ctx), is_modal_open: false, fetch_needed: false }
-    }
-
-    /// returns none if album art is supposed to be hidden
-    fn fetch_album_art(ctx: &Ctx) -> Option<()> {
-        if matches!(ctx.config.album_art.method, ImageMethod::None) {
-            return None;
-        }
-
-        let (_, current_song) = ctx.find_current_song_in_queue()?;
-
-        let disabled_protos = &ctx.config.album_art.disabled_protocols;
-        let song_uri = current_song.file.as_str();
-        if disabled_protos.iter().any(|proto| song_uri.starts_with(proto)) {
-            log::debug!(uri = song_uri; "Not downloading album art because the protocol is disabled");
-            return None;
-        }
-
-        let song_uri = song_uri.to_owned();
-        let order = ctx.config.album_art.order;
-        ctx.query().id(ALBUM_ART).replace_id(ALBUM_ART).target(PaneType::AlbumArt).query(move |client| {
-            let start = std::time::Instant::now();
-            log::debug!(file = song_uri.as_str(); "Searching for album art");
-            let result = client.find_album_art(&song_uri, order)?;
-            log::debug!(elapsed:? = start.elapsed(), size = result.as_ref().map(|v|v.len()); "Found album art");
-
-            Ok(MpdQueryResult::AlbumArt(result))
-        });
-
-        Some(())
     }
 }
 
@@ -83,7 +53,7 @@ impl Pane for AlbumArtPane {
     }
 
     fn before_show(&mut self, ctx: &Ctx) -> Result<()> {
-        if AlbumArtPane::fetch_album_art(ctx).is_none() {
+        if album_art::fetch_album_art(ctx).is_none() {
             self.album_art.show_default(ctx)?;
         }
         Ok(())

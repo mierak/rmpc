@@ -1,8 +1,14 @@
+use std::sync::Arc;
+
 use serde::{Deserialize, Serialize};
 use strum::Display;
 
 use super::Size;
-use crate::{mpd::mpd_client::AlbumArtOrder, shared::terminal::ImageBackend};
+use crate::{
+    config::utils::tilde_expand,
+    mpd::mpd_client::AlbumArtOrder,
+    shared::terminal::ImageBackend,
+};
 
 #[derive(Debug, Serialize, Deserialize, PartialEq, Eq, Clone)]
 #[serde(default)]
@@ -13,6 +19,7 @@ pub struct AlbumArtConfigFile {
     pub disabled_protocols: Vec<String>,
     pub vertical_align: VerticalAlignFile,
     pub horizontal_align: HorizontalAlignFile,
+    pub custom_loader: Option<Vec<String>>,
 }
 
 impl Default for AlbumArtConfigFile {
@@ -24,6 +31,7 @@ impl Default for AlbumArtConfigFile {
             disabled_protocols: vec!["http://".to_string(), "https://".to_string()],
             vertical_align: VerticalAlignFile::default(),
             horizontal_align: HorizontalAlignFile::default(),
+            custom_loader: None,
         }
     }
 }
@@ -36,6 +44,7 @@ pub struct AlbumArtConfig {
     pub disabled_protocols: Vec<String>,
     pub vertical_align: VerticalAlign,
     pub horizontal_align: HorizontalAlign,
+    pub custom_loader: Option<Arc<Vec<String>>>,
 }
 
 #[derive(Default, Display, Debug, Serialize, Deserialize, Clone, Copy, PartialEq, Eq)]
@@ -120,6 +129,9 @@ impl From<AlbumArtConfigFile> for AlbumArtConfig {
             disabled_protocols: value.disabled_protocols,
             vertical_align: value.vertical_align.into(),
             horizontal_align: value.horizontal_align.into(),
+            custom_loader: value.custom_loader.map(|arr| {
+                Arc::new(arr.into_iter().map(|v| tilde_expand(&v).into_owned()).collect())
+            }),
         }
     }
 }

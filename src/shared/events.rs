@@ -69,6 +69,18 @@ pub(crate) enum WorkRequest {
     },
     Command(Command),
     ResizeImage(Box<dyn FnOnce() -> Result<EncodeData> + Send + Sync>),
+    LoadAlbumArt {
+        file: String,
+        loader: std::sync::Arc<Vec<String>>,
+    },
+}
+
+#[derive(Debug)]
+pub enum LoadAlbumArtResult {
+    Loaded { file: String, data: Vec<u8> },
+    DisplayDefault { file: String },
+    Fallback { file: String },
+    Failure { file: String, message: String },
 }
 
 #[derive(Debug)]
@@ -100,6 +112,9 @@ pub(crate) enum WorkDone {
     YtDlpDownloaded {
         id: DownloadId,
         result: Result<YtDlpDownloadResult, YtDlpDownloadError>,
+    },
+    AlbumArtLoaded {
+        result: LoadAlbumArtResult,
     },
     None,
 }
