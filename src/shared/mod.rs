@@ -1,3 +1,4 @@
+pub mod album_art;
 pub mod args;
 pub mod cmp;
 pub mod config_read;

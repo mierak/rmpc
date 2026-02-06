@@ -11,14 +11,15 @@ use ratatui::{Terminal, layout::Rect, prelude::Backend};
 
 use super::command::{create_env, run_external};
 use crate::{
-    config::{Config, cli::RemoteCommandQuery},
+    config::{Config, cli::RemoteCommandQuery, tabs::PaneType},
     ctx::Ctx,
     mpd::{
         commands::{IdleEvent, State},
         mpd_client::{MpdClient, SaveMode},
     },
     shared::{
-        events::{AppEvent, WorkDone},
+        album_art,
+        events::{AppEvent, LoadAlbumArtResult, WorkDone},
         ext::error::ErrorExt,
         id::{self, Id},
         keys::KeyResolver,
@@ -316,6 +317,37 @@ fn main_task<B: Backend + std::io::Write>(
                     render_wanted = true;
                 }
                 AppEvent::WorkDone(Ok(result)) => match result {
+                    WorkDone::AlbumArtLoaded { result } => match result {
+                        LoadAlbumArtResult::Loaded { file, data } => {
+                            if let Err(err) = ui.on_command_finished(
+                                album_art::ALBUM_ART,
+                                Some(PaneType::AlbumArt),
+                                MpdQueryResult::AlbumArt(Some(data)),
+                                &mut ctx,
+                            ) {
+                                log::error!(error:? = err; "UI failed to handle album art loaded event");
+                                album_art::request_album_art_from_mpd(file, &ctx);
+                            }
+                        }
+                        LoadAlbumArtResult::DisplayDefault { file } => {
+                            if let Err(err) = ui.on_command_finished(
+                                album_art::ALBUM_ART,
+                                Some(PaneType::AlbumArt),
+                                MpdQueryResult::AlbumArt(None),
+                                &mut ctx,
+                            ) {
+                                log::error!(error:? = err; "UI failed to handle display default album art event");
+                                album_art::request_album_art_from_mpd(file, &ctx);
+                            }
+                        }
+                        LoadAlbumArtResult::Fallback { file } => {
+                            album_art::request_album_art_from_mpd(file, &ctx);
+                        }
+                        LoadAlbumArtResult::Failure { file, message } => {
+                            status_error!("Album art loading failed: {}", message);
+                            album_art::request_album_art_from_mpd(file, &ctx);
+                        }
+                    },
                     WorkDone::YtDlpPlaylistResolved { urls } => {
                         ctx.ytdlp_manager.queue_download_many(urls);
                         ctx.ytdlp_manager.download_next();
