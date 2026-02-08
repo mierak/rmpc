@@ -140,7 +140,7 @@ fn display(w: &mut impl Write, data: EncodedData) -> Result<()> {
     // bytes. Finally, send: ESC ] 1337 ; FileEnd ^G
     tmux_write!(
         w,
-        "\x1B7\x1b[{y};{x}H\x1b]1337;File=inline=1;size={size};width={img_width_px}px;height={img_height_px}px;preserveAspectRatio=1;doNotMoveCursor=1:{content}\x08\x1b\n\x1B8",
+        "\x1B7\x1b[{y};{x}H\x1b]1337;File=inline=1;size={size};width={img_width_px}px;height={img_height_px}px;preserveAspectRatio=1;doNotMoveCursor=1:{content}\x1B\x5C\x1b\n\x1B8",
     )?;
 
     w.flush()?;
