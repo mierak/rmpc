@@ -17,6 +17,8 @@ keybinds if they contained either `{` or `}`. You will now need to escape these 
 ### Fixed
 
 - Theme hot reload not working when it was set using the `theme.ron` form
+- Issue with Iterm2 image protocol not rendering images sometimes
+
 
 ## [0.11.0] - 2026-02-01
 
