@@ -14,6 +14,8 @@ keybinds if they contained either `{` or `}`. You will now need to escape these 
 
 ### Changed
 
+- Improved error message when invalid `default_album_art_path` path is provided
+
 ### Fixed
 
 - Theme hot reload not working when it was set using the `theme.ron` form

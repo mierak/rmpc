@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 
 use ::serde::{Deserialize, Serialize};
-use anyhow::{Result, bail};
+use anyhow::{Context, Result, bail};
 use cava::{CavaTheme, CavaThemeFile};
 use itertools::Itertools;
 use level_styles::{LevelStyles, LevelStylesFile};
@@ -413,13 +413,13 @@ impl TryFrom<UiConfigFile> for UiConfig {
             },
             highlighted_item_style: value.highlighted_item_style.to_config_or(None, None)?,
             current_item_style: value.current_item_style.to_config_or(None, None)?,
-            default_album_art: value.default_album_art_path.map_or(
-                Ok(DEFAULT_ART as &'static [u8]),
-                |path| -> Result<_> {
+            default_album_art: value
+                .default_album_art_path
+                .map_or(Ok(DEFAULT_ART as &'static [u8]), |path| -> Result<_> {
                     let path = tilde_expand(&path);
                     Ok(std::fs::read(path.as_ref())?.leak())
-                },
-            )?,
+                })
+                .context("Failed to read 'default_album_art_path'")?,
             browser_song_format: TryInto::<SongFormat>::try_into(value.browser_song_format)?,
             preview_label_style: value.preview_label_style.to_config_or(None, None)?,
             preview_metadata_group_style: value
