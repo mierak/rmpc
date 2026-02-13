@@ -38,7 +38,7 @@ use self::{
 use crate::{
     config::{
         tabs::{SizedPaneOrSplit, Tab, TabName},
-        utils::{tilde_expand_path, env_var_expand},
+        utils::{env_var_expand, absolute_env_var_expand_path},
     },
     shared::{duration_format::DurationFormat, lrc::LrcOffset, terminal::TERMINAL},
     tmux,
@@ -284,7 +284,7 @@ impl ConfigFile {
             // TODO: ADD ENV VAR EXPANSION TO CACHE DIR AS WELL!!
             // NOTE: This should also be forced to be an absolute path after expansion, 
             // Currently it can be a relative path, which dosen't make sense
-            cache_dir: self.cache_dir.map(|v| tilde_expand_path(&v)),
+            cache_dir: self.cache_dir.map(|v| absolute_env_var_expand_path(&v)).unwrap_or_default(),
             lyrics_dir: self.lyrics_dir.map(|v| {
                 let v = env_var_expand(&v);
                 let v = tilde_expand(&v);
@@ -427,6 +427,16 @@ pub mod utils {
 
     use crate::shared::env::ENV;
 
+    pub fn absolute_env_var_expand_path(inp: &Path) -> Option<PathBuf> {
+        let path_str = inp.to_str()?;
+        let expanded = env_var_expand(path_str);
+        let expanded_path = tilde_expand_path(&PathBuf::from(expanded));
+        if expanded_path.is_absolute() {
+            return Some(expanded_path);
+        }
+        None
+    }
+
     pub fn tilde_expand_path(inp: &Path) -> PathBuf {
         let Ok(home) = ENV.var("HOME") else {
             return inp.to_owned();
@@ -448,7 +458,7 @@ pub mod utils {
         let Ok(home) = ENV.var("HOME") else {
             return Cow::Borrowed(inp);
         };
-        let home = home.strip_suffix("/").unwrap_or(home.as_ref());
+        let home = home.strip_suffix(MAIN_SEPARATOR).unwrap_or(home.as_ref());
 
         if let Some(inp) = inp.strip_prefix('~') {
             if inp.is_empty() {
@@ -492,7 +502,7 @@ pub mod utils {
 
         use super::tilde_expand;
         use crate::{
-            config::utils::{env_var_expand, tilde_expand_path},
+            config::utils::{env_var_expand, tilde_expand_path, absolute_env_var_expand_path},
             shared::env::ENV,
         };
 
@@ -578,9 +588,31 @@ pub mod utils {
             ENV.set("EMPTY".to_string(), String::new());
             assert_eq!(env_var_expand(input), expected);
         }
+
+        #[test_case("$HOME", "/home/some_user")]
+        #[test_case("$HOME/yes", "/home/some_user/yes")]
+        #[test_case("/start/$VALUE/end", "/start/path/end")]
+        #[test_case("$EMPTY/path", "/path")]
+        #[test_case("/start/$EMPTY/end", "/start//end")]
+        #[test_case("/$NOT_SET", "/$NOT_SET")]
+        #[test_case("/basic/path", "/basic/path")]
+        #[test_case("not/absolute/path", "")]
+        // NOTE: current implementation only expands vars that are the entire part. 
+        // This is different from how shells do it, but I can't think of a use case for it in paths
+        // #[test_case("/no$HOME$VALUE", "/no/home/some_userpath")]
+        fn env_var_expansion_path(input: &str, expected: &str) {
+            let _guard = TEST_LOCK.lock().unwrap();
+
+            ENV.clear();
+            ENV.set("HOME".to_string(), "/home/some_user".to_string());
+            ENV.set("VALUE".to_string(), "path".to_string());
+            ENV.set("EMPTY".to_string(), String::new());
+            let got = absolute_env_var_expand_path(PathBuf::from(input).as_path()).unwrap_or_default();
+            assert_eq!(got, PathBuf::from(expected));
+        }
     }
 }
-
+    
 #[cfg(test)]
 #[allow(clippy::unwrap_used)]
 mod tests {
