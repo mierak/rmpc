@@ -5,7 +5,7 @@ use strum::Display;
 
 use super::Size;
 use crate::{
-    config::utils::{tilde_expand, env_var_expand},
+    config::utils::{env_var_expand, tilde_expand},
     mpd::mpd_client::AlbumArtOrder,
     shared::terminal::ImageBackend,
 };
@@ -31,7 +31,7 @@ impl Default for AlbumArtConfigFile {
             disabled_protocols: vec!["http://".to_string(), "https://".to_string()],
             vertical_align: VerticalAlignFile::default(),
             horizontal_align: HorizontalAlignFile::default(),
-            custom_loader: None
+            custom_loader: None,
         }
     }
 }
@@ -130,7 +130,11 @@ impl From<AlbumArtConfigFile> for AlbumArtConfig {
             vertical_align: value.vertical_align.into(),
             horizontal_align: value.horizontal_align.into(),
             custom_loader: value.custom_loader.map(|arr| {
-                Arc::new(arr.into_iter().map(|v| tilde_expand(&env_var_expand(&v)).into_owned()).collect())
+                Arc::new(
+                    arr.into_iter()
+                        .map(|v| tilde_expand(&env_var_expand(&v)).into_owned())
+                        .collect(),
+                )
             }),
         }
     }

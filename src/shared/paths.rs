@@ -1,6 +1,9 @@
 use std::path::{Path, PathBuf};
 
-use crate::{config::utils::{env_var_expand, tilde_expand}, shared::env::ENV};
+use crate::{
+    config::utils::{env_var_expand, tilde_expand},
+    shared::env::ENV,
+};
 
 #[cfg(debug_assertions)]
 const CONFIG_NAME: &str = "config.debug.ron";

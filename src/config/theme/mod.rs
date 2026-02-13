@@ -42,7 +42,7 @@ pub use self::{
 use super::{
     defaults,
     tabs::{PaneConversionError, PaneOrSplitFile, SizedPaneOrSplit},
-    utils::{tilde_expand, env_var_expand},
+    utils::{env_var_expand, tilde_expand},
 };
 
 const DEFAULT_ART: &[u8; 58599] = include_bytes!("../../../assets/default.jpg");

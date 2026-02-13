@@ -15,6 +15,7 @@ keybinds if they contained either `{` or `}`. You will now need to escape these 
 ### Changed
 
 - Improved error message when invalid `default_album_art_path` path is provided
+- Environment variables are not resolved when parsing paths in the config file or theme
 
 ### Fixed
 

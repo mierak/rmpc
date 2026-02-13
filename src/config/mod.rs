@@ -38,7 +38,7 @@ use self::{
 use crate::{
     config::{
         tabs::{SizedPaneOrSplit, Tab, TabName},
-        utils::{env_var_expand, absolute_env_var_expand_path},
+        utils::{absolute_env_var_expand_path, env_var_expand},
     },
     shared::{duration_format::DurationFormat, lrc::LrcOffset, terminal::TERMINAL},
     tmux,
@@ -282,7 +282,7 @@ impl ConfigFile {
         let mut config = Config {
             theme_name: self.theme,
             // TODO: ADD ENV VAR EXPANSION TO CACHE DIR AS WELL!!
-            // NOTE: This should also be forced to be an absolute path after expansion, 
+            // NOTE: This should also be forced to be an absolute path after expansion,
             // Currently it can be a relative path, which dosen't make sense
             cache_dir: self.cache_dir.map(|v| absolute_env_var_expand_path(&v)).unwrap_or_default(),
             lyrics_dir: self.lyrics_dir.map(|v| {
@@ -318,11 +318,19 @@ impl ConfigFile {
             artists: self.artists.into(),
             album_art: self.album_art.into(),
             on_song_change: self.on_song_change.map(|arr| {
-                Arc::new(arr.into_iter().map(|v| tilde_expand(&env_var_expand(&v)).into_owned()).collect_vec())
+                Arc::new(
+                    arr.into_iter()
+                        .map(|v| tilde_expand(&env_var_expand(&v)).into_owned())
+                        .collect_vec(),
+                )
             }),
             exec_on_song_change_at_start: self.exec_on_song_change_at_start,
             on_resize: self.on_resize.map(|arr| {
-                Arc::new(arr.into_iter().map(|v| tilde_expand(&env_var_expand(&v)).into_owned()).collect_vec())
+                Arc::new(
+                    arr.into_iter()
+                        .map(|v| tilde_expand(&env_var_expand(&v)).into_owned())
+                        .collect_vec(),
+                )
             }),
             show_playlists_in_browser: self.show_playlists_in_browser,
             browser_song_sort: Arc::new(SortOptions {
@@ -502,7 +510,7 @@ pub mod utils {
 
         use super::tilde_expand;
         use crate::{
-            config::utils::{env_var_expand, tilde_expand_path, absolute_env_var_expand_path},
+            config::utils::{absolute_env_var_expand_path, env_var_expand, tilde_expand_path},
             shared::env::ENV,
         };
 
@@ -576,9 +584,9 @@ pub mod utils {
         #[test_case("$NOT_SET", "$NOT_SET")]
         #[test_case("no/$NOT_SET/path", "no/$NOT_SET/path")]
         #[test_case("basic/path", "basic/path")]
-        // NOTE: current implementation only expands vars that are the entire part. 
-        // This is different from how shells do it, but I can't think of a use case for it in paths
-        // #[test_case("no$HOME$VALUE", "no/home/some_userpath")]
+        // NOTE: current implementation only expands vars that are the entire part.
+        // This is different from how shells do it, but I can't think of a use case for
+        // it in paths #[test_case("no$HOME$VALUE", "no/home/some_userpath")]
         fn env_var_expansion(input: &str, expected: &str) {
             let _guard = TEST_LOCK.lock().unwrap();
 
@@ -597,9 +605,9 @@ pub mod utils {
         #[test_case("/$NOT_SET", "/$NOT_SET")]
         #[test_case("/basic/path", "/basic/path")]
         #[test_case("not/absolute/path", "")]
-        // NOTE: current implementation only expands vars that are the entire part. 
-        // This is different from how shells do it, but I can't think of a use case for it in paths
-        // #[test_case("/no$HOME$VALUE", "/no/home/some_userpath")]
+        // NOTE: current implementation only expands vars that are the entire part.
+        // This is different from how shells do it, but I can't think of a use case for
+        // it in paths #[test_case("/no$HOME$VALUE", "/no/home/some_userpath")]
         fn env_var_expansion_path(input: &str, expected: &str) {
             let _guard = TEST_LOCK.lock().unwrap();
 
@@ -607,12 +615,13 @@ pub mod utils {
             ENV.set("HOME".to_string(), "/home/some_user".to_string());
             ENV.set("VALUE".to_string(), "path".to_string());
             ENV.set("EMPTY".to_string(), String::new());
-            let got = absolute_env_var_expand_path(PathBuf::from(input).as_path()).unwrap_or_default();
+            let got =
+                absolute_env_var_expand_path(PathBuf::from(input).as_path()).unwrap_or_default();
             assert_eq!(got, PathBuf::from(expected));
         }
     }
 }
-    
+
 #[cfg(test)]
 #[allow(clippy::unwrap_used)]
 mod tests {
