@@ -38,7 +38,7 @@ use self::{
 use crate::{
     config::{
         tabs::{SizedPaneOrSplit, Tab, TabName},
-        utils::tilde_expand_path,
+        utils::{tilde_expand_path, env_var_expand},
     },
     shared::{duration_format::DurationFormat, lrc::LrcOffset, terminal::TERMINAL},
     tmux,
@@ -281,8 +281,12 @@ impl ConfigFile {
         let album_art_method = self.album_art.method;
         let mut config = Config {
             theme_name: self.theme,
+            // TODO: ADD ENV VAR EXPANSION TO CACHE DIR AS WELL!!
+            // NOTE: This should also be forced to be an absolute path after expansion, 
+            // Currently it can be a relative path, which dosen't make sense
             cache_dir: self.cache_dir.map(|v| tilde_expand_path(&v)),
             lyrics_dir: self.lyrics_dir.map(|v| {
+                let v = env_var_expand(&v);
                 let v = tilde_expand(&v);
                 if v.ends_with('/') { v.into_owned() } else { format!("{v}/") }
             }),
@@ -314,11 +318,11 @@ impl ConfigFile {
             artists: self.artists.into(),
             album_art: self.album_art.into(),
             on_song_change: self.on_song_change.map(|arr| {
-                Arc::new(arr.into_iter().map(|v| tilde_expand(&v).into_owned()).collect_vec())
+                Arc::new(arr.into_iter().map(|v| tilde_expand(&env_var_expand(&v)).into_owned()).collect_vec())
             }),
             exec_on_song_change_at_start: self.exec_on_song_change_at_start,
             on_resize: self.on_resize.map(|arr| {
-                Arc::new(arr.into_iter().map(|v| tilde_expand(&v).into_owned()).collect_vec())
+                Arc::new(arr.into_iter().map(|v| tilde_expand(&env_var_expand(&v)).into_owned()).collect_vec())
             }),
             show_playlists_in_browser: self.show_playlists_in_browser,
             browser_song_sort: Arc::new(SortOptions {

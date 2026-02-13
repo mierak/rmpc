@@ -42,7 +42,7 @@ pub use self::{
 use super::{
     defaults,
     tabs::{PaneConversionError, PaneOrSplitFile, SizedPaneOrSplit},
-    utils::tilde_expand,
+    utils::{tilde_expand, env_var_expand},
 };
 
 const DEFAULT_ART: &[u8; 58599] = include_bytes!("../../../assets/default.jpg");
@@ -416,6 +416,7 @@ impl TryFrom<UiConfigFile> for UiConfig {
             default_album_art: value
                 .default_album_art_path
                 .map_or(Ok(DEFAULT_ART as &'static [u8]), |path| -> Result<_> {
+                    let path = env_var_expand(&path);
                     let path = tilde_expand(&path);
                     Ok(std::fs::read(path.as_ref())?.leak())
                 })
