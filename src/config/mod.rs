@@ -418,7 +418,7 @@ impl From<OnOffOneshot> for crate::mpd::commands::status::OnOffOneshot {
 pub mod utils {
     use std::{
         borrow::Cow,
-        path::{MAIN_SEPARATOR, Path, PathBuf},
+        path::{MAIN_SEPARATOR, MAIN_SEPARATOR_STR, Path, PathBuf},
     };
 
     use crate::shared::env::ENV;
@@ -459,6 +459,23 @@ pub mod utils {
         Cow::Borrowed(inp)
     }
 
+    pub fn env_var_expand(inp: &str) -> String {
+        let parts: Vec<&str> = inp.split(MAIN_SEPARATOR).collect();
+
+        let expanded_parts: Vec<String> = parts
+            .iter()
+            .map(|part| {
+                if let Some(var_key) = part.strip_prefix('$') {
+                    ENV.var(var_key).unwrap_or_else(|_| (*part).to_string())
+                } else {
+                    (*part).to_string()
+                }
+            })
+            .collect();
+
+        return expanded_parts.join(MAIN_SEPARATOR_STR);
+    }
+
     #[cfg(test)]
     #[allow(clippy::unwrap_used)]
     mod tests {
@@ -470,7 +487,10 @@ pub mod utils {
         use test_case::test_case;
 
         use super::tilde_expand;
-        use crate::{config::utils::tilde_expand_path, shared::env::ENV};
+        use crate::{
+            config::utils::{env_var_expand, tilde_expand_path},
+            shared::env::ENV,
+        };
 
         static TEST_LOCK: LazyLock<Mutex<()>> = LazyLock::new(|| Mutex::new(()));
 
@@ -484,7 +504,7 @@ pub mod utils {
             let _guard = TEST_LOCK.lock().unwrap();
 
             ENV.clear();
-            ENV.set("HOME".to_string(), "/home/some_user/".to_string());
+            ENV.set("HOME".to_string(), "/home/some_user".to_string());
             assert_eq!(tilde_expand(input), expected);
         }
 
@@ -512,7 +532,7 @@ pub mod utils {
             let _guard = TEST_LOCK.lock().unwrap();
 
             ENV.clear();
-            ENV.set("HOME".to_string(), "/home/some_user/".to_string());
+            ENV.set("HOME".to_string(), "/home/some_user".to_string());
 
             let got = tilde_expand_path(&PathBuf::from(input));
             assert_eq!(got, PathBuf::from(expected));
@@ -532,6 +552,27 @@ pub mod utils {
 
             let got = tilde_expand_path(&PathBuf::from(input));
             assert_eq!(got, PathBuf::from(expected));
+        }
+
+        #[test_case("$HOME", "/home/some_user")]
+        #[test_case("$HOME/yes", "/home/some_user/yes")]
+        #[test_case("start/$VALUE/end", "start/path/end")]
+        #[test_case("$EMPTY/path", "/path")]
+        #[test_case("start/$EMPTY/end", "start//end")]
+        #[test_case("$NOT_SET", "$NOT_SET")]
+        #[test_case("no/$NOT_SET/path", "no/$NOT_SET/path")]
+        #[test_case("basic/path", "basic/path")]
+        // NOTE: current implementation only expands vars that are the entire part. 
+        // This is different from how shells do it, but I can't think of a use case for it in paths
+        // #[test_case("no$HOME$VALUE", "no/home/some_userpath")]
+        fn env_var_expansion(input: &str, expected: &str) {
+            let _guard = TEST_LOCK.lock().unwrap();
+
+            ENV.clear();
+            ENV.set("HOME".to_string(), "/home/some_user".to_string());
+            ENV.set("VALUE".to_string(), "path".to_string());
+            ENV.set("EMPTY".to_string(), String::new());
+            assert_eq!(env_var_expand(input), expected);
         }
     }
 }
