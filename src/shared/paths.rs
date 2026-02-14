@@ -1,6 +1,9 @@
 use std::path::{Path, PathBuf};
 
-use crate::{config::utils::tilde_expand, shared::env::ENV};
+use crate::{
+    config::utils::{env_var_expand, tilde_expand},
+    shared::env::ENV,
+};
 
 #[cfg(debug_assertions)]
 const CONFIG_NAME: &str = "config.debug.ron";
@@ -58,6 +61,6 @@ pub fn theme_paths(
         config_dir.join("themes").join(theme_name),
         config_dir.join(format!("{theme_name}.ron")),
         config_dir.join(theme_name),
-        PathBuf::from(tilde_expand(theme_name).into_owned()),
+        PathBuf::from(tilde_expand(&env_var_expand(theme_name)).into_owned()),
     ]
 }

@@ -3,7 +3,7 @@ use std::path::PathBuf;
 use serde::{Deserialize, Serialize};
 
 use super::{Config, ConfigFile, MpdAddress, address::MpdPassword, utils::tilde_expand};
-use crate::config::utils::tilde_expand_path;
+use crate::config::utils::{absolute_env_var_expand_path, env_var_expand};
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(default)]
@@ -88,8 +88,17 @@ impl CliConfigFile {
             MpdAddress::resolve(address_cli, password_cli, self.address, self.password);
 
         CliConfig {
-            cache_dir: self.cache_dir.map(|v| tilde_expand_path(&v)),
+            cache_dir: self
+                .cache_dir
+                .map(|v| -> Option<PathBuf> {
+                    absolute_env_var_expand_path(&v).unwrap_or_else(|err| {
+                        log::warn!("Failed to expand cache_dir path '{}': {err}", v.display());
+                        None
+                    })
+                })
+                .unwrap_or_default(),
             lyrics_dir: self.lyrics_dir.map(|v| {
+                let v = env_var_expand(&v);
                 let v = tilde_expand(&v);
                 if v.ends_with('/') { v.into_owned() } else { format!("{v}/") }
             }),
