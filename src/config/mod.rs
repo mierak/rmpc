@@ -2,7 +2,7 @@ use std::{collections::HashMap, path::PathBuf, str::FromStr, sync::Arc, time::Du
 
 use address::MpdPassword;
 use album_art::{AlbumArtConfig, AlbumArtConfigFile, ImageMethodFile};
-use anyhow::Result;
+use anyhow::{Context, Result};
 use artists::{Artists, ArtistsFile};
 use cava::{Cava, CavaFile};
 use clap::Parser;
@@ -271,7 +271,7 @@ impl ConfigFile {
         address_cli: Option<String>,
         password_cli: Option<String>,
         skip_album_art_check: bool,
-    ) -> Result<Config> {
+    ) -> Result<Config, anyhow::Error> {
         let original_tabs_definition = self.tabs.clone();
         let tabs: Tabs = self.tabs.convert(&theme.components, &theme.border_symbol_sets)?;
         let active_panes = Config::calc_active_panes(&tabs.tabs, &theme.layout);
@@ -281,10 +281,12 @@ impl ConfigFile {
         let album_art_method = self.album_art.method;
         let mut config = Config {
             theme_name: self.theme,
-            // TODO: ADD ENV VAR EXPANSION TO CACHE DIR AS WELL!!
-            // NOTE: This should also be forced to be an absolute path after expansion,
-            // Currently it can be a relative path, which dosen't make sense
-            cache_dir: self.cache_dir.map(|v| absolute_env_var_expand_path(&v)).unwrap_or_default(),
+            cache_dir: self
+                .cache_dir
+                .map_or(Ok(None), |v| -> Result<Option<PathBuf>> {
+                    absolute_env_var_expand_path(&v)
+                })
+                .context("Invalid cache_dir path")?,
             lyrics_dir: self.lyrics_dir.map(|v| {
                 let v = env_var_expand(&v);
                 let v = tilde_expand(&v);
@@ -435,14 +437,15 @@ pub mod utils {
 
     use crate::shared::env::ENV;
 
-    pub fn absolute_env_var_expand_path(inp: &Path) -> Option<PathBuf> {
-        let path_str = inp.to_str()?;
+    pub fn absolute_env_var_expand_path(inp: &Path) -> Result<Option<PathBuf>, anyhow::Error> {
+        let path_str =
+            inp.to_str().ok_or_else(|| anyhow::anyhow!("Invalid path: '{}'", inp.display()))?;
         let expanded = env_var_expand(path_str);
         let expanded_path = tilde_expand_path(&PathBuf::from(expanded));
         if expanded_path.is_absolute() {
-            return Some(expanded_path);
+            return Ok(Some(expanded_path));
         }
-        None
+        Err(anyhow::anyhow!("Path is not absolute: {}", expanded_path.display()))
     }
 
     pub fn tilde_expand_path(inp: &Path) -> PathBuf {
@@ -604,10 +607,6 @@ pub mod utils {
         #[test_case("/start/$EMPTY/end", "/start//end")]
         #[test_case("/$NOT_SET", "/$NOT_SET")]
         #[test_case("/basic/path", "/basic/path")]
-        #[test_case("not/absolute/path", "")]
-        // NOTE: current implementation only expands vars that are the entire part.
-        // This is different from how shells do it, but I can't think of a use case for
-        // it in paths #[test_case("/no$HOME$VALUE", "/no/home/some_userpath")]
         fn env_var_expansion_path(input: &str, expected: &str) {
             let _guard = TEST_LOCK.lock().unwrap();
 
@@ -615,9 +614,8 @@ pub mod utils {
             ENV.set("HOME".to_string(), "/home/some_user".to_string());
             ENV.set("VALUE".to_string(), "path".to_string());
             ENV.set("EMPTY".to_string(), String::new());
-            let got =
-                absolute_env_var_expand_path(PathBuf::from(input).as_path()).unwrap_or_default();
-            assert_eq!(got, PathBuf::from(expected));
+            let got = absolute_env_var_expand_path(PathBuf::from(input).as_path()).ok().unwrap();
+            assert_eq!(got, Some(PathBuf::from(expected)));
         }
     }
 }
