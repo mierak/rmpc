@@ -6,10 +6,7 @@ use strum::{Display, EnumDiscriminants, VariantArray};
 
 use super::ToDescription;
 use crate::{
-    config::{
-        tabs::TabName,
-        utils::{env_var_expand, tilde_expand},
-    },
+    config::{tabs::TabName, utils::tilde_expand},
     mpd::{QueuePosition, commands::Song},
     shared::{args, macros::status_warn, song_ext::SongsExt},
 };
@@ -163,11 +160,7 @@ impl From<GlobalActionFile> for GlobalAction {
                 GlobalAction::ExternalCommand {
                     prompt: command.iter().any(|cmd| args::contains_placeholder_args(cmd)),
                     command: Arc::new(
-                        // TODO: TEST THIS!!
-                        command
-                            .into_iter()
-                            .map(|v| tilde_expand(&env_var_expand(&v)).into_owned())
-                            .collect_vec(),
+                        command.into_iter().map(|v| tilde_expand(&v).into_owned()).collect_vec(),
                     ),
                     description,
                 }

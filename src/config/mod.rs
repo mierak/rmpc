@@ -320,19 +320,11 @@ impl ConfigFile {
             artists: self.artists.into(),
             album_art: self.album_art.into(),
             on_song_change: self.on_song_change.map(|arr| {
-                Arc::new(
-                    arr.into_iter()
-                        .map(|v| tilde_expand(&env_var_expand(&v)).into_owned())
-                        .collect_vec(),
-                )
+                Arc::new(arr.into_iter().map(|v| tilde_expand(&v).into_owned()).collect_vec())
             }),
             exec_on_song_change_at_start: self.exec_on_song_change_at_start,
             on_resize: self.on_resize.map(|arr| {
-                Arc::new(
-                    arr.into_iter()
-                        .map(|v| tilde_expand(&env_var_expand(&v)).into_owned())
-                        .collect_vec(),
-                )
+                Arc::new(arr.into_iter().map(|v| tilde_expand(&v).into_owned()).collect_vec())
             }),
             show_playlists_in_browser: self.show_playlists_in_browser,
             browser_song_sort: Arc::new(SortOptions {
