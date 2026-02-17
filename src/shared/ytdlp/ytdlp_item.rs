@@ -118,7 +118,7 @@ impl FromStr for YtDlpContent {
         };
 
         match host.strip_prefix("www.").unwrap_or(host) {
-            "youtube.com" => {
+            "youtube.com" | "music.youtube.com" => {
                 let segments = url
                     .path_segments()
                     .ok_or_else(|| YtDlpParseError::invalid_yt(s, "cannot-be-a-base"))?
