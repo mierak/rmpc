@@ -11,6 +11,7 @@ All notable changes to this project will be documented in this file.
 keybinds if they contained either `{` or `}`. You will now need to escape these by doubling them up: `{{` and `}}`.
 - `scroll_speed` to `song_table_format`
 - `album_art.custom_loader` to allow for more flexibility when choosing the album art image
+- added `CopyToClipboard()` action
 
 ### Changed
 

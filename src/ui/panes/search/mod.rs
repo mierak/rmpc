@@ -17,7 +17,16 @@ use crate::{
         keys::{
             CommonAction,
             GlobalAction,
-            actions::{AddKind, AutoplayKind, DeleteKind, Position, RateKind, SaveKind},
+            actions::{
+                AddKind,
+                AutoplayKind,
+                CopyContent,
+                CopyContentsKind,
+                DeleteKind,
+                Position,
+                RateKind,
+                SaveKind,
+            },
         },
         tabs::PaneType,
     },
@@ -32,6 +41,7 @@ use crate::{
     },
     shared::{
         args,
+        clipboard::Clipboard,
         keys::ActionEvent,
         macros::{modal, status_error, status_info, status_warn},
         mouse_event::{MouseEvent, MouseEventKind, calculate_scrollbar_position},
@@ -46,6 +56,7 @@ use crate::{
             menu::{
                 add_to_playlist_or_show_modal,
                 create_add_modal,
+                create_copy_to_clipboard_modal,
                 create_delete_modal,
                 create_rating_modal,
                 create_save_modal,
@@ -389,6 +400,7 @@ impl SearchPane {
                 CommonAction::PreviousResult => {}
                 CommonAction::Select => {}
                 CommonAction::InvertSelection => {}
+                CommonAction::CopyToClipboard { kind: _ } => {}
                 CommonAction::Rename => {}
                 CommonAction::Close => {}
                 CommonAction::Confirm => {
@@ -624,6 +636,39 @@ impl SearchPane {
                     self.songs_dir.invert_marked();
 
                     ctx.render()?;
+                }
+                CommonAction::CopyToClipboard { kind: CopyContentsKind::Content(content) } => {
+                    let items = self.items(content.all);
+                    let format = match &content.content {
+                        CopyContent::DisplayedValue => {
+                            ctx.config.theme.browser_song_format.0.as_slice()
+                        }
+                        CopyContent::Metadata(props) => props,
+                    };
+
+                    let content = items
+                        .map(|(_, item)| <Song as DirStackItem>::format(item, format, ctx))
+                        .join("\n");
+
+                    Clipboard::from(content).write_with_status();
+                }
+                CommonAction::CopyToClipboard { kind: CopyContentsKind::Modal(opts) } => {
+                    let items = self.items(false).map(|(_, b)| b.clone()).collect_vec();
+                    let all_items = if opts.iter().any(|opt| opt.1.all) {
+                        self.items(true).map(|(_, b)| b.clone()).collect_vec()
+                    } else {
+                        Vec::new()
+                    };
+
+                    let modal = create_copy_to_clipboard_modal(
+                        &opts,
+                        ctx.config.theme.browser_song_format.0.clone(),
+                        items,
+                        all_items,
+                        ctx,
+                    );
+
+                    modal!(ctx, modal);
                 }
                 CommonAction::Close if !self.songs_dir.marked().is_empty() => {
                     self.songs_dir.marked_mut().clear();

@@ -17,8 +17,19 @@ use actions::{CommonActionFile, GlobalActionFile, QueueActionsFile};
 pub use key::Key;
 use serde::{Deserialize, Serialize};
 
+#[cfg(debug_assertions)]
+#[cfg(not(debug_assertions))]
+#[cfg(debug_assertions)]
+use crate::config::keys::actions::CopyContentsFile;
 use crate::config::keys::{
-    actions::{DuplicateStrategy, RateKind, SaveKind},
+    actions::{
+        CopyContentFile,
+        CopyContentsFile,
+        CopyContentsKindFile,
+        DuplicateStrategy,
+        RateKind,
+        SaveKind,
+    },
     key::KeySequence,
 };
 
@@ -138,6 +149,8 @@ impl Default for KeyConfigFile {
             (s().char('N'),                       C::PreviousResult),
             (s().char(' '),                       C::Select),
             (s().char(' ').ctrl(),                C::InvertSelection),
+            (s().char('Y'),                       C::CopyToClipboard { kind: CopyContentsKindFile::default() }),
+            (s().char('y'),                       C::CopyToClipboard { kind: CopyContentsKindFile::Content(CopyContentsFile { all: false, content: CopyContentFile::DisplayedValue })}),
             (s().char('a'),                       C::Add),
             (s().char('A'),                       C::AddAll),
             (s().char('D'),                       C::Delete),

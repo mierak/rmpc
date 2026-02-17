@@ -113,6 +113,11 @@
             "<C-s>s":     Save(kind: Modal(all: false, duplicates_strategy: Ask)),
             "<C-s>a":     Save(kind: Modal(all: true, duplicates_strategy: Ask)),
             "r":          Rate(),
+            "Y":          CopyToClipboard(kind: Modal([
+                              ("Displayed value", (content: DisplayedValue, all: false)),
+                              ("Artist - Title", (content: Metadata([(kind: Property(Artist)), (kind: Text(" - ")), (kind: Property(Title))]), all: false)),
+                          ])),
+            "y":          CopyToClipboard(kind: Content(content: DisplayedValue, all : false)),
         },
         queue: {
             "d":          Delete,

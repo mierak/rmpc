@@ -21,6 +21,12 @@ use crate::{
 #[derive(Debug, derive_more::Deref, Clone, Copy, Eq, PartialEq, Ord, PartialOrd)]
 pub struct DownloadId(Id);
 
+impl std::fmt::Display for DownloadId {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        self.0.fmt(f)
+    }
+}
+
 impl DownloadId {
     pub fn new() -> Self {
         Self(id::new())

@@ -40,6 +40,7 @@ pub trait DirStackItem {
     fn to_list_item_simple<'a>(&self, ctx: &Ctx) -> ListItem<'a> {
         self.to_list_item(ctx, false, false, None)
     }
+    fn format(&self, format: &[Property<SongProperty>], ctx: &Ctx) -> String;
 }
 
 impl DirStackItem for DirOrSong {
@@ -126,6 +127,13 @@ impl DirStackItem for DirOrSong {
             }
         }
     }
+
+    fn format(&self, format: &[Property<SongProperty>], ctx: &Ctx) -> String {
+        match self {
+            DirOrSong::Dir { name, .. } => name.clone(),
+            DirOrSong::Song(s) => <Song as DirStackItem>::format(s, format, ctx),
+        }
+    }
 }
 
 impl DirStackItem for Song {
@@ -191,6 +199,21 @@ impl DirStackItem for Song {
         } else {
             ListItem::from(value)
         }
+    }
+
+    fn format(&self, format: &[Property<SongProperty>], ctx: &Ctx) -> String {
+        format
+            .iter()
+            .map(|prop| {
+                prop.as_string(
+                    Some(self),
+                    &ctx.config.theme.format_tag_separator,
+                    ctx.config.theme.multiple_tag_resolution_strategy,
+                    ctx,
+                )
+                .unwrap_or_default()
+            })
+            .join(" ")
     }
 }
 
@@ -275,5 +298,9 @@ impl DirStackItem for String {
         } else {
             ListItem::new(Line::from(vec![marker_span, Span::from(self.clone())]))
         }
+    }
+
+    fn format(&self, _format: &[Property<SongProperty>], _ctx: &Ctx) -> String {
+        self.clone()
     }
 }
