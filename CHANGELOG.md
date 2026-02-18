@@ -12,7 +12,7 @@ keybinds if they contained either `{` or `}`. You will now need to escape these 
 - `scroll_speed` to `song_table_format`
 - `album_art.custom_loader` to allow for more flexibility when choosing the album art image
 - added `CopyToClipboard()` action
-- `stop_on_exit` config option to automatically stop playback when exiting rmpc
+- `on_exit` config option to execute a command when exiting rmpc, similar to `on_song_change`
 
 ### Changed
 

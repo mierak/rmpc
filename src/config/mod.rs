@@ -91,7 +91,7 @@ pub struct Config {
     pub auto_open_downloads: bool,
     pub extra_yt_dlp_args: Vec<String>,
     pub duration_format: DurationFormat,
-    pub stop_on_exit: bool,
+    pub on_exit: Option<Arc<Vec<String>>>,
 }
 
 impl Default for Config {
@@ -159,7 +159,7 @@ pub struct ConfigFile {
     pub extra_yt_dlp_args: Vec<String>,
     pub auto_open_downloads: bool,
     pub duration_format: String,
-    pub stop_on_exit: bool,
+    pub on_exit: Option<Vec<String>>,
 }
 
 #[derive(Debug, Serialize, Deserialize, Copy, Clone, PartialEq, Eq)]
@@ -230,7 +230,7 @@ impl Default for ConfigFile {
             extra_yt_dlp_args: Vec::new(),
             auto_open_downloads: true,
             duration_format: "%m:%S".to_string(),
-            stop_on_exit: false,
+            on_exit: None,
         }
     }
 }
@@ -379,7 +379,9 @@ impl ConfigFile {
             extra_yt_dlp_args: self.extra_yt_dlp_args,
             auto_open_downloads: self.auto_open_downloads,
             duration_format: DurationFormat::parse(&self.duration_format)?,
-            stop_on_exit: self.stop_on_exit,
+            on_exit: self.on_exit.map(|arr| {
+                Arc::new(arr.into_iter().map(|v| tilde_expand(&v).into_owned()).collect_vec())
+            }),
         };
 
         if skip_album_art_check {
