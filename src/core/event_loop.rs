@@ -247,6 +247,14 @@ fn main_task<B: Backend + std::io::Write>(
                     match ui.handle_action(&mut action, &mut ctx) {
                         Ok(KeyHandleResult::None) => continue,
                         Ok(KeyHandleResult::Quit) => {
+                            if ctx.config.stop_on_exit
+                                && let Err(err) = ctx.query_sync(|client| {
+                                    client.stop()?;
+                                    Ok(())
+                                })
+                            {
+                                log::error!(error:? = err; "Failed to send stop command on exit");
+                            }
                             if let Err(err) = ui.on_event(UiEvent::Exit, &mut ctx) {
                                 log::error!(error:? = err; "UI failed to handle quit event");
                             }

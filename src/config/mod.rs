@@ -91,6 +91,7 @@ pub struct Config {
     pub auto_open_downloads: bool,
     pub extra_yt_dlp_args: Vec<String>,
     pub duration_format: DurationFormat,
+    pub stop_on_exit: bool,
 }
 
 impl Default for Config {
@@ -158,6 +159,7 @@ pub struct ConfigFile {
     pub extra_yt_dlp_args: Vec<String>,
     pub auto_open_downloads: bool,
     pub duration_format: String,
+    pub stop_on_exit: bool,
 }
 
 #[derive(Debug, Serialize, Deserialize, Copy, Clone, PartialEq, Eq)]
@@ -228,6 +230,7 @@ impl Default for ConfigFile {
             extra_yt_dlp_args: Vec::new(),
             auto_open_downloads: true,
             duration_format: "%m:%S".to_string(),
+            stop_on_exit: false,
         }
     }
 }
@@ -376,6 +379,7 @@ impl ConfigFile {
             extra_yt_dlp_args: self.extra_yt_dlp_args,
             auto_open_downloads: self.auto_open_downloads,
             duration_format: DurationFormat::parse(&self.duration_format)?,
+            stop_on_exit: self.stop_on_exit,
         };
 
         if skip_album_art_check {
