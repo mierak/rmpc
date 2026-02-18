@@ -24,6 +24,7 @@ keybinds if they contained either `{` or `}`. You will now need to escape these 
 - Issue with Iterm2 image protocol not rendering images sometimes
 - Moved `Update` and `Rescan` back to `u` and `U` respectively because they were conflicting with other
 keybinds
+- Fixed a benign error when deleting items from the queue really fast
 
 
 ## [0.11.0] - 2026-02-01
