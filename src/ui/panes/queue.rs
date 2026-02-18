@@ -37,7 +37,12 @@ use crate::{
     },
     core::command::{create_env, run_external},
     ctx::{Ctx, LIKE_STICKER, RATING_STICKER},
-    mpd::{QueuePosition, client::Client, commands::Song, mpd_client::MpdClient},
+    mpd::{
+        QueuePosition,
+        client::Client,
+        commands::Song,
+        mpd_client::{MpdClient, SingleOrRange},
+    },
     shared::{
         args,
         clipboard::Clipboard,
@@ -711,10 +716,9 @@ impl Pane for QueuePane {
                     ctx.render()?;
                 }
                 QueueActions::Delete => {
-                    if let Some(selected_song) = self.queue.selected() {
-                        let id = selected_song.id;
+                    if let Some((idx, _)) = self.queue.selected_with_idx() {
                         ctx.command(move |client| {
-                            client.delete_id(id)?;
+                            client.delete_from_queue(SingleOrRange::single(idx))?;
                             Ok(())
                         });
                     } else {
