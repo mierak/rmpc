@@ -22,6 +22,8 @@ keybinds if they contained either `{` or `}`. You will now need to escape these 
 
 - Theme hot reload not working when it was set using the `theme.ron` form
 - Issue with Iterm2 image protocol not rendering images sometimes
+- Moved `Update` and `Rescan` back to `u` and `U` respectively because they were conflicting with other
+keybinds
 
 
 ## [0.11.0] - 2026-02-01
