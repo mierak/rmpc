@@ -1104,6 +1104,18 @@ impl Pane for QueuePane {
                     });
                 }
                 CommonAction::Rate {
+                    kind: RateKind::ClearRating(),
+                    current: false,
+                    min_rating: _,
+                    max_rating: _,
+                } => {
+                    let items = self.enqueue_items(false).0;
+                    ctx.command(move |client| {
+                        client.delete_sticker_multiple(RATING_STICKER, items)?;
+                        Ok(())
+                    });
+                }
+                CommonAction::Rate {
                     kind: RateKind::Modal { values, custom, like },
                     current: false,
                     min_rating,
