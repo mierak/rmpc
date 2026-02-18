@@ -109,8 +109,8 @@ impl Default for KeyConfigFile {
             (s().char('5'),                       G::SwitchToTab("Albums".to_string())),
             (s().char('6'),                       G::SwitchToTab("Playlists".to_string())),
             (s().char('7'),                       G::SwitchToTab("Search".to_string())),
-            (s().char('u').ctrl(),                G::Update),
-            (s().char('U').ctrl(),                G::Rescan),
+            (s().char('u'),                       G::Update),
+            (s().char('U'),                       G::Rescan),
             (s().char('R'),                       G::AddRandom),
         ]);
 

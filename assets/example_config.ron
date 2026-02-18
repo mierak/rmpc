@@ -64,8 +64,8 @@
             "5":          SwitchToTab("Albums"),
             "6":          SwitchToTab("Playlists"),
             "7":          SwitchToTab("Search"),
-            "<C-u>":      Update,
-            "<C-U>":      Rescan,
+            "u":          Update,
+            "U":          Rescan,
             "R":          AddRandom,
         },
         navigation: {
