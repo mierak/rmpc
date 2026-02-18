@@ -20,7 +20,15 @@ use crate::{
             CommonAction,
             GlobalAction,
             QueueActions,
-            actions::{AddKind, AutoplayKind, DeleteKind, RateKind, SaveKind},
+            actions::{
+                AddKind,
+                AutoplayKind,
+                CopyContent,
+                CopyContentsKind,
+                DeleteKind,
+                RateKind,
+                SaveKind,
+            },
         },
         theme::{
             AlbumSeparator,
@@ -32,6 +40,7 @@ use crate::{
     mpd::{QueuePosition, client::Client, commands::Song, mpd_client::MpdClient},
     shared::{
         args,
+        clipboard::Clipboard,
         ext::{btreeset_ranges::BTreeSetRanges, rect::RectExt},
         keys::ActionEvent,
         macros::{modal, status_error, status_info, status_warn},
@@ -41,7 +50,7 @@ use crate::{
     },
     ui::{
         UiEvent,
-        dirstack::Dir,
+        dirstack::{Dir, DirStackItem},
         input::InputResultEvent,
         modals::{
             confirm_modal::{Action, ConfirmModal},
@@ -50,6 +59,7 @@ use crate::{
             menu::{
                 add_to_playlist_or_show_modal,
                 create_add_modal,
+                create_copy_to_clipboard_modal,
                 create_delete_modal,
                 create_rating_modal,
                 create_save_modal,
@@ -984,6 +994,39 @@ impl Pane for QueuePane {
                     self.queue.invert_marked();
 
                     ctx.render()?;
+                }
+                CommonAction::CopyToClipboard { kind: CopyContentsKind::Content(content) } => {
+                    let items = self.items(content.all);
+                    let format = match &content.content {
+                        CopyContent::DisplayedValue => &self.column_formats,
+                        CopyContent::Metadata(props) => props,
+                    };
+
+                    let content = items
+                        .map(|(_, song)| <Song as DirStackItem>::format(song, format, ctx))
+                        .join("\n");
+
+                    Clipboard::from(content).write_with_status();
+                }
+                CommonAction::CopyToClipboard { kind: CopyContentsKind::Modal(opts) } => {
+                    let column_formats = self.column_formats.clone();
+
+                    let items = self.items(false).map(|(_, b)| b.clone()).collect_vec();
+                    let all_items = if opts.iter().any(|opt| opt.1.all) {
+                        self.items(true).map(|(_, b)| b.clone()).collect_vec()
+                    } else {
+                        Vec::new()
+                    };
+
+                    let modal = create_copy_to_clipboard_modal(
+                        &opts,
+                        column_formats,
+                        items,
+                        all_items,
+                        ctx,
+                    );
+
+                    modal!(ctx, modal);
                 }
                 CommonAction::Close if !self.queue.marked().is_empty() => {
                     self.queue.marked_mut().clear();

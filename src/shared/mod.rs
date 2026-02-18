@@ -1,5 +1,6 @@
 pub mod album_art;
 pub mod args;
+pub mod clipboard;
 pub mod cmp;
 pub mod config_read;
 pub mod dependencies;

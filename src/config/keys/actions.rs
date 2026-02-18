@@ -6,7 +6,11 @@ use strum::{Display, EnumDiscriminants, VariantArray};
 
 use super::ToDescription;
 use crate::{
-    config::{tabs::TabName, utils::tilde_expand},
+    config::{
+        tabs::TabName,
+        theme::properties::{Property, PropertyFile, SongProperty, SongPropertyFile},
+        utils::tilde_expand,
+    },
     mpd::{QueuePosition, commands::Song},
     shared::{args, macros::status_warn, song_ext::SongsExt},
 };
@@ -760,6 +764,98 @@ impl Default for DeleteKind {
     }
 }
 
+#[derive(Debug, serde::Serialize, serde::Deserialize, Clone, PartialEq)]
+pub enum CopyContentsKindFile {
+    Modal(#[serde(default)] Vec<(String, CopyContentsFile)>),
+    Content(CopyContentsFile),
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub enum CopyContentsKind {
+    Modal(Vec<(String, CopyContents)>),
+    Content(CopyContents),
+}
+
+impl Default for CopyContentsKindFile {
+    fn default() -> Self {
+        Self::Modal(vec![
+            ("Displayed value".into(), CopyContentsFile {
+                content: CopyContentFile::DisplayedValue,
+                all: false,
+            }),
+            ("Artist - Title".into(), CopyContentsFile {
+                content: CopyContentFile::Metadata(vec![
+                    PropertyFile::property(SongPropertyFile::Artist),
+                    PropertyFile::text(" - "),
+                    PropertyFile::property(SongPropertyFile::Title),
+                ]),
+                all: false,
+            }),
+        ])
+    }
+}
+
+impl TryFrom<CopyContentsKindFile> for CopyContentsKind {
+    type Error = anyhow::Error;
+
+    fn try_from(value: CopyContentsKindFile) -> Result<Self, Self::Error> {
+        match value {
+            CopyContentsKindFile::Modal(items) => {
+                let items = items
+                    .into_iter()
+                    .map(|(label, item)| -> anyhow::Result<_> { Ok((label, item.try_into()?)) })
+                    .try_collect()?;
+                Ok(CopyContentsKind::Modal(items))
+            }
+            CopyContentsKindFile::Content(content) => {
+                Ok(CopyContentsKind::Content(content.try_into()?))
+            }
+        }
+    }
+}
+
+#[derive(Debug, serde::Serialize, serde::Deserialize, Clone, PartialEq)]
+pub struct CopyContentsFile {
+    #[serde(default)]
+    pub all: bool,
+    pub content: CopyContentFile,
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct CopyContents {
+    pub all: bool,
+    pub content: CopyContent,
+}
+
+#[derive(Debug, serde::Serialize, serde::Deserialize, Clone, PartialEq)]
+pub enum CopyContentFile {
+    DisplayedValue,
+    Metadata(Vec<PropertyFile<SongPropertyFile>>),
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub enum CopyContent {
+    DisplayedValue,
+    Metadata(Vec<Property<SongProperty>>),
+}
+
+impl TryFrom<CopyContentsFile> for CopyContents {
+    type Error = anyhow::Error;
+
+    fn try_from(value: CopyContentsFile) -> Result<Self, Self::Error> {
+        Ok(CopyContents {
+            all: value.all,
+            content: match value.content {
+                CopyContentFile::DisplayedValue => CopyContent::DisplayedValue,
+                CopyContentFile::Metadata(props) => {
+                    let props = props.into_iter().map(|prop| prop.convert()).try_collect()?;
+                    CopyContent::Metadata(props)
+                }
+            },
+        })
+    }
+}
+
 // Common actions
 
 #[derive(Debug, serde::Serialize, serde::Deserialize, Clone, PartialEq)]
@@ -785,6 +881,10 @@ pub enum CommonActionFile {
     PreviousResult,
     Select,
     InvertSelection,
+    CopyToClipboard {
+        #[serde(default)]
+        kind: CopyContentsKindFile,
+    },
     Delete,
     Rename,
     Close,
@@ -846,6 +946,9 @@ pub enum CommonAction {
     PreviousResult,
     Select,
     InvertSelection,
+    CopyToClipboard {
+        kind: CopyContentsKind,
+    },
     Delete,
     Rename,
     Close,
@@ -893,6 +996,7 @@ impl ToDescription for CommonAction {
                 "Mark current item as selected in the browser, useful for example when you want to add multiple songs to a playlist".into()
             }
             CommonAction::InvertSelection => "Inverts the current selected items".into(),
+            CommonAction::CopyToClipboard { kind: _ } => "Copy item(s) under cursor to clipboard".into(),
             CommonAction::Delete => {
                 "Delete. For example a playlist, song from a playlist or wipe the current queue".into()
             }
@@ -1069,6 +1173,9 @@ impl TryFrom<CommonActionFile> for CommonAction {
             CommonActionFile::PreviousResult => CommonAction::PreviousResult,
             CommonActionFile::Select => CommonAction::Select,
             CommonActionFile::InvertSelection => CommonAction::InvertSelection,
+            CommonActionFile::CopyToClipboard { kind } => {
+                CommonAction::CopyToClipboard { kind: kind.try_into()? }
+            }
             CommonActionFile::Add => CommonAction::AddOptions {
                 kind: AddKind::Action(AddOpts {
                     autoplay: AutoplayKind::None,

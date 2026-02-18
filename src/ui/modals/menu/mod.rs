@@ -12,7 +12,10 @@ use ratatui::{
 };
 
 use crate::{
-    config::keys::actions::{AddOpts, DuplicateStrategy},
+    config::{
+        keys::actions::{AddOpts, CopyContent, CopyContents, DuplicateStrategy},
+        theme::properties::{Property, SongProperty},
+    },
     ctx::{Ctx, LIKE_STICKER, RATING_STICKER},
     mpd::{
         client::Client,
@@ -21,13 +24,17 @@ use crate::{
         proto_client::ProtoClient,
     },
     shared::{
+        clipboard::Clipboard,
         cmp::StringCompare,
         macros::{modal, status_error, status_info, status_warn},
         mpd_client_ext::{Enqueue, MpdClientExt as _},
     },
-    ui::modals::{
-        confirm_modal::{Action, ConfirmModal},
-        menu::select_section::SelectSection,
+    ui::{
+        dirstack::DirStackItem,
+        modals::{
+            confirm_modal::{Action, ConfirmModal},
+            menu::select_section::SelectSection,
+        },
     },
 };
 
@@ -633,4 +640,49 @@ pub fn delete_from_playlist_or_show_confirmation(
     }
 
     Ok(())
+}
+
+pub fn create_copy_to_clipboard_modal<'a, I>(
+    opts: &Vec<(String, CopyContents)>,
+    column_formats: Vec<Property<SongProperty>>,
+    items: Vec<I>,
+    all_items: Vec<I>,
+    ctx: &Ctx,
+) -> MenuModal<'a>
+where
+    I: DirStackItem + Send + Sync + 'static,
+{
+    MenuModal::new(ctx)
+        .select_section(ctx, |mut section| {
+            for opt in opts {
+                section.add_item(opt.0.clone(), opt.0.clone());
+            }
+
+            let opts = opts.clone();
+            section.action(move |ctx, value| {
+                let Some(opt) = opts.iter().find(|opt| opt.0 == value) else {
+                    // shouldn't happen since the options are generated from
+                    // the same list, but just in case
+                    status_error!("Invalid option selected");
+                    return Ok(());
+                };
+
+                let format = match &opt.1.content {
+                    CopyContent::DisplayedValue => &column_formats,
+                    CopyContent::Metadata(props) => props,
+                };
+
+                let items = if opt.1.all { all_items } else { items };
+                let content = items
+                    .into_iter()
+                    .map(|song| <I as DirStackItem>::format(&song, format, ctx))
+                    .join("\n");
+
+                Clipboard::from(content).write_with_status();
+                Ok(())
+            });
+            Some(section)
+        })
+        .list_section(ctx, |section| Some(section.item("Cancel", |_ctx| Ok(()))))
+        .build()
 }

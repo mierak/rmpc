@@ -240,6 +240,20 @@ pub enum PropertyKindOrText<T> {
     Transform(Transform<T>),
 }
 
+impl<T: Clone> PropertyFile<T> {
+    pub fn text(value: impl Into<String>) -> Self {
+        Self { kind: PropertyKindFileOrText::Text(value.into()), style: None, default: None }
+    }
+
+    pub fn sticker(value: impl Into<String>) -> Self {
+        Self { kind: PropertyKindFileOrText::Sticker(value.into()), style: None, default: None }
+    }
+
+    pub fn property(value: T) -> Self {
+        Self { kind: PropertyKindFileOrText::Property(value), style: None, default: None }
+    }
+}
+
 impl<T: Clone> PropertyKindOrText<T> {
     pub fn contains_stickers(&self) -> bool {
         match self {
