@@ -713,6 +713,13 @@ impl<'ui> Ui<'ui> {
                                     Ok(())
                                 });
                             }
+                            RateKind::ClearRating() => {
+                                let uri = song.file.clone();
+                                ctx.command(move |client| {
+                                    client.delete_sticker(&uri, RATING_STICKER)?;
+                                    Ok(())
+                                });
+                            }
                             RateKind::Like() => {
                                 let uri = song.file.clone();
                                 ctx.command(move |client| {

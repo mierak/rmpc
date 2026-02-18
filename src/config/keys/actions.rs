@@ -698,6 +698,7 @@ pub enum RateKind {
         like: bool,
     },
     Value(i32),
+    ClearRating(),
     Like(),
     Dislike(),
     Neutral(),
@@ -1055,6 +1056,13 @@ impl ToDescription for CommonAction {
                     format!("Set currently playing song's rating to {val}")
                 } else {
                     format!("Set song rating to {val}")
+                }.into()
+            }
+            CommonAction::Rate { kind: RateKind::ClearRating(), current, ..  } => {
+                if *current {
+                    "Clear the currently playing songs's rating".to_string()
+                } else {
+                    "Clear song rating".to_string()
                 }.into()
             }
             CommonAction::Rate { kind: k @ RateKind::Like() | k @ RateKind::Dislike() | k @ RateKind::Neutral(), current , .. } => {
