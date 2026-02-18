@@ -9,7 +9,7 @@ use std::{
 use crossbeam::channel::{Receiver, RecvTimeoutError};
 use ratatui::{Terminal, layout::Rect, prelude::Backend};
 
-use super::command::{create_env, run_external};
+use super::command::{create_env, run_external, run_external_blocking};
 use crate::{
     config::{Config, cli::RemoteCommandQuery, tabs::PaneType},
     ctx::Ctx,
@@ -247,6 +247,16 @@ fn main_task<B: Backend + std::io::Write>(
                     match ui.handle_action(&mut action, &mut ctx) {
                         Ok(KeyHandleResult::None) => continue,
                         Ok(KeyHandleResult::Quit) => {
+                            if let Some(command) = &ctx.config.on_exit {
+                                let env = create_env(&ctx, std::iter::empty());
+                                if let Err(err) = run_external_blocking(
+                                    command.as_slice(),
+                                    &[],
+                                    env.iter().map(|(k, v)| (k.as_str(), v.as_str())),
+                                ) {
+                                    log::error!(error:? = err; "Failed to run on_exit command");
+                                }
+                            }
                             if let Err(err) = ui.on_event(UiEvent::Exit, &mut ctx) {
                                 log::error!(error:? = err; "UI failed to handle quit event");
                             }
