@@ -1001,13 +1001,13 @@ impl Pane for QueuePane {
                 }
                 CommonAction::CopyToClipboard { kind: CopyContentsKind::Content(content) } => {
                     let items = self.items(content.all);
-                    let format = match &content.content {
-                        CopyContent::DisplayedValue => &self.column_formats,
-                        CopyContent::Metadata(props) => props,
+                    let (sep, format) = match &content.content {
+                        CopyContent::DisplayedValue => (" ", &self.column_formats),
+                        CopyContent::Metadata(props) => ("", props),
                     };
 
                     let content = items
-                        .map(|(_, song)| <Song as DirStackItem>::format(song, format, ctx))
+                        .map(|(_, song)| <Song as DirStackItem>::format(song, format, sep, ctx))
                         .join("\n");
 
                     Clipboard::from(content).write_with_status();
@@ -1027,6 +1027,8 @@ impl Pane for QueuePane {
                         column_formats,
                         items,
                         all_items,
+                        " ",
+                        "",
                         ctx,
                     );
 

@@ -40,7 +40,7 @@ pub trait DirStackItem {
     fn to_list_item_simple<'a>(&self, ctx: &Ctx) -> ListItem<'a> {
         self.to_list_item(ctx, false, false, None)
     }
-    fn format(&self, format: &[Property<SongProperty>], ctx: &Ctx) -> String;
+    fn format(&self, format: &[Property<SongProperty>], sep: &str, ctx: &Ctx) -> String;
 }
 
 impl DirStackItem for DirOrSong {
@@ -128,10 +128,10 @@ impl DirStackItem for DirOrSong {
         }
     }
 
-    fn format(&self, format: &[Property<SongProperty>], ctx: &Ctx) -> String {
+    fn format(&self, format: &[Property<SongProperty>], sep: &str, ctx: &Ctx) -> String {
         match self {
             DirOrSong::Dir { name, .. } => name.clone(),
-            DirOrSong::Song(s) => <Song as DirStackItem>::format(s, format, ctx),
+            DirOrSong::Song(s) => <Song as DirStackItem>::format(s, format, sep, ctx),
         }
     }
 }
@@ -201,7 +201,7 @@ impl DirStackItem for Song {
         }
     }
 
-    fn format(&self, format: &[Property<SongProperty>], ctx: &Ctx) -> String {
+    fn format(&self, format: &[Property<SongProperty>], sep: &str, ctx: &Ctx) -> String {
         format
             .iter()
             .map(|prop| {
@@ -213,7 +213,7 @@ impl DirStackItem for Song {
                 )
                 .unwrap_or_default()
             })
-            .join(" ")
+            .join(sep)
     }
 }
 
@@ -300,7 +300,7 @@ impl DirStackItem for String {
         }
     }
 
-    fn format(&self, _format: &[Property<SongProperty>], _ctx: &Ctx) -> String {
+    fn format(&self, _format: &[Property<SongProperty>], _sep: &str, _ctx: &Ctx) -> String {
         self.clone()
     }
 }

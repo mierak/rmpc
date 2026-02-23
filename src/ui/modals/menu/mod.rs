@@ -647,6 +647,8 @@ pub fn create_copy_to_clipboard_modal<'a, I>(
     column_formats: Vec<Property<SongProperty>>,
     items: Vec<I>,
     all_items: Vec<I>,
+    display_value_sep: &'static str,
+    sep: &'static str,
     ctx: &Ctx,
 ) -> MenuModal<'a>
 where
@@ -667,15 +669,15 @@ where
                     return Ok(());
                 };
 
-                let format = match &opt.1.content {
-                    CopyContent::DisplayedValue => &column_formats,
-                    CopyContent::Metadata(props) => props,
+                let (sep, format) = match &opt.1.content {
+                    CopyContent::DisplayedValue => (display_value_sep, &column_formats),
+                    CopyContent::Metadata(props) => (sep, props),
                 };
 
                 let items = if opt.1.all { all_items } else { items };
                 let content = items
                     .into_iter()
-                    .map(|song| <I as DirStackItem>::format(&song, format, ctx))
+                    .map(|song| <I as DirStackItem>::format(&song, format, sep, ctx))
                     .join("\n");
 
                 Clipboard::from(content).write_with_status();
