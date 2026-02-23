@@ -27,6 +27,7 @@ keybinds if they contained either `{` or `}`. You will now need to escape these 
 - Moved `Update` and `Rescan` back to `u` and `U` respectively because they were conflicting with other
 keybinds
 - Fixed a benign error when deleting items from the queue really fast
+- Attempt to fix sync issues with cava visualiser
 
 
 ## [0.11.0] - 2026-02-01

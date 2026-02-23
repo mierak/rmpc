@@ -24,7 +24,7 @@ use ratatui::{
 use super::Pane;
 use crate::{
     config::{
-        cava::Cava,
+        cava::{Cava, CavaInputMethod},
         theme::cava::{CavaTheme, Orientation},
     },
     ctx::Ctx,
@@ -186,8 +186,10 @@ impl CavaPane {
         let cfg_dir = std::env::temp_dir().join("rmpc");
         std::fs::create_dir_all(&cfg_dir)?;
         let cfg_path = cfg_dir.join(format!("cava-{}.conf", rustix::process::geteuid().as_raw()));
-        let config = config.to_cava_config_file(bars)?;
-        std::fs::write(&cfg_path, config)?;
+        let cfg_string = config.to_cava_config_file(bars)?;
+        std::fs::write(&cfg_path, cfg_string)?;
+
+        Self::try_clear_fifo(config);
 
         Ok(ProcessGuard {
             handle: std::process::Command::new("cava")
@@ -198,6 +200,52 @@ impl CavaPane {
                 .stdin(Stdio::null())
                 .spawn()?,
         })
+    }
+
+    fn try_clear_fifo(config: &Cava) {
+        // Attempt to clear MPD's fifo to keep the visualiser in sync with the current
+        // track's audio data
+        if !matches!(config.input.method, CavaInputMethod::Fifo) {
+            return;
+        }
+
+        let fifo_path = &config.input.source;
+        if !std::path::Path::new(fifo_path).exists() {
+            log::warn!(
+                "Cava is configured to use FIFO input, but the FIFO does not exist at the specified path: {fifo_path}. Not attempting to clear the FIFO"
+            );
+            return;
+        }
+
+        let fd = match rustix::fs::open(
+            fifo_path,
+            rustix::fs::OFlags::NONBLOCK | rustix::fs::OFlags::RDONLY | rustix::fs::OFlags::CLOEXEC,
+            rustix::fs::Mode::empty(),
+        ) {
+            Ok(fd) => fd,
+            Err(err) => {
+                log::error!(err:?; "Failed to open MPD fifo for clearing");
+                return;
+            }
+        };
+
+        log::debug!("Attempting to clear MPD fifo at path {fifo_path} before starting cava");
+        let mut file = std::fs::File::from(fd);
+        let mut buf = [0; 8096];
+        loop {
+            match file.read(&mut buf) {
+                Ok(0) => break,
+                Ok(n) => {
+                    log::trace!("Read {n} bytes from MPD fifo while clearing it");
+                }
+                Err(e) if e.kind() == std::io::ErrorKind::WouldBlock => {
+                    break;
+                }
+                Err(e) => {
+                    log::error!(e:?; "Encountered unexpected error while clearing MPD fifo");
+                }
+            }
+        }
     }
 
     fn run_cava_loop(
