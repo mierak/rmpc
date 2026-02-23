@@ -647,7 +647,7 @@ impl SearchPane {
                     };
 
                     let content = items
-                        .map(|(_, item)| <Song as DirStackItem>::format(item, format, ctx))
+                        .map(|(_, item)| <Song as DirStackItem>::format(item, format, "", ctx))
                         .join("\n");
 
                     Clipboard::from(content).write_with_status();
@@ -665,6 +665,8 @@ impl SearchPane {
                         ctx.config.theme.browser_song_format.0.clone(),
                         items,
                         all_items,
+                        "",
+                        "",
                         ctx,
                     );
 

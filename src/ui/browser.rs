@@ -502,7 +502,7 @@ where
                     CopyContent::Metadata(props) => props,
                 };
 
-                let content = items.map(|(_, item)| item.format(format, ctx)).join("\n");
+                let content = items.map(|(_, item)| item.format(format, "", ctx)).join("\n");
 
                 Clipboard::from(content).write_with_status();
             }
@@ -519,6 +519,8 @@ where
                     ctx.config.theme.browser_song_format.0.clone(),
                     items,
                     all_items,
+                    "",
+                    "",
                     ctx,
                 );
 

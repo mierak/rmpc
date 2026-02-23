@@ -353,7 +353,7 @@ impl DirStackItem for DownloadId {
         ListItem::new("")
     }
 
-    fn format(&self, _format: &[Property<SongProperty>], _ctx: &Ctx) -> String {
+    fn format(&self, _format: &[Property<SongProperty>], _sep: &str, _ctx: &Ctx) -> String {
         self.to_string()
     }
 }
