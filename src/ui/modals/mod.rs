@@ -54,7 +54,12 @@ pub(crate) trait Modal: std::fmt::Debug {
         None
     }
 
+    fn destroy(&mut self, ctx: &Ctx) -> Result<()> {
+        Ok(())
+    }
+
     fn hide(&mut self, ctx: &Ctx) -> Result<()> {
+        self.destroy(ctx)?;
         ctx.app_event_sender
             .send(crate::AppEvent::UiEvent(crate::ui::UiAppEvent::PopModal(self.id())))?;
         Ok(())

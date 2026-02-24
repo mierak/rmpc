@@ -160,6 +160,11 @@ impl<'a, C: FnOnce(&Ctx, &str) -> Result<()> + 'a> Modal for InputModal<'a, C> {
         Ok(())
     }
 
+    fn destroy(&mut self, ctx: &Ctx) -> Result<()> {
+        ctx.input.destroy_buffer(self.input_buffer_id);
+        Ok(())
+    }
+
     fn handle_insert_mode(&mut self, kind: InputResultEvent, ctx: &Ctx) -> Result<()> {
         match kind {
             InputResultEvent::Push => {}
@@ -170,7 +175,6 @@ impl<'a, C: FnOnce(&Ctx, &str) -> Result<()> + 'a> Modal for InputModal<'a, C> {
                 {
                     (callback)(ctx, &ctx.input.value(self.input_buffer_id))?;
                 }
-                ctx.input.destroy_buffer(self.input_buffer_id);
                 self.hide(ctx)?;
             }
             InputResultEvent::NoChange => {}
@@ -194,7 +198,6 @@ impl<'a, C: FnOnce(&Ctx, &str) -> Result<()> + 'a> Modal for InputModal<'a, C> {
                     ctx.render()?;
                 }
                 CommonAction::Close => {
-                    ctx.input.destroy_buffer(self.input_buffer_id);
                     self.hide(ctx)?;
                 }
                 CommonAction::Confirm => {
@@ -203,7 +206,6 @@ impl<'a, C: FnOnce(&Ctx, &str) -> Result<()> + 'a> Modal for InputModal<'a, C> {
                     {
                         (callback)(ctx, &ctx.input.value(self.input_buffer_id))?;
                     }
-                    ctx.input.destroy_buffer(self.input_buffer_id);
                     self.hide(ctx)?;
                 }
                 CommonAction::FocusInput => {
@@ -232,11 +234,9 @@ impl<'a, C: FnOnce(&Ctx, &str) -> Result<()> + 'a> Modal for InputModal<'a, C> {
                         if let Some(callback) = self.callback.take() {
                             (callback)(ctx, &ctx.input.value(self.input_buffer_id))?;
                         }
-                        ctx.input.destroy_buffer(self.input_buffer_id);
                         self.hide(ctx)?;
                     }
                     Some(_) => {
-                        ctx.input.destroy_buffer(self.input_buffer_id);
                         self.hide(ctx)?;
                     }
                     None => {

@@ -105,12 +105,6 @@ impl AddRandomModal<'_> {
             .work_sender
             .send(WorkRequest::Command(Command::AddRandom { tag, count: count.parse()? }))?)
     }
-
-    fn destroy(&mut self, ctx: &Ctx) -> Result<()> {
-        ctx.input.destroy_buffer(self.count_buffer_id);
-        self.hide(ctx)?;
-        Ok(())
-    }
 }
 
 impl Modal for AddRandomModal<'_> {
@@ -196,13 +190,18 @@ impl Modal for AddRandomModal<'_> {
         Ok(())
     }
 
+    fn destroy(&mut self, ctx: &Ctx) -> Result<()> {
+        ctx.input.destroy_buffer(self.count_buffer_id);
+        Ok(())
+    }
+
     fn handle_insert_mode(&mut self, kind: InputResultEvent, ctx: &Ctx) -> Result<()> {
         match kind {
             InputResultEvent::Push => {}
             InputResultEvent::Pop => {}
             InputResultEvent::Confirm => {
                 Self::add_random(self.selected_tag, &ctx.input.value(self.count_buffer_id), ctx)?;
-                self.destroy(ctx)?;
+                self.hide(ctx)?;
             }
             InputResultEvent::NoChange => {}
             InputResultEvent::Cancel => {}
@@ -232,7 +231,7 @@ impl Modal for AddRandomModal<'_> {
                         ctx.render()?;
                     }
                     CommonAction::Close => {
-                        self.destroy(ctx)?;
+                        self.hide(ctx)?;
                     }
                     _ => {}
                 }
@@ -256,7 +255,7 @@ impl Modal for AddRandomModal<'_> {
                         ctx.render()?;
                     }
                     CommonAction::Close => {
-                        self.destroy(ctx)?;
+                        self.hide(ctx)?;
                     }
                     _ => {}
                 }
@@ -287,7 +286,7 @@ impl Modal for AddRandomModal<'_> {
                         ctx.render()?;
                     }
                     CommonAction::Close => {
-                        self.destroy(ctx)?;
+                        self.hide(ctx)?;
                     }
                     CommonAction::Confirm => {
                         if state.selected == 0 {
@@ -297,7 +296,7 @@ impl Modal for AddRandomModal<'_> {
                                 ctx,
                             )?;
                         }
-                        self.destroy(ctx)?;
+                        self.hide(ctx)?;
                     }
                     _ => {}
                 }
@@ -358,10 +357,10 @@ impl Modal for AddRandomModal<'_> {
                             &ctx.input.value(self.count_buffer_id),
                             ctx,
                         )?;
-                        self.destroy(ctx)?;
+                        self.hide(ctx)?;
                     }
                     Some(_) => {
-                        self.destroy(ctx)?;
+                        self.hide(ctx)?;
                     }
                     None => {}
                 }

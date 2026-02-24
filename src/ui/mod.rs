@@ -247,6 +247,17 @@ impl<'ui> Ui<'ui> {
         ctx: &mut Ctx,
     ) -> Result<KeyHandleResult> {
         if let Some(ref mut modal) = self.modals.last_mut() {
+            if ctx.config.quit_closes_modal
+                && let Some(action) = key.claim_global()
+            {
+                if matches!(action, GlobalAction::Quit) {
+                    modal.hide(ctx)?;
+                    return Ok(KeyHandleResult::None);
+                }
+
+                key.abandon();
+            }
+
             modal.handle_key(key, ctx)?;
             return Ok(KeyHandleResult::None);
         }

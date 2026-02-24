@@ -133,7 +133,7 @@ impl Modal for MenuModal<'_> {
                 InputResultEvent::Pop => {}
                 InputResultEvent::Confirm => {
                     if self.sections[self.current_section_idx].confirm(ctx)? {
-                        self.destroy(ctx)?;
+                        self.hide(ctx)?;
                     }
                 }
                 InputResultEvent::Cancel => {
@@ -190,11 +190,11 @@ impl Modal for MenuModal<'_> {
                     ctx.render()?;
                 }
                 CommonAction::Close => {
-                    self.destroy(ctx)?;
+                    self.hide(ctx)?;
                 }
                 CommonAction::Confirm => {
                     if self.sections[self.current_section_idx].confirm(ctx)? {
-                        self.destroy(ctx)?;
+                        self.hide(ctx)?;
                     }
                 }
                 CommonAction::NextResult => {
@@ -230,7 +230,7 @@ impl Modal for MenuModal<'_> {
                     if ctx.input.is_insert_mode() {
                         ctx.render()?;
                     } else {
-                        self.destroy(ctx)?;
+                        self.hide(ctx)?;
                     }
                 }
             }
@@ -248,6 +248,14 @@ impl Modal for MenuModal<'_> {
         }
         Ok(())
     }
+
+    fn destroy(&mut self, ctx: &Ctx) -> Result<()> {
+        for s in &mut self.sections {
+            s.on_close(ctx)?;
+        }
+        ctx.input.destroy_buffer(self.filter_buffer_id);
+        Ok(())
+    }
 }
 
 impl<'a> MenuModal<'a> {
@@ -262,15 +270,6 @@ impl<'a> MenuModal<'a> {
             filter: None,
             filter_buffer_id: BufferId::new(),
         }
-    }
-
-    pub fn destroy(&mut self, ctx: &Ctx) -> Result<()> {
-        for s in &mut self.sections {
-            s.on_close(ctx)?;
-        }
-        ctx.input.destroy_buffer(self.filter_buffer_id);
-        self.hide(ctx)?;
-        Ok(())
     }
 
     fn next_result(&mut self, ctx: &Ctx) {
