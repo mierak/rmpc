@@ -25,6 +25,7 @@
     browser_song_sort: [Disc, Track, Artist, Title],
     directories_sort: SortFormat(group_by_type: true, reverse: false),
     auto_open_downloads: true,
+    quit_closes_modal: false,
     album_art: (
         method: Auto,
         max_size_px: (width: 1200, height: 1200),

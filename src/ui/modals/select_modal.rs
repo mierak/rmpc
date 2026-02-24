@@ -227,13 +227,11 @@ impl<V: Display + std::fmt::Debug, Callback: FnOnce(&Ctx, V, usize) -> Result<()
                         ctx.render()?;
                     }
                     FocusedComponent::Buttons => {
-                        self.button_group_state = ButtonGroupState::default();
                         self.hide(ctx)?;
                         ctx.render()?;
                     }
                 },
                 CommonAction::Close => {
-                    self.button_group_state = ButtonGroupState::default();
                     self.hide(ctx)?;
                     ctx.render()?;
                 }
@@ -241,6 +239,11 @@ impl<V: Display + std::fmt::Debug, Callback: FnOnce(&Ctx, V, usize) -> Result<()
             }
         }
 
+        Ok(())
+    }
+
+    fn destroy(&mut self, _ctx: &Ctx) -> Result<()> {
+        self.button_group_state = ButtonGroupState::default();
         Ok(())
     }
 
