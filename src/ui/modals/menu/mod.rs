@@ -42,6 +42,7 @@ mod input_section;
 mod list_section;
 pub mod modal;
 mod multi_action_section;
+mod multi_select_section;
 mod select_section;
 
 trait Section {
@@ -57,6 +58,9 @@ trait Section {
     fn select(&mut self, idx: usize);
     fn unselect(&mut self, ctx: &Ctx);
     fn unfocus(&mut self, _ctx: &Ctx) {}
+
+    /// Toggles the current item in multi-select sections. No-op by default.
+    fn toggle(&mut self) {}
 
     /// Returns true if the modal should be destroyed upon executing
     fn confirm(&mut self, ctx: &Ctx) -> Result<bool>;
@@ -80,6 +84,7 @@ enum SectionType<'a> {
     Select(SelectSection),
     Multi(MultiActionSection<'a>),
     Input(InputSection<'a>),
+    MultiSelect(multi_select_section::MultiSelectSection),
 }
 
 impl Section for SectionType<'_> {
@@ -89,6 +94,7 @@ impl Section for SectionType<'_> {
             SectionType::Multi(s) => s.down(),
             SectionType::Input(s) => s.down(),
             SectionType::Select(s) => s.down(),
+            SectionType::MultiSelect(s) => s.down(),
         }
     }
 
@@ -98,6 +104,7 @@ impl Section for SectionType<'_> {
             SectionType::Multi(s) => s.up(),
             SectionType::Input(s) => s.up(),
             SectionType::Select(s) => s.up(),
+            SectionType::MultiSelect(s) => s.up(),
         }
     }
 
@@ -107,6 +114,7 @@ impl Section for SectionType<'_> {
             SectionType::Multi(s) => s.right(),
             SectionType::Input(s) => s.right(),
             SectionType::Select(s) => s.right(),
+            SectionType::MultiSelect(s) => s.right(),
         }
     }
 
@@ -116,6 +124,7 @@ impl Section for SectionType<'_> {
             SectionType::Multi(s) => s.left(),
             SectionType::Input(s) => s.left(),
             SectionType::Select(s) => s.left(),
+            SectionType::MultiSelect(s) => s.left(),
         }
     }
 
@@ -125,6 +134,7 @@ impl Section for SectionType<'_> {
             SectionType::Multi(s) => s.selected(),
             SectionType::Input(s) => s.selected(),
             SectionType::Select(s) => s.selected(),
+            SectionType::MultiSelect(s) => s.selected(),
         }
     }
 
@@ -134,6 +144,7 @@ impl Section for SectionType<'_> {
             SectionType::Multi(s) => s.select(idx),
             SectionType::Input(s) => s.select(idx),
             SectionType::Select(s) => s.select(idx),
+            SectionType::MultiSelect(s) => s.select(idx),
         }
     }
 
@@ -143,6 +154,7 @@ impl Section for SectionType<'_> {
             SectionType::Multi(s) => s.unselect(ctx),
             SectionType::Input(s) => s.unselect(ctx),
             SectionType::Select(s) => s.unselect(ctx),
+            SectionType::MultiSelect(s) => s.unselect(ctx),
         }
     }
 
@@ -152,6 +164,17 @@ impl Section for SectionType<'_> {
             SectionType::Multi(s) => s.unfocus(ctx),
             SectionType::Input(s) => s.unfocus(ctx),
             SectionType::Select(s) => s.unfocus(ctx),
+            SectionType::MultiSelect(s) => s.unfocus(ctx),
+        }
+    }
+
+    fn toggle(&mut self) {
+        match self {
+            SectionType::Menu(s) => s.toggle(),
+            SectionType::Multi(s) => s.toggle(),
+            SectionType::Input(s) => s.toggle(),
+            SectionType::Select(s) => s.toggle(),
+            SectionType::MultiSelect(s) => s.toggle(),
         }
     }
 
@@ -161,6 +184,7 @@ impl Section for SectionType<'_> {
             SectionType::Multi(s) => s.confirm(ctx),
             SectionType::Input(s) => s.confirm(ctx),
             SectionType::Select(s) => s.confirm(ctx),
+            SectionType::MultiSelect(s) => s.confirm(ctx),
         }
     }
 
@@ -170,6 +194,7 @@ impl Section for SectionType<'_> {
             SectionType::Multi(s) => s.on_close(ctx),
             SectionType::Input(s) => s.on_close(ctx),
             SectionType::Select(s) => s.on_close(ctx),
+            SectionType::MultiSelect(s) => s.on_close(ctx),
         }
     }
 
@@ -179,6 +204,7 @@ impl Section for SectionType<'_> {
             SectionType::Multi(s) => s.len(),
             SectionType::Input(s) => s.len(),
             SectionType::Select(s) => s.len(),
+            SectionType::MultiSelect(s) => s.len(),
         }
     }
 
@@ -188,6 +214,7 @@ impl Section for SectionType<'_> {
             SectionType::Multi(s) => s.preferred_height(),
             SectionType::Input(s) => s.preferred_height(),
             SectionType::Select(s) => s.preferred_height(),
+            SectionType::MultiSelect(s) => s.preferred_height(),
         }
     }
 
@@ -197,6 +224,7 @@ impl Section for SectionType<'_> {
             SectionType::Multi(s) => s.render(area, buf, filter, ctx),
             SectionType::Input(s) => s.render(area, buf, filter, ctx),
             SectionType::Select(s) => s.render(area, buf, filter, ctx),
+            SectionType::MultiSelect(s) => s.render(area, buf, filter, ctx),
         }
     }
 
@@ -206,6 +234,7 @@ impl Section for SectionType<'_> {
             SectionType::Multi(s) => s.left_click(pos, ctx),
             SectionType::Input(s) => s.left_click(pos, ctx),
             SectionType::Select(s) => s.left_click(pos, ctx),
+            SectionType::MultiSelect(s) => s.left_click(pos, ctx),
         }
     }
 
@@ -215,6 +244,7 @@ impl Section for SectionType<'_> {
             SectionType::Multi(s) => s.double_click(pos, ctx),
             SectionType::Input(s) => s.double_click(pos, ctx),
             SectionType::Select(s) => s.double_click(pos, ctx),
+            SectionType::MultiSelect(s) => s.double_click(pos, ctx),
         }
     }
 
@@ -224,6 +254,7 @@ impl Section for SectionType<'_> {
             SectionType::Multi(s) => s.item_labels_iter(),
             SectionType::Input(s) => s.item_labels_iter(),
             SectionType::Select(s) => s.item_labels_iter(),
+            SectionType::MultiSelect(s) => s.item_labels_iter(),
         }
     }
 }
@@ -405,9 +436,14 @@ pub fn create_save_modal<'a>(
             });
             Some(sect)
         })
-        .select_section(ctx, move |mut sect| {
-            sect.action(move |ctx, playlist_name| {
-                add_to_playlist_or_show_modal(playlist_name, song_paths, duplicate_strategy, ctx);
+        .multi_select_section(ctx, move |mut sect| {
+            sect.action(move |ctx, playlist_names| {
+                add_to_playlists_or_show_modal(
+                    playlist_names,
+                    &song_paths,
+                    duplicate_strategy,
+                    ctx,
+                );
                 Ok(())
             });
             for mut playlist in playlists {
@@ -426,55 +462,64 @@ pub fn create_save_modal<'a>(
 
 pub fn add_to_playlist_or_show_modal(
     playlist_name: String,
-    all_songs: Vec<String>,
+    all_songs: &[String],
     duplicate_strategy: DuplicateStrategy,
     ctx: &Ctx,
 ) {
-    let pl_name = playlist_name.clone();
-    let songs_in_playlist = match ctx.query_sync(move |client| {
-        let pl: HashSet<_> =
-            client.list_playlist_info(&pl_name, None)?.into_iter().map(|s| s.file).collect();
-        Ok(pl)
-    }) {
-        Ok(v) => v,
-        Err(err) => {
-            status_error!("Failed to fetch playlist info: {err}");
-            return;
-        }
-    };
+    add_to_playlists_or_show_modal(vec![playlist_name], all_songs, duplicate_strategy, ctx);
+}
 
-    let (duplicate_songs, non_duplicate_songs): (Vec<_>, Vec<_>) =
-        all_songs.iter().cloned().partition(|s| songs_in_playlist.contains(s));
+pub fn add_to_playlists_or_show_modal(
+    playlist_names: Vec<String>,
+    all_songs: &[String],
+    duplicate_strategy: DuplicateStrategy,
+    ctx: &Ctx,
+) {
+    for playlist_name in playlist_names {
+        let pl_name = playlist_name.clone();
+        let all_songs = all_songs.to_owned();
+        let songs_in_playlist = match ctx.query_sync(move |client| {
+            let pl: HashSet<_> =
+                client.list_playlist_info(&pl_name, None)?.into_iter().map(|s| s.file).collect();
+            Ok(pl)
+        }) {
+            Ok(v) => v,
+            Err(err) => {
+                status_error!("Failed to fetch playlist info for '{playlist_name}': {err}");
+                continue;
+            }
+        };
 
-    match duplicate_strategy {
-        DuplicateStrategy::None if !duplicate_songs.is_empty() => {}
-        DuplicateStrategy::NonDuplicate if !duplicate_songs.is_empty() => {
-            // add only non duplicate songs
-            ctx.command(move |client| {
-                client.add_to_playlist_multiple(&playlist_name, non_duplicate_songs)?;
-                Ok(())
-            });
-        }
-        DuplicateStrategy::Ask if !duplicate_songs.is_empty() => {
-            // show modal window
-            let modal = create_duplicate_songs_modal(
-                playlist_name,
-                all_songs,
-                &duplicate_songs,
-                non_duplicate_songs,
-                ctx,
-            );
-            modal!(ctx, modal);
-        }
-        DuplicateStrategy::All
-        | DuplicateStrategy::None
-        | DuplicateStrategy::NonDuplicate
-        | DuplicateStrategy::Ask => {
-            // add all songs
-            ctx.command(move |client| {
-                client.add_to_playlist_multiple(&playlist_name, all_songs)?;
-                Ok(())
-            });
+        let (duplicate_songs, non_duplicate_songs): (Vec<_>, Vec<_>) =
+            all_songs.iter().cloned().partition(|s| songs_in_playlist.contains(s));
+
+        match duplicate_strategy {
+            DuplicateStrategy::None if !duplicate_songs.is_empty() => {}
+            DuplicateStrategy::NonDuplicate if !duplicate_songs.is_empty() => {
+                ctx.command(move |client| {
+                    client.add_to_playlist_multiple(&playlist_name, non_duplicate_songs)?;
+                    Ok(())
+                });
+            }
+            DuplicateStrategy::Ask if !duplicate_songs.is_empty() => {
+                let modal = create_duplicate_songs_modal(
+                    playlist_name,
+                    all_songs,
+                    &duplicate_songs,
+                    non_duplicate_songs,
+                    ctx,
+                );
+                modal!(ctx, modal);
+            }
+            DuplicateStrategy::All
+            | DuplicateStrategy::None
+            | DuplicateStrategy::NonDuplicate
+            | DuplicateStrategy::Ask => {
+                ctx.command(move |client| {
+                    client.add_to_playlist_multiple(&playlist_name, all_songs)?;
+                    Ok(())
+                });
+            }
         }
     }
 }
@@ -549,14 +594,14 @@ pub fn create_delete_modal<'a>(
         });
 
     Ok(MenuModal::new(ctx)
-        .select_section(ctx, move |mut sect| {
+        .multi_select_section(ctx, move |mut sect| {
             for playlist in playlists {
                 sect.add_item(playlist.name.clone(), playlist.name);
             }
             sect.add_max_height(12);
-            sect.action(move |ctx, playlist| {
-                delete_from_playlist_or_show_confirmation(
-                    playlist,
+            sect.action(move |ctx, playlist_names| {
+                delete_from_playlists_or_show_confirmation(
+                    playlist_names,
                     &song_paths,
                     confirmation,
                     ctx,
@@ -639,6 +684,18 @@ pub fn delete_from_playlist_or_show_confirmation(
         delete_songs(ctx);
     }
 
+    Ok(())
+}
+
+pub fn delete_from_playlists_or_show_confirmation(
+    playlist_names: Vec<String>,
+    song_paths: &HashSet<String>,
+    confirmation: bool,
+    ctx: &Ctx,
+) -> Result<()> {
+    for playlist_name in playlist_names {
+        delete_from_playlist_or_show_confirmation(playlist_name, song_paths, confirmation, ctx)?;
+    }
     Ok(())
 }
 
