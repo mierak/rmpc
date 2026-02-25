@@ -26,12 +26,14 @@ Running rmpc is very straight forward.
 1. Ensure you have latest version of rust installed.
 
 2. Clone the repository and switch to the newly created directory
+
 ```bash
 git clone https://github.com/mierak/rmpc.git
 cd rmpc
 ```
 
 3. Run rmpc
+
 ```bash
 # in debug mode
 cargo run
@@ -48,11 +50,15 @@ You can also use a special `Logs` pane your debug config which displays logs dir
 ## Formatting the code
 
 Rmpc uses `rustfmt` nightly to format the code.
+
 1. Install nightly `rustfmt`
+
 ```bash
 rustup component add rustfmt --toolchain nightly
 ```
+
 2. Format the code
+
 ```bash
 cargo +nightly fmt --all
 ```
@@ -66,6 +72,7 @@ all information relevant to your issue.
 Sometimes you might be asked to provide `trace` level logs. You can obtain them by running rmpc
 with `RUST_LOG` environment variable set to trace. The log file is located at `/tmp/rmpc_${UID}.log`.
 These logs can be very verbose so you might have to upload them somewhere and link them to the issue.
+
 ```bash
 RUST_LOG=trace rmpc
 # or if you are running directly from source code
@@ -101,15 +108,18 @@ which correspond to the current dev and release version respectively.
 To run the documentation locally:
 
 1. Ensure you have [node.js](https://nodejs.org/en) installed.
+
 2. Go to the repository root and install dependencies
+
 ```bash
 npm install
 ```
+
 3. Run the dev server
+
 ```bash
 npm run dev
 ```
 
 A local HTTP server will be started. Navigate to http://localhost:4321 and you should see the
 docs website. All changes you make to the docs should be automatically reflected in your browser.
-
