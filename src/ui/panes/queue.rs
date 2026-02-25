@@ -1171,7 +1171,7 @@ impl Pane for QueuePane {
                         return Ok(());
                     }
 
-                    add_to_playlist_or_show_modal(name, song_paths, duplicates_strategy, ctx);
+                    add_to_playlist_or_show_modal(name, &song_paths, duplicates_strategy, ctx);
                 }
                 CommonAction::Save { kind: SaveKind::Modal { all, duplicates_strategy } } => {
                     let song_paths: Vec<String> =

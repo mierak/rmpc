@@ -17,6 +17,7 @@ use super::{
     input_section::InputSection,
     list_section::ListSection,
     multi_action_section::MultiActionSection,
+    multi_select_section::MultiSelectSection,
 };
 use crate::{
     config::keys::CommonAction,
@@ -203,6 +204,10 @@ impl Modal for MenuModal<'_> {
                 }
                 CommonAction::PreviousResult => {
                     self.prev_result(ctx);
+                    ctx.render()?;
+                }
+                CommonAction::Select => {
+                    self.sections[self.current_section_idx].toggle();
                     ctx.render()?;
                 }
                 _ => {}
@@ -443,6 +448,24 @@ impl<'a> MenuModal<'a> {
         if let Some(mut section) = section {
             section.state.set_content_len(Some(section.items.len()));
             self.sections.push(SectionType::Select(section));
+            self.areas.push(Rect::default());
+        }
+        self
+    }
+
+    pub fn multi_select_section(
+        mut self,
+        ctx: &Ctx,
+        cb: impl FnOnce(MultiSelectSection) -> Option<MultiSelectSection>,
+    ) -> Self {
+        let section = MultiSelectSection::new(
+            ctx.config.theme.current_item_style,
+            ctx.config.theme.highlighted_item_style,
+        );
+        let section = cb(section);
+        if let Some(mut section) = section {
+            section.state.set_content_len(Some(section.items.len()));
+            self.sections.push(SectionType::MultiSelect(section));
             self.areas.push(Rect::default());
         }
         self
