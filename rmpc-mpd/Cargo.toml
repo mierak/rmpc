@@ -1,0 +1,22 @@
+[package]
+name = "rmpc-mpd"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+rmpc-shared = { path = "../rmpc-shared" }
+log = { workspace = true }
+anyhow = { workspace = true }
+strum = { workspace = true }
+chrono = { workspace = true }
+serde = { workspace = true }
+derive_more = { workspace = true }
+rand = { workspace = true }
+itertools = { workspace = true }
+
+[dev-dependencies]
+rstest = "0.26.1"
+test-case = "3.3.1"
+
+[lints]
+workspace = true

@@ -1,0 +1,69 @@
+[package]
+name = "rmpc"
+version = "0.11.0"
+edition = "2024"
+license = "BSD-3-Clause"
+description = "A beautiful and configurable TUI client for MPD"
+homepage = "https://rmpc.mierak.dev"
+repository = "https://github.com/mierak/rmpc"
+readme = "README.md"
+rust-version = "1.88.0"
+
+[lints]
+workspace = true
+
+[dependencies]
+rmpc-mpd = { path = "../rmpc-mpd" }
+rmpc-shared = { path = "../rmpc-shared" }
+clap = { workspace = true }
+dialoguer = { workspace = true }
+anyhow = { workspace = true }
+bon = { workspace = true }
+base64 = { workspace = true }
+crossterm = { workspace = true }
+image = { workspace = true }
+ratatui = { workspace = true }
+strum = { workspace = true }
+flate2 = { workspace = true }
+itertools = { workspace = true }
+ron = { workspace = true }
+derive_more = { workspace = true }
+rustix = { workspace = true }
+bitflags = { workspace = true }
+log = { workspace = true }
+flexi_logger = { workspace = true }
+chrono = { workspace = true }
+serde = { workspace = true }
+serde_with = { workspace = true }
+either = { workspace = true }
+walkdir = { workspace = true }
+which = { workspace = true }
+url = { workspace = true }
+sysinfo = { workspace = true }
+color_quant = { workspace = true }
+enum-map = { workspace = true }
+textwrap = { workspace = true }
+crossbeam = { workspace = true }
+notify-debouncer-full = { workspace = true }
+unicode-width = { workspace = true }
+unicase = { workspace = true }
+serde_path_to_error = { workspace = true }
+serde_json = { workspace = true }
+ansi_colours = { workspace = true }
+thiserror = { workspace = true }
+parking_lot = { workspace = true }
+unicode-segmentation = { workspace = true }
+winnow = { workspace = true }
+
+[dev-dependencies]
+rstest = { workspace = true }
+test-case = { workspace = true }
+
+[build-dependencies]
+rmpc-mpd = { path = "../rmpc-mpd" }
+clap = { workspace = true }
+strum = { workspace = true }
+serde = { workspace = true }
+clap_complete = { workspace = true }
+clap_mangen = { workspace = true }
+vergen-gitcl = { workspace = true }

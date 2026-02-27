@@ -1,0 +1,180 @@
+.ie \n(.g .ds Aq \(aq
+.el .ds Aq '
+.TH rmpc 1  "rmpc " 
+.SH NAME
+rmpc
+.SH SYNOPSIS
+\fBrmpc\fR [\fB\-c\fR|\fB\-\-config\fR] [\fB\-t\fR|\fB\-\-theme\fR] [\fB\-\-clean\fR] [\fB\-a\fR|\fB\-\-address\fR] [\fB\-p\fR|\fB\-\-password\fR] [\fB\-\-partition\fR] [\fB\-\-autocreate\fR] [\fB\-h\fR|\fB\-\-help\fR] [\fIsubcommands\fR]
+.SH DESCRIPTION
+.SH OPTIONS
+.TP
+\fB\-c\fR, \fB\-\-config\fR \fI<FILE>\fR
+
+.TP
+\fB\-t\fR, \fB\-\-theme\fR \fI<FILE>\fR
+
+.TP
+\fB\-\-clean\fR
+Skip user config and start with defaults, must be the only argument
+.TP
+\fB\-a\fR, \fB\-\-address\fR \fI<ADDRESS>\fR
+Override the address to connect to. Defaults to value in the config file
+.TP
+\fB\-p\fR, \fB\-\-password\fR \fI<PASSWORD>\fR
+Override the MPD password
+.TP
+\fB\-\-partition\fR \fI<PARTITION>\fR
+Partition to connect to at startup
+.TP
+\fB\-\-autocreate\fR
+Automatically create the partition if it does not exist. Requires partition to be set
+.TP
+\fB\-h\fR, \fB\-\-help\fR
+Print help
+.SH SUBCOMMANDS
+.TP
+rmpc\-addrandom(1)
+.TP
+rmpc\-config(1)
+Prints the default config. Can be used to bootstrap your config file
+.TP
+rmpc\-theme(1)
+Prints the default theme. Can be used to bootstrap your theme file
+.TP
+rmpc\-lyricsindex(1)
+Index the lyrics dir and display result, meant only for debugging purposes
+.TP
+rmpc\-update(1)
+Scan MPD\*(Aqs music directory for updates
+.TP
+rmpc\-rescan(1)
+Scan MPD\*(Aqs music directory for updates. Also rescans unmodified files
+.TP
+rmpc\-albumart(1)
+Saves the current album art to a file. Exit codes: * 0: Success * 1: Error * 2: No album art found * 3: No song playing
+.TP
+rmpc\-debuginfo(1)
+Prints information about optional runtime dependencies
+.TP
+rmpc\-version(1)
+Prints the rmpc version
+.TP
+rmpc\-queue(1)
+Prints the list of songs in the current queue
+.TP
+rmpc\-listall(1)
+Lists files from the music database. If no file is specified, lists all songs in the database
+.TP
+rmpc\-play(1)
+Plays song at the position in the current playlist. Defaults to current paused song
+.TP
+rmpc\-pause(1)
+Pause playback
+.TP
+rmpc\-unpause(1)
+Unpause playback
+.TP
+rmpc\-togglepause(1)
+Toggles between play and pause
+.TP
+rmpc\-stop(1)
+Stops playback
+.TP
+rmpc\-next(1)
+Plays the next song in the playlist
+.TP
+rmpc\-prev(1)
+Plays the previous song in the playlist
+.TP
+rmpc\-volume(1)
+Sets volume, relative if prefixed by + or \-. Prints current volume if no arguments is given
+.TP
+rmpc\-repeat(1)
+On or off
+.TP
+rmpc\-random(1)
+On or off
+.TP
+rmpc\-single(1)
+On, off or oneshot
+.TP
+rmpc\-consume(1)
+On, off or oneshot
+.TP
+rmpc\-togglerepeat(1)
+Toggles the repeat mode
+.TP
+rmpc\-togglerandom(1)
+Toggles the random mode
+.TP
+rmpc\-togglesingle(1)
+Toggles the single mode
+.TP
+rmpc\-toggleconsume(1)
+Toggles the consume mode
+.TP
+rmpc\-seek(1)
+Seeks current song(seconds), relative if prefixed by + or \-
+.TP
+rmpc\-clear(1)
+Clear the current queue
+.TP
+rmpc\-add(1)
+Add a song to the current queue. Relative to music database root. \*(Aq/\*(Aq to add all files to the queue
+.TP
+rmpc\-addyt(1)
+Add a song from youtube to the current queue
+.TP
+rmpc\-searchyt(1)
+Search and add the first match to the current queue (youTube by default)
+.TP
+rmpc\-save(1)
+Save the current queue as a playlist
+.TP
+rmpc\-load(1)
+Loads a playlist into the current queue
+.TP
+rmpc\-outputs(1)
+List MPD outputs
+.TP
+rmpc\-toggleoutput(1)
+Toggle MPD output on or off
+.TP
+rmpc\-enableoutput(1)
+Enable MPD output
+.TP
+rmpc\-disableoutput(1)
+Disable MPD output
+.TP
+rmpc\-decoders(1)
+List MPD decoder plugins
+.TP
+rmpc\-status(1)
+Prints various information like the playback status
+.TP
+rmpc\-song(1)
+Prints info about the current song. If \-\-path specified, prints information about the song at the given path instead. If \-\-path is specified multiple times, prints an array containing all the songs
+.TP
+rmpc\-mount(1)
+Mounts supported storage to MPD
+.TP
+rmpc\-unmount(1)
+Unmounts storage with given name
+.TP
+rmpc\-listmounts(1)
+List currently mounted storages
+.TP
+rmpc\-listpartitions(1)
+List the currently existing partitions
+.TP
+rmpc\-sticker(1)
+Manipulate and query song stickers
+.TP
+rmpc\-remote(1)
+Send a remote command to running rmpc instance
+.TP
+rmpc\-sendmessage(1)
+Sends a message to given channel for inter client communication
+.TP
+rmpc\-help(1)
+Print this message or the help of the given subcommand(s)
