@@ -2428,8 +2428,9 @@ dependencies = [
  "log",
  "notify-debouncer-full",
  "parking_lot",
- "rand 0.9.2",
  "ratatui",
+ "rmpc-mpd",
+ "rmpc-shared",
  "ron",
  "rstest",
  "rustix",
@@ -2451,6 +2452,27 @@ dependencies = [
  "which",
  "winnow",
 ]
+
+[[package]]
+name = "rmpc-mpd"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "chrono",
+ "derive_more",
+ "itertools 0.14.0",
+ "log",
+ "rand 0.9.2",
+ "rmpc-shared",
+ "rstest",
+ "serde",
+ "strum",
+ "test-case",
+]
+
+[[package]]
+name = "rmpc-shared"
+version = "0.1.0"
 
 [[package]]
 name = "roff"
