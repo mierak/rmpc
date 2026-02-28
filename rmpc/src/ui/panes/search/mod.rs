@@ -5,7 +5,6 @@ use enum_map::EnumMap;
 use itertools::Itertools;
 use ratatui::{
     layout::{Constraint, Layout, Rect},
-    style::Stylize,
     text::Span,
     widgets::{Block, Borders, List, ListItem, ListState, Padding},
 };
@@ -1087,7 +1086,11 @@ impl Pane for SearchPane {
                     let mut result = Vec::new();
                     for group in preview {
                         if let Some(name) = group.name {
-                            result.push(ListItem::new(name).yellow().bold());
+                            let mut item = ListItem::new(name);
+                            if let Some(style) = group.header_style {
+                                item = item.style(style);
+                            }
+                            result.push(item);
                         }
                         result.extend(group.items.clone());
                         result.push(ListItem::new(Span::raw("")));
