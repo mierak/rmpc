@@ -3,6 +3,7 @@ use std::{borrow::Cow, fmt::Write, ops::Range, sync::Arc};
 use anyhow::bail;
 use itertools::Itertools;
 use rmpc_mpd::{commands::Song, queue_position::QueuePosition};
+use rmpc_shared::paths::utils::tilde_expand;
 use strum::{Display, EnumDiscriminants, VariantArray};
 
 use super::ToDescription;
@@ -10,7 +11,6 @@ use crate::{
     config::{
         tabs::TabName,
         theme::properties::{Property, PropertyFile, SongProperty, SongPropertyFile},
-        utils::tilde_expand,
     },
     shared::{args, macros::status_warn, song_ext::SongsExt},
 };

@@ -15,6 +15,10 @@ use rmpc_mpd::{
     mpd_client::MpdClient,
     proto_client::SocketClient,
 };
+use rmpc_shared::{
+    env::ENV,
+    paths::{config_paths, theme_paths},
+};
 use shared::{
     dependencies::CAVA,
     macros::{status_warn, try_skip},
@@ -38,11 +42,9 @@ use crate::{
             read_config_for_debuginfo,
         },
         dependencies::{DEPENDENCIES, FFMPEG, FFPROBE, PYTHON3, PYTHON3MUTAGEN, UEBERZUGPP, YTDLP},
-        env::ENV,
         events::{AppEvent, ClientRequest, WorkRequest},
         logging,
         mpd_query::{MpdCommand, MpdQuery, MpdQueryResult},
-        paths::{config_paths, theme_paths},
         terminal::{TERMINAL, Terminal},
         tmux::{self, IS_TMUX},
     },

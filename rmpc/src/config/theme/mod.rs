@@ -8,6 +8,7 @@ use level_styles::{LevelStyles, LevelStylesFile};
 use properties::{SongFormat, SongFormatFile};
 use ratatui::style::{Color, Style};
 use rmpc_mpd::commands::metadata_tag::MetadataTag;
+use rmpc_shared::paths::utils::{env_var_expand, tilde_expand};
 
 use self::{
     header::{HeaderConfig, HeaderConfigFile},
@@ -40,7 +41,6 @@ pub use self::{
 use super::{
     defaults,
     tabs::{PaneConversionError, PaneOrSplitFile, SizedPaneOrSplit},
-    utils::{env_var_expand, tilde_expand},
 };
 
 const DEFAULT_ART: &[u8; 58599] = include_bytes!("../../../../assets/default.jpg");

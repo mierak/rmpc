@@ -1,11 +1,12 @@
 use std::sync::Arc;
 
 use rmpc_mpd::mpd_client::AlbumArtOrder;
+use rmpc_shared::paths::utils::tilde_expand;
 use serde::{Deserialize, Serialize};
 use strum::Display;
 
 use super::Size;
-use crate::{config::utils::tilde_expand, shared::terminal::ImageBackend};
+use crate::shared::terminal::ImageBackend;
 
 #[derive(Debug, Serialize, Deserialize, PartialEq, Eq, Clone)]
 #[serde(default)]
