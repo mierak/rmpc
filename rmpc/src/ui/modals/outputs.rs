@@ -124,16 +124,19 @@ impl Modal for OutputsModal {
         self.scrolling_state
             .set_content_and_viewport_len(self.outputs.len(), table_area.height.into());
 
-        let table = Table::new(rows, [
-            Constraint::Percentage(80),
-            Constraint::Percentage(20),
-            Constraint::Length(10),
-            Constraint::Length(9),
-        ])
-        .column_spacing(0)
-        .style(ctx.config.as_text_style())
-        .header(Row::new(["Name", "Plugin", "Enabled", "Partition"]))
-        .row_highlight_style(ctx.config.theme.current_item_style);
+        let table =
+            Table::new(rows, [
+                Constraint::Percentage(80),
+                Constraint::Percentage(20),
+                Constraint::Length(10),
+                Constraint::Length(9),
+            ])
+            .column_spacing(0)
+            .style(ctx.config.as_text_style())
+            .header(Row::new(["Name", "Plugin", "Enabled", "Partition"]).style(
+                ctx.config.theme.text_color.map(|c| Style::default().fg(c)).unwrap_or_default(),
+            ))
+            .row_highlight_style(ctx.config.theme.current_item_style);
 
         let table_area = table_area.inner(Margin { horizontal: 1, vertical: 0 });
         self.outputs_table_area = table_area;

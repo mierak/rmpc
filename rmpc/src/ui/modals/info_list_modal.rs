@@ -139,7 +139,9 @@ impl Modal for InfoListModal {
         self.scrolling_state.set_content_and_viewport_len(rows.len(), table_area.height.into());
 
         let header_table = Table::new(
-            vec![Row::new([Cell::from("Tag"), Cell::from("Value")])],
+            vec![Row::new([Cell::from("Tag"), Cell::from("Value")]).style(
+                ctx.config.theme.text_color.map(|c| Style::default().fg(c)).unwrap_or_default(),
+            )],
             &column_constraints,
         )
         .column_spacing(1)

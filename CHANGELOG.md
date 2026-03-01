@@ -30,6 +30,7 @@ keybinds
 - Fixed a benign error when deleting items from the queue really fast
 - Attempt to fix sync issues with cava visualiser
 - `preview_metadata_group_style` not being applied in the search pane
+- modals ignoring `text_color`
 
 
 ## [0.11.0] - 2026-02-01

@@ -326,7 +326,7 @@ impl<'ui> Ui<'ui> {
                                 .iter()
                                 .filter(|p| *p != "default" && **p != ctx.status.partition)
                             {
-                                section = section.add_item(partition);
+                                section = section.add_item(partition, ctx);
                                 any_non_default = true;
                             }
 

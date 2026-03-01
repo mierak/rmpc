@@ -146,7 +146,12 @@ impl Modal for AddRandomModal<'_> {
                 .input_style(ctx.config.theme.current_item_style)
                 .call()
         } else {
-            combobox.label_style(ctx.config.as_text_style()).call()
+            combobox
+                .label_style(ctx.config.as_text_style())
+                .input_style(
+                    ctx.config.theme.text_color.map(|c| Style::default().fg(c)).unwrap_or_default(),
+                )
+                .call()
         };
 
         let count = Input::builder()
@@ -167,7 +172,12 @@ impl Modal for AddRandomModal<'_> {
                 .input_style(ctx.config.theme.current_item_style)
                 .build()
         } else {
-            count.label_style(ctx.config.as_text_style()).build()
+            count
+                .label_style(ctx.config.as_text_style())
+                .input_style(
+                    ctx.config.theme.text_color.map(|c| Style::default().fg(c)).unwrap_or_default(),
+                )
+                .build()
         };
 
         self.button_group.set_active_style(match self.active_input {

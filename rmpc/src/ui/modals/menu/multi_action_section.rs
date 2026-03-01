@@ -42,10 +42,18 @@ impl<'a> MultiActionSection<'a> {
         }
     }
 
-    pub fn add_item(mut self, label: impl Into<String>) -> Self {
+    pub fn add_item(mut self, label: impl Into<String>, ctx: &Ctx) -> Self {
+        let (active_style, inactive_style) = if let Some(s) = ctx.config.theme.text_color {
+            (Style::default().fg(s).reversed(), Style::default().fg(s))
+        } else {
+            (Style::default().reversed(), Style::default())
+        };
         self.items.push(MultiActionItem {
             label: label.into(),
-            buttons: ButtonGroup::default().spacing(1),
+            buttons: ButtonGroup::default()
+                .active_style(active_style)
+                .inactive_style(inactive_style)
+                .spacing(1),
             buttons_state: ButtonGroupState::default(),
         });
         self
@@ -152,6 +160,13 @@ impl Section for MultiActionSection<'_> {
                 && item.label.to_lowercase().contains(f)
             {
                 text = text.style(ctx.config.theme.highlighted_item_style);
+            } else {
+                text = text.style(
+                    ctx.config
+                        .theme
+                        .text_color
+                        .map_or(Style::default(), |c| Style::default().fg(c)),
+                );
             }
 
             let mut item_area = area.shrink_from_top(idx as u16);
@@ -166,7 +181,12 @@ impl Section for MultiActionSection<'_> {
             if self.selected_idx.is_some_and(|i| i == idx) {
                 item.buttons.set_active_style(self.current_item_style);
             } else {
-                item.buttons.set_active_style(Style::default());
+                item.buttons.set_active_style(
+                    ctx.config
+                        .theme
+                        .text_color
+                        .map_or(Style::default().reversed(), |c| Style::default().fg(c).reversed()),
+                );
             }
 
             item.buttons.render(buttons_area, buf, &mut item.buttons_state);
