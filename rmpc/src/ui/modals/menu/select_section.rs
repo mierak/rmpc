@@ -169,6 +169,13 @@ impl Section for SelectSection {
                 && item.label.to_lowercase().contains(f)
             {
                 text = text.style(ctx.config.theme.highlighted_item_style);
+            } else {
+                text = text.style(
+                    ctx.config
+                        .theme
+                        .text_color
+                        .map_or(Style::default(), |c| Style::default().fg(c)),
+                );
             }
             let idx = idx.saturating_sub(self.state.offset());
 

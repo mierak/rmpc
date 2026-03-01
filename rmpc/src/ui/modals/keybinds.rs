@@ -309,7 +309,16 @@ impl Modal for KeybindsModal {
         self.scrolling_state.set_content_and_viewport_len(rows.len(), table_area.height.into());
 
         let header_table = Table::new(
-            vec![Row::new([Cell::from("Key"), Cell::from("Action"), Cell::from("Description")])],
+            vec![
+                Row::new([Cell::from("Key"), Cell::from("Action"), Cell::from("Description")])
+                    .style(
+                        ctx.config
+                            .theme
+                            .text_color
+                            .map(|c| Style::default().fg(c))
+                            .unwrap_or_default(),
+                    ),
+            ],
             constraints,
         )
         .column_spacing(1)

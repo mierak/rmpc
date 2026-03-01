@@ -128,8 +128,11 @@ impl Section for InputSection<'_> {
             {
                 ctx.config.theme.highlighted_item_style
             } else {
-                Style::default()
+                ctx.config.theme.text_color.map_or(Style::default(), |c| Style::default().fg(c))
             })
+            .input_style(
+                ctx.config.theme.text_color.map_or(Style::default(), |c| Style::default().fg(c)),
+            )
             .build();
 
         input.render(area, buf);

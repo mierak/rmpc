@@ -132,11 +132,16 @@ impl Modal for DecodersModal {
         self.scrolling_state.set_content_and_viewport_len(rows.len(), table_area.height.into());
 
         let header_table = Table::new(
-            vec![Row::new([
-                Cell::from("Plugin"),
-                Cell::from("MIME types"),
-                Cell::from("Suffixes"),
-            ])],
+            vec![
+                Row::new([Cell::from("Plugin"), Cell::from("MIME types"), Cell::from("Suffixes")])
+                    .style(
+                        ctx.config
+                            .theme
+                            .text_color
+                            .map(|c| Style::default().fg(c))
+                            .unwrap_or_default(),
+                    ),
+            ],
             [
                 Constraint::Percentage(name_col_width),
                 Constraint::Percentage(mime_col_width),

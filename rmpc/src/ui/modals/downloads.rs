@@ -61,18 +61,20 @@ impl Modal for DownloadsModal {
 
         let table_area = block.inner(popup_area);
 
+        let text_style =
+            ctx.config.theme.text_color.map(|c| Style::default().fg(c)).unwrap_or_default();
         let rows = ctx.ytdlp_manager.map_values(|item| {
             Row::new([
                 Cell::from(""), // marker
-                Cell::from(item.inner.id.clone()),
-                Cell::from(item.inner.kind.to_string()),
+                Cell::from(item.inner.id.clone()).style(text_style),
+                Cell::from(item.inner.kind.to_string()).style(text_style),
                 Cell::from(item.state.to_string()).style(item.state.as_style(ctx)),
             ])
         });
         let item_count = rows.len();
         let table = Table::new(rows, constraints![==1, ==33%, ==33%, ==34%])
             .row_highlight_style(ctx.config.theme.current_item_style)
-            .header(Row::new(["", "Id", "Source", "State"]));
+            .header(Row::new(["", "Id", "Source", "State"]).style(text_style));
 
         self.queue
             .state

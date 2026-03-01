@@ -137,6 +137,9 @@ impl<'a, C: FnOnce(&Ctx, &str) -> Result<()> + 'a> Modal for InputModal<'a, C> {
             .buffer_id(self.input_buffer_id)
             .label(self.input_label)
             .label_style(ctx.config.as_text_style())
+            .input_style(
+                ctx.config.theme.text_color.map(|c| Style::default().fg(c)).unwrap_or_default(),
+            )
             .focused(ctx.input.is_insert_mode())
             .focused_style(ctx.config.theme.highlight_border_style)
             .unfocused_style(ctx.config.as_border_style())
