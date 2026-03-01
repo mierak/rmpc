@@ -29,6 +29,9 @@
         # (or without the "github:..." if you're currently in this repository)
         packages.default = naerskLib.buildPackage {
           src = ./.;
+          # Avoid naersk's dummy dependency derivation; it conflicts with
+          # workspace-level `unused_crate_dependencies = "deny"` lints.
+          singleStep = true;
           # Since the nix build is isolated, vergen won't have access to the git repository,
           # so we'll have to set the environment variable ourselves.
           #
