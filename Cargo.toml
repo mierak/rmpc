@@ -1,5 +1,5 @@
 [workspace]
-members = ["rmpc","rmpc-mpd", "rmpc-shared"]
+members = ["rmpc","rmpc-mpd", "rmpc-shared", "rmpcd"]
 resolver = "3"
 default-members = ["rmpc"]
 
@@ -61,6 +61,12 @@ thiserror = "2.0.18"
 parking_lot = { version = "0.12.5", features = [] }
 unicode-segmentation = "1.12.0"
 winnow = "^0.7.14"
+mlua = { version = "0.11.6", features = ["lua55", "vendored", "anyhow", "serde"]}
+zbus = { version = "5.14.0", features = ["tokio"] }
+tokio = { version = "1.49.0", features = ["full", "tracing"] }
+tracing = "0.1"
+tracing-subscriber = "0.3"
+console-subscriber = "0.5"
 
 [workspace.lints.clippy]
 pedantic = { level = "deny", priority = -1 }

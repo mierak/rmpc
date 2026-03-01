@@ -58,6 +58,7 @@ winnow = { workspace = true }
 [dev-dependencies]
 rstest = { workspace = true }
 test-case = { workspace = true }
+rmpc-shared = { path = "../rmpc-shared", features = ["test-impl"] }
 
 [build-dependencies]
 rmpc-mpd = { path = "../rmpc-mpd" }

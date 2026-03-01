@@ -1,10 +1,10 @@
 use std::path::PathBuf;
 
 use rmpc_mpd::address::MpdPassword;
+use rmpc_shared::paths::utils::{absolute_env_var_expand_path, env_var_expand, tilde_expand};
 use serde::{Deserialize, Serialize};
 
-use super::{Config, ConfigFile, MpdAddress, utils::tilde_expand};
-use crate::config::utils::{absolute_env_var_expand_path, env_var_expand};
+use super::{Config, ConfigFile, MpdAddress};
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(default)]
@@ -86,7 +86,7 @@ impl CliConfigFile {
         password_cli: Option<String>,
     ) -> CliConfig {
         let (address, password) =
-            crate::config::address::resolve(address_cli, password_cli, self.address, self.password);
+            rmpc_mpd::address::resolve(address_cli, password_cli, self.address, self.password);
 
         CliConfig {
             cache_dir: self

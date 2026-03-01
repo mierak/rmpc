@@ -1,7 +1,7 @@
 use anyhow::Result;
+use rmpc_shared::env::ENV;
 
 use crate::shared::{
-    env::ENV,
     terminal::tty::Tty,
     tmux::{self, IS_TMUX},
 };

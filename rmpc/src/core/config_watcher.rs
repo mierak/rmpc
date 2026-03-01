@@ -14,6 +14,7 @@ use notify_debouncer_full::{
         event::{AccessKind, AccessMode},
     },
 };
+use rmpc_shared::paths::theme_paths;
 
 use crate::{
     AppEvent,
@@ -26,7 +27,6 @@ use crate::{
             read_theme_file,
         },
         macros::try_skip,
-        paths::theme_paths,
     },
 };
 

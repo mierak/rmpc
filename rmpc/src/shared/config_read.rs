@@ -3,17 +3,15 @@ use std::{
     path::{Path, PathBuf},
 };
 
+use rmpc_shared::paths::{config_paths, theme_paths};
 use thiserror::Error;
 
-use crate::{
-    config::{
-        Config,
-        ConfigFile,
-        cli::Args,
-        cli_config::{CliConfig, CliConfigFile},
-        theme::{UiConfig, UiConfigFile},
-    },
-    shared::paths::{config_paths, theme_paths},
+use crate::config::{
+    Config,
+    ConfigFile,
+    cli::Args,
+    cli_config::{CliConfig, CliConfigFile},
+    theme::{UiConfig, UiConfigFile},
 };
 
 #[derive(Error, Debug)]

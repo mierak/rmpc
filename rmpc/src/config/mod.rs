@@ -8,14 +8,13 @@ use clap::Parser;
 use cli::{Args, OnOff, OnOffOneshot};
 use itertools::Itertools;
 use rmpc_mpd::address::{MpdAddress, MpdPassword};
+use rmpc_shared::paths::utils::{absolute_env_var_expand_path, env_var_expand, tilde_expand};
 use search::SearchFile;
 use serde::{Deserialize, Serialize};
 use sort_mode::{SortMode, SortModeFile, SortOptions};
 use tabs::{PaneType, Tabs, TabsFile, validate_tabs};
 use theme::properties::{SongProperty, SongPropertyFile};
-use utils::tilde_expand;
 
-pub mod address;
 pub mod album_art;
 pub mod artists;
 pub mod cava;
@@ -35,10 +34,7 @@ use self::{
     theme::{ConfigColor, UiConfig},
 };
 use crate::{
-    config::{
-        tabs::{SizedPaneOrSplit, Tab, TabName},
-        utils::{absolute_env_var_expand_path, env_var_expand},
-    },
+    config::tabs::{SizedPaneOrSplit, Tab, TabName},
     shared::{duration_format::DurationFormat, lrc::LrcOffset, terminal::TERMINAL},
     tmux,
 };
@@ -282,7 +278,7 @@ impl ConfigFile {
         let active_panes = Config::calc_active_panes(&tabs.tabs, &theme.layout);
 
         let (address, password) =
-            crate::config::address::resolve(address_cli, password_cli, self.address, self.password);
+            rmpc_mpd::address::resolve(address_cli, password_cli, self.address, self.password);
         let album_art_method = self.album_art.method;
         let mut config = Config {
             theme_name: self.theme,
@@ -426,197 +422,6 @@ impl From<OnOffOneshot> for rmpc_mpd::commands::status::OnOffOneshot {
             OnOffOneshot::On => rmpc_mpd::commands::status::OnOffOneshot::On,
             OnOffOneshot::Off => rmpc_mpd::commands::status::OnOffOneshot::Off,
             OnOffOneshot::Oneshot => rmpc_mpd::commands::status::OnOffOneshot::Oneshot,
-        }
-    }
-}
-
-pub mod utils {
-    use std::{
-        borrow::Cow,
-        path::{MAIN_SEPARATOR, MAIN_SEPARATOR_STR, Path, PathBuf},
-    };
-
-    use crate::shared::env::ENV;
-
-    pub fn absolute_env_var_expand_path(inp: &Path) -> Result<Option<PathBuf>, anyhow::Error> {
-        let path_str =
-            inp.to_str().ok_or_else(|| anyhow::anyhow!("Invalid path: '{}'", inp.display()))?;
-        let expanded = env_var_expand(path_str);
-        let expanded_path = tilde_expand_path(&PathBuf::from(expanded));
-        if expanded_path.is_absolute() {
-            return Ok(Some(expanded_path));
-        }
-        Err(anyhow::anyhow!("Path is not absolute: {}", expanded_path.display()))
-    }
-
-    pub fn tilde_expand_path(inp: &Path) -> PathBuf {
-        let Ok(home) = ENV.var("HOME") else {
-            return inp.to_owned();
-        };
-        let home = home.strip_suffix(MAIN_SEPARATOR).unwrap_or(home.as_ref());
-
-        if let Ok(inp) = inp.strip_prefix("~") {
-            if inp.as_os_str().is_empty() {
-                return home.into();
-            }
-
-            return PathBuf::from(home.to_owned()).join(inp);
-        }
-
-        inp.to_path_buf()
-    }
-
-    pub fn tilde_expand(inp: &str) -> Cow<'_, str> {
-        let Ok(home) = ENV.var("HOME") else {
-            return Cow::Borrowed(inp);
-        };
-        let home = home.strip_suffix(MAIN_SEPARATOR).unwrap_or(home.as_ref());
-
-        if let Some(inp) = inp.strip_prefix('~') {
-            if inp.is_empty() {
-                return Cow::Owned(home.to_owned());
-            }
-
-            if inp.starts_with(MAIN_SEPARATOR) {
-                return Cow::Owned(format!("{home}{inp}"));
-            }
-        }
-
-        Cow::Borrowed(inp)
-    }
-
-    pub fn env_var_expand(inp: &str) -> String {
-        let parts: Vec<&str> = inp.split(MAIN_SEPARATOR).collect();
-
-        let expanded_parts: Vec<String> = parts
-            .iter()
-            .map(|part| {
-                if let Some(var_key) = part.strip_prefix('$') {
-                    ENV.var(var_key).unwrap_or_else(|_| (*part).to_string())
-                } else {
-                    (*part).to_string()
-                }
-            })
-            .collect();
-
-        return expanded_parts.join(MAIN_SEPARATOR_STR);
-    }
-
-    #[cfg(test)]
-    #[allow(clippy::unwrap_used)]
-    mod tests {
-        use std::{
-            path::PathBuf,
-            sync::{LazyLock, Mutex},
-        };
-
-        use test_case::test_case;
-
-        use super::tilde_expand;
-        use crate::{
-            config::utils::{absolute_env_var_expand_path, env_var_expand, tilde_expand_path},
-            shared::env::ENV,
-        };
-
-        static TEST_LOCK: LazyLock<Mutex<()>> = LazyLock::new(|| Mutex::new(()));
-
-        #[test_case("~", "/home/some_user")]
-        #[test_case("~enene", "~enene")]
-        #[test_case("~nope/", "~nope/")]
-        #[test_case("~/yes", "/home/some_user/yes")]
-        #[test_case("no/~/no", "no/~/no")]
-        #[test_case("basic/path", "basic/path")]
-        fn home_dir_present(input: &str, expected: &str) {
-            let _guard = TEST_LOCK.lock().unwrap();
-
-            ENV.clear();
-            ENV.set("HOME".to_string(), "/home/some_user".to_string());
-            assert_eq!(tilde_expand(input), expected);
-        }
-
-        #[test_case("~", "~")]
-        #[test_case("~enene", "~enene")]
-        #[test_case("~nope/", "~nope/")]
-        #[test_case("~/yes", "~/yes")]
-        #[test_case("no/~/no", "no/~/no")]
-        #[test_case("basic/path", "basic/path")]
-        fn home_dir_not_present(input: &str, expected: &str) {
-            let _guard = TEST_LOCK.lock().unwrap();
-
-            ENV.clear();
-            ENV.remove("HOME");
-            assert_eq!(tilde_expand(input), expected);
-        }
-
-        #[test_case("~", "/home/some_user")]
-        #[test_case("~enene", "~enene")]
-        #[test_case("~nope/", "~nope/")]
-        #[test_case("~/yes", "/home/some_user/yes")]
-        #[test_case("no/~/no", "no/~/no")]
-        #[test_case("basic/path", "basic/path")]
-        fn home_dir_present_path(input: &str, expected: &str) {
-            let _guard = TEST_LOCK.lock().unwrap();
-
-            ENV.clear();
-            ENV.set("HOME".to_string(), "/home/some_user".to_string());
-
-            let got = tilde_expand_path(&PathBuf::from(input));
-            assert_eq!(got, PathBuf::from(expected));
-        }
-
-        #[test_case("~", "~")]
-        #[test_case("~enene", "~enene")]
-        #[test_case("~nope/", "~nope/")]
-        #[test_case("~/yes", "~/yes")]
-        #[test_case("no/~/no", "no/~/no")]
-        #[test_case("basic/path", "basic/path")]
-        fn home_dir_not_present_path(input: &str, expected: &str) {
-            let _guard = TEST_LOCK.lock().unwrap();
-
-            ENV.clear();
-            ENV.remove("HOME");
-
-            let got = tilde_expand_path(&PathBuf::from(input));
-            assert_eq!(got, PathBuf::from(expected));
-        }
-
-        #[test_case("$HOME", "/home/some_user")]
-        #[test_case("$HOME/yes", "/home/some_user/yes")]
-        #[test_case("start/$VALUE/end", "start/path/end")]
-        #[test_case("$EMPTY/path", "/path")]
-        #[test_case("start/$EMPTY/end", "start//end")]
-        #[test_case("$NOT_SET", "$NOT_SET")]
-        #[test_case("no/$NOT_SET/path", "no/$NOT_SET/path")]
-        #[test_case("basic/path", "basic/path")]
-        // NOTE: current implementation only expands vars that are the entire part.
-        // This is different from how shells do it, but I can't think of a use case for
-        // it in paths #[test_case("no$HOME$VALUE", "no/home/some_userpath")]
-        fn env_var_expansion(input: &str, expected: &str) {
-            let _guard = TEST_LOCK.lock().unwrap();
-
-            ENV.clear();
-            ENV.set("HOME".to_string(), "/home/some_user".to_string());
-            ENV.set("VALUE".to_string(), "path".to_string());
-            ENV.set("EMPTY".to_string(), String::new());
-            assert_eq!(env_var_expand(input), expected);
-        }
-
-        #[test_case("$HOME", "/home/some_user")]
-        #[test_case("$HOME/yes", "/home/some_user/yes")]
-        #[test_case("/start/$VALUE/end", "/start/path/end")]
-        #[test_case("$EMPTY/path", "/path")]
-        #[test_case("/start/$EMPTY/end", "/start//end")]
-        #[test_case("/$NOT_SET", "/$NOT_SET")]
-        #[test_case("/basic/path", "/basic/path")]
-        fn env_var_expansion_path(input: &str, expected: &str) {
-            let _guard = TEST_LOCK.lock().unwrap();
-
-            ENV.clear();
-            ENV.set("HOME".to_string(), "/home/some_user".to_string());
-            ENV.set("VALUE".to_string(), "path".to_string());
-            ENV.set("EMPTY".to_string(), String::new());
-            let got = absolute_env_var_expand_path(PathBuf::from(input).as_path()).ok().unwrap();
-            assert_eq!(got, Some(PathBuf::from(expected)));
         }
     }
 }

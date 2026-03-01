@@ -12,11 +12,11 @@ use crossterm::{
     execute,
     terminal::{EnterAlternateScreen, LeaveAlternateScreen, disable_raw_mode, enable_raw_mode},
 };
+use rmpc_shared::env::ENV;
 
 use crate::{
     config::album_art::{ImageMethod, ImageMethodFile},
     shared::{
-        env::ENV,
         terminal::{crossterm_backend::CrosstermLockingBackend, tty::Tty},
         tmux::IS_TMUX,
     },

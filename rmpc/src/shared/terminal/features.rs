@@ -1,6 +1,7 @@
 use anyhow::Result;
+use rmpc_shared::env::ENV;
 
-use crate::shared::{dependencies::UEBERZUGPP, env::ENV, terminal::tty::Tty, tmux::IS_TMUX};
+use crate::shared::{dependencies::UEBERZUGPP, terminal::tty::Tty, tmux::IS_TMUX};
 
 pub(super) fn detect_kitty_keyboard() -> Result<bool> {
     let kitty_keyboard_protocol = if *IS_TMUX {
