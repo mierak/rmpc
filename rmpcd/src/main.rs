@@ -1,7 +1,6 @@
 use std::sync::Arc;
 
 use anyhow::Result;
-use mlua::Function;
 use rmpc_mpd::{
     client::Client,
     commands::{IdleEvent, Status},
@@ -27,8 +26,6 @@ async fn main() -> Result<()> {
 
     let (lua, lua_config) = lua::init()?;
 
-    let on_song_change: Option<Function> = lua_config.get("on_song_change")?;
-    let on_state_change: Option<Function> = lua_config.get("on_state_change")?;
     let address = lua_config.get::<String>("address")?;
     let password = lua_config.get::<Option<String>>("password")?;
     let (address, password) = rmpc_mpd::address::resolve(None, None, address, password);
@@ -59,17 +56,7 @@ async fn main() -> Result<()> {
     let tx = if enable_mpris { Some(mpris::setup(mpd.clone(), ctx.clone()).await?) } else { None };
 
     info!("Starting event loop");
-    event_loop::init(
-        mpd.clone(),
-        ctx.clone(),
-        idle_rx,
-        idle_tx,
-        tx,
-        lua,
-        on_song_change,
-        on_state_change,
-    )
-    .await?;
+    event_loop::init(mpd.clone(), ctx.clone(), idle_rx, idle_tx, tx, lua).await?;
 
     mpd.shutdown().await;
 
