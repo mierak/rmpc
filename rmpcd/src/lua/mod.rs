@@ -24,6 +24,8 @@ pub fn init() -> Result<(Lua, Table)> {
     lualib::sync::init(&lua)?;
     lualib::process::init(&lua)?;
     lualib::hooks::init(&lua)?;
+    lualib::http::init(&lua)?;
+    lualib::fs::init(&lua)?;
 
     install_builtins(&lua)?;
 
