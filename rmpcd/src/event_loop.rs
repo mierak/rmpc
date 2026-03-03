@@ -4,7 +4,7 @@ use std::sync::{
 };
 
 use anyhow::Result;
-use mlua::LuaSerdeExt;
+use mlua::{LuaSerdeExt, Table};
 use rmpc_mpd::{
     commands::{IdleEvent, State},
     mpd_client::{AlbumArtOrder, MpdClient},
@@ -27,7 +27,6 @@ use crate::{
 
 static IS_PLAYING: AtomicBool = AtomicBool::new(false);
 
-#[allow(clippy::too_many_arguments)]
 pub async fn init(
     client: Arc<AsyncClient>,
     ctx: Arc<RwLock<Ctx>>,
@@ -35,14 +34,14 @@ pub async fn init(
     tx: UnboundedSender<AppEvent>,
     mpris_tx: Option<UnboundedSender<Change>>,
     lua: mlua::Lua,
-    on_change: Option<mlua::Function>,
-    on_state_change: Option<mlua::Function>,
 ) -> Result<()> {
     if ctx.read().await.status.state == State::Play {
         start_update_loop(client.clone(), tx.clone());
     }
 
     let mut change_buffer = Vec::new();
+    let hooks = lua.globals().get::<Table>("rmpcd")?.get::<Table>("hooks")?;
+
     loop {
         let Some(ev) = rx.recv().await else {
             warn!("Idle task ended");
@@ -58,9 +57,7 @@ pub async fn init(
                 let ro_mpd_state = ctx.read().await;
                 let ro_status = &ro_mpd_state.status;
                 let ro_song = &ro_mpd_state.current_song;
-                if let Some(on_change) = &on_change
-                    && ro_song != &song
-                {
+                if ro_song != &song {
                     let old_song = lua.to_value(&ro_song.as_ref().map(Song::from))?;
                     let new_song = lua.to_value(&song.as_ref().map(Song::from))?;
 
@@ -74,18 +71,25 @@ pub async fn init(
                         None
                     };
 
-                    if let Err(err) = on_change.call::<()>((old_song, new_song)) {
-                        error!(err = ?err, "Failed to call on_change callback");
+                    let song_hooks = hooks.get::<Table>("on_song_change")?;
+
+                    for func in song_hooks.sequence_values::<mlua::Function>() {
+                        if let Err(err) = func?.call_async::<()>((&old_song, &new_song)).await {
+                            error!(err = ?err, "Failed to call on_song_change callback");
+                        }
                     }
                 }
 
-                if ro_status.state != new_status.state
-                    && let Some(on_state_change) = &on_state_change
-                {
+                if ro_status.state != new_status.state {
                     let old_state = lua.to_value(&ro_status.state)?;
                     let new_state = lua.to_value(&new_status.state)?;
-                    if let Err(err) = on_state_change.call::<()>((old_state, new_state)) {
-                        error!(err = ?err, "Failed to call on_state_change callback");
+
+                    let state_hooks = hooks.get::<Table>("on_state_change")?;
+
+                    for func in state_hooks.sequence_values::<mlua::Function>() {
+                        if let Err(err) = func?.call_async::<()>((&old_state, &new_state)).await {
+                            error!(err = ?err, "Failed to call on_state_change callback");
+                        }
                     }
                 }
 

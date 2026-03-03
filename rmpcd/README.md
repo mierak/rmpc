@@ -21,23 +21,26 @@ Address has the same syntax as [rmpc](https://rmpc.mierak.dev/configuration/#add
 
 Example:
 ```lua
-local song_changes = 0
-local state_changes = 0
+local debounced_notify = sync.debounce(500, function(new_song)
+	rmpcd.notify(new_song)
+end)
+
+rmpcd.register("on_song_change", function(old_song, new_song)
+	debounced_notify(new_song)
+end)
+
+rmpcd.register("on_song_change", function(old_song, new_song)
+	print("song changed from " .. old_song.file .. " to " .. new_song.file)
+end)
+
+rmpcd.register("on_state_change", function(old_state, new_state)
+	print("state changed from " .. old_state .. " to " .. new_state)
+end)
 
 ---@type Config
 return {
-	address = "127.0.0.1:6600",
+	address = "@mpd",
 	mpris = true,
-	on_song_change = function(old_song, new_song)
-		song_changes = song_changes + 1
-		if new_song == nil then
-			log.info("Song changed " .. song_changes .. " times, no song is currently playing")
-		end
-	end,
-	on_state_change = function(old_state, state)
-		state_changes = state_changes + 1
-		log.info("State changed " .. state_changes .. " times, current state is: " .. state)
-	end,
 }
 ```
 
@@ -45,6 +48,7 @@ return {
 
 ```lua
 ---@meta
+
 ---@alias MetadataTag string | string[]
 
 ---@class Song
@@ -87,11 +91,12 @@ return {
 
 ---@alias PlaybackState "Play" | "Pause" | "Stop"
 
+---@alias HookType "on_song_change" | "on_state_change"
+
 ---@class Config
 ---@field address string
 ---@field mpris boolean
----@field on_song_change fun(old_song: Song | nil, new_song: Song | nil): nil
----@field on_state_change fun(old_state: PlaybackState, state: PlaybackState): nil
+---@field password? string
 
 ---@class Logger
 ---@field info fun(msg: string): nil
@@ -100,7 +105,30 @@ return {
 ---@field warn fun(msg: string): nil
 ---@field trace fun(msg: string): nil
 
----Global logger injected by rmpcd (Rust) into Lua as `log`.
 ---@type Logger
 log = log
+
+---@class TimeoutHandle
+---@field cancel fun(): nil
+
+---@class Sync
+---@field set_timeout fun(timeout_ms: integer, callback: fun()): TimeoutHandle
+---@field debounce fun(timeout_ms: integer, callback: fun(...)): fun(...)
+
+---@type Sync
+sync = sync
+
+---@class Process
+---@field spawn fun(cmd: string[]): (integer|nil, string|nil)
+
+---@type Process
+process = process
+
+---@class Rmpcd
+---@field register fun(hook: HookType, func: fun(...): nil): nil
+---@field notify fun(new_song: Song|nil): nil
+---@field hooks table
+
+---@type Rmpcd
+rmpcd = rmpcd
 ```
