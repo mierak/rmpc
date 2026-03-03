@@ -1,6 +1,10 @@
+use std::sync::Arc;
+
 use anyhow::{Result, bail};
 use mlua::{Lua, Table};
 use rmpc_shared::paths::rmpcd_config_dir;
+
+use crate::async_client::AsyncClient;
 
 mod lualib;
 
@@ -20,13 +24,7 @@ pub fn init() -> Result<(Lua, Table)> {
     let rmpcd = lua.create_table()?;
     lua.globals().raw_set("rmpcd", &rmpcd)?;
 
-    lualib::log::init(&lua)?;
-    lualib::sync::init(&lua)?;
-    lualib::process::init(&lua)?;
-    lualib::hooks::init(&lua)?;
-    lualib::http::init(&lua)?;
-    lualib::fs::init(&lua)?;
-
+    install_lib(&lua)?;
     install_builtins(&lua)?;
 
     let file = std::fs::read(config_dir.join("init.lua"))?;
@@ -35,9 +33,25 @@ pub fn init() -> Result<(Lua, Table)> {
     Ok((lua, lua_config))
 }
 
-fn install_builtins(lua: &Lua) -> mlua::Result<()> {
+pub fn install_lib(lua: &Lua) -> mlua::Result<()> {
+    lualib::log::init(lua)?;
+    lualib::sync::init(lua)?;
+    lualib::process::init(lua)?;
+    lualib::hooks::init(lua)?;
+    lualib::http::init(lua)?;
+    lualib::fs::init(lua)?;
+    Ok(())
+}
+
+pub fn install_mpd(lua: &Lua, client: &Arc<AsyncClient>) -> mlua::Result<()> {
+    lualib::mpd::init(lua, client)?;
+    Ok(())
+}
+
+pub fn install_builtins(lua: &Lua) -> mlua::Result<()> {
     lua.load(include_str!("./builtin/notify.lua")).set_name("notify").exec()?;
     lua.load(include_str!("./builtin/sync.lua")).set_name("sync").exec()?;
+    lua.load(include_str!("./builtin/playcount.lua")).set_name("playcount").exec()?;
 
     Ok(())
 }

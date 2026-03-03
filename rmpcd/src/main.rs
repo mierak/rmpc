@@ -22,7 +22,12 @@ mod song;
 
 #[tokio::main]
 async fn main() -> Result<()> {
-    tracing_subscriber::fmt().with_writer(std::io::stderr).with_ansi(true).init();
+    tracing_subscriber::fmt()
+        .with_line_number(true)
+        .with_file(true)
+        .with_writer(std::io::stderr)
+        .with_ansi(true)
+        .init();
 
     let (lua, lua_config) = lua::init()?;
 
@@ -41,6 +46,8 @@ async fn main() -> Result<()> {
             }
         },
     ));
+
+    lua::install_mpd(&lua, &mpd)?;
 
     let status = mpd.run(|c| c.get_status()).await?;
     let current_song = mpd.run(|c| c.get_current_song()).await?;

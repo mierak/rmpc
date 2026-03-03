@@ -43,6 +43,7 @@ pub async fn init(
     let hooks = lua.globals().get::<Table>("rmpcd")?.get::<Table>("hooks")?;
 
     loop {
+        debug!("Waiting for events...");
         let Some(ev) = rx.recv().await else {
             warn!("Idle task ended");
             break;
@@ -147,17 +148,12 @@ pub async fn init(
                                 tx.send_safe(Change::Queue);
                             }
                         }
-                        IdleEvent::Options => {}
-                        IdleEvent::Database => {}
-                        IdleEvent::Update => {}
-                        IdleEvent::StoredPlaylist => {}
-                        IdleEvent::Output => {}
-                        IdleEvent::Partition => {}
-                        IdleEvent::Sticker => {}
-                        IdleEvent::Subscription => {}
-                        IdleEvent::Message => {}
-                        IdleEvent::Neighbor => {}
-                        IdleEvent::Mount => {}
+                        ev => {
+                            debug!(?ev, "Event currently not supported");
+                            // TODO receiving event without calling client::run will block the event
+                            // loop forever
+                            client.run(|c| c.get_current_song()).await.ok();
+                        }
                     }
                 }
             }
