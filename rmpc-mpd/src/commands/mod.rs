@@ -8,6 +8,7 @@ pub mod list_mounts;
 pub mod list_playlist;
 pub mod list_playlists;
 pub mod lsinfo;
+pub mod messages;
 pub mod metadata_tag;
 pub mod mpd_config;
 pub mod outputs;

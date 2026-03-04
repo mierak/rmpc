@@ -1,6 +1,9 @@
-use std::sync::{
-    Arc,
-    atomic::{AtomicBool, Ordering},
+use std::{
+    collections::HashMap,
+    sync::{
+        Arc,
+        atomic::{AtomicBool, Ordering},
+    },
 };
 
 use anyhow::Result;
@@ -20,6 +23,7 @@ use crate::{
     async_client::AsyncClient,
     ctx::Ctx,
     ext::SenderExt,
+    lua::lualib::hooks::{ON_MESSAGE, ON_MESSAGES, ON_SONG_CHANGE, ON_STATE_CHANGE},
     mpd_ext::MpdExt,
     mpris::Change,
     song::Song,
@@ -72,7 +76,7 @@ pub async fn init(
                         None
                     };
 
-                    let song_hooks = hooks.get::<Table>("on_song_change")?;
+                    let song_hooks = hooks.get::<Table>(ON_SONG_CHANGE)?;
 
                     for func in song_hooks.sequence_values::<mlua::Function>() {
                         if let Err(err) = func?.call_async::<()>((&old_song, &new_song)).await {
@@ -85,7 +89,7 @@ pub async fn init(
                     let old_state = lua.to_value(&ro_status.state)?;
                     let new_state = lua.to_value(&new_status.state)?;
 
-                    let state_hooks = hooks.get::<Table>("on_state_change")?;
+                    let state_hooks = hooks.get::<Table>(ON_STATE_CHANGE)?;
 
                     for func in state_hooks.sequence_values::<mlua::Function>() {
                         if let Err(err) = func?.call_async::<()>((&old_state, &new_state)).await {
@@ -146,6 +150,33 @@ pub async fn init(
                             ctx.write().await.queue = new_queue.unwrap_or_default();
                             if let Some(tx) = &mpris_tx {
                                 tx.send_safe(Change::Queue);
+                            }
+                        }
+                        IdleEvent::Message => {
+                            let messages = client.run(|c| c.read_messages()).await?;
+
+                            let message_hooks = hooks.get::<Table>(ON_MESSAGE)?;
+                            for func in message_hooks.sequence_values::<mlua::Function>() {
+                                let func = func?;
+                                for (k, v) in &messages.0 {
+                                    if let Err(err) = func
+                                        .call_async::<()>((lua.to_value(k)?, lua.to_value(v)?))
+                                        .await
+                                    {
+                                        error!(err = ?err, "Failed to call on_message callback");
+                                    }
+                                }
+                            }
+
+                            let msgs_hooks = hooks.get::<Table>(ON_MESSAGES)?;
+                            let messages: HashMap<String, Vec<String>> =
+                                messages.0.into_iter().collect();
+                            let messages = lua.to_value(&messages)?;
+
+                            for func in msgs_hooks.sequence_values::<mlua::Function>() {
+                                if let Err(err) = func?.call_async::<()>(&messages).await {
+                                    error!(err = ?err, "Failed to call on_messages callback");
+                                }
                             }
                         }
                         ev => {

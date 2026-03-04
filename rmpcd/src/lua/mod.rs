@@ -6,7 +6,7 @@ use rmpc_shared::paths::rmpcd_config_dir;
 
 use crate::async_client::AsyncClient;
 
-mod lualib;
+pub mod lualib;
 
 pub fn init() -> Result<(Lua, Table)> {
     let Some(config_dir) = rmpcd_config_dir() else {

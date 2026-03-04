@@ -28,7 +28,7 @@ use super::{
     version::Version,
 };
 use crate::{
-    commands::list_all::ListAll,
+    commands::{list_all::ListAll, messages::Messages},
     filter::{Filter, FilterExt, Tag},
     queue_position::QueuePosition,
     single_or_range::SingleOrRange,
@@ -202,7 +202,15 @@ pub trait MpdCommand {
     fn send_delete_partition(&mut self, name: &str) -> MpdResult<()>;
     fn send_list_partitions(&mut self) -> MpdResult<()>;
     fn send_move_output(&mut self, output_name: &str) -> MpdResult<()>;
+
+    // c2c
+    fn send_channels(&mut self) -> MpdResult<()>;
+    fn send_subscribe(&mut self, channel: &str) -> MpdResult<()>;
+    fn send_unsubscribe(&mut self, channel: &str) -> MpdResult<()>;
+    fn send_read_messages(&mut self) -> MpdResult<()>;
     fn send_send_message(&mut self, channel: &str, content: &str) -> MpdResult<()>;
+
+    // String normalization
     fn send_string_normalization_enable(
         &mut self,
         features: &[StringNormalizationFeature],
@@ -351,9 +359,15 @@ pub trait MpdClient: Sized {
     fn delete_partition(&mut self, name: &str) -> MpdResult<()>;
     fn list_partitions(&mut self) -> MpdResult<MpdList>;
     fn move_output(&mut self, output_name: &str) -> MpdResult<()>;
+
     // Client to client
+    fn channels(&mut self) -> MpdResult<MpdList>;
+    fn subscribe(&mut self, channel: &str) -> MpdResult<()>;
+    fn unsubscribe(&mut self, channel: &str) -> MpdResult<()>;
+    fn read_messages(&mut self) -> MpdResult<Messages>;
     fn send_message(&mut self, channel: &str, content: &str) -> MpdResult<()>;
 
+    // String normalization
     fn string_normalization_enable(
         &mut self,
         features: &[StringNormalizationFeature],
@@ -850,6 +864,22 @@ impl<T: SocketClient> MpdCommand for T {
 
     fn send_move_output(&mut self, output_name: &str) -> MpdResult<()> {
         self.execute(&format!("moveoutput {}", output_name.quote_and_escape()))
+    }
+
+    fn send_channels(&mut self) -> MpdResult<()> {
+        self.execute("channels")
+    }
+
+    fn send_subscribe(&mut self, channel: &str) -> MpdResult<()> {
+        self.execute(&format!("subscribe {}", channel.quote_and_escape()))
+    }
+
+    fn send_unsubscribe(&mut self, channel: &str) -> MpdResult<()> {
+        self.execute(&format!("unsubscribe {}", channel.quote_and_escape()))
+    }
+
+    fn send_read_messages(&mut self) -> MpdResult<()> {
+        self.execute("readmessages")
     }
 
     fn send_send_message(&mut self, channel: &str, content: &str) -> MpdResult<()> {

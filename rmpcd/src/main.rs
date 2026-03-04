@@ -8,6 +8,7 @@ use rmpc_mpd::{
 };
 use tokio::sync::RwLock;
 use tracing::{error, info};
+use tracing_subscriber::EnvFilter;
 
 use crate::{async_client::AsyncClient, ctx::Ctx};
 
@@ -27,6 +28,7 @@ async fn main() -> Result<()> {
         .with_file(true)
         .with_writer(std::io::stderr)
         .with_ansi(true)
+        .with_env_filter(EnvFilter::from_default_env())
         .init();
 
     let (lua, lua_config) = lua::init()?;
@@ -34,6 +36,8 @@ async fn main() -> Result<()> {
     let address = lua_config.get::<String>("address")?;
     let password = lua_config.get::<Option<String>>("password")?;
     let (address, password) = rmpc_mpd::address::resolve(None, None, address, password);
+    let subscribe_channels =
+        lua_config.get::<Option<Vec<String>>>("subscribe_channels")?.unwrap_or_default();
 
     let (idle_tx, idle_rx) = tokio::sync::mpsc::unbounded_channel::<AppEvent>();
 
@@ -48,6 +52,13 @@ async fn main() -> Result<()> {
     ));
 
     lua::install_mpd(&lua, &mpd)?;
+
+    if !subscribe_channels.is_empty() {
+        info!(channels = ?subscribe_channels, "Subscribing to channels");
+        for channel in subscribe_channels {
+            mpd.run(move |c| c.subscribe(&channel)).await?;
+        }
+    }
 
     let status = mpd.run(|c| c.get_status()).await?;
     let current_song = mpd.run(|c| c.get_current_song()).await?;
