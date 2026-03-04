@@ -30,6 +30,7 @@ use crate::{
         list::MpdList,
         list_all::ListAll,
         list_playlist::FileList,
+        messages::Messages,
         mpd_config::MpdConfig,
         outputs::Outputs,
         status::OnOffOneshot,
@@ -826,6 +827,22 @@ impl MpdClient for Client<'_> {
 
     fn move_output(&mut self, output_name: &str) -> MpdResult<()> {
         self.send_move_output(output_name).and_then(|()| self.read_ok())
+    }
+
+    fn channels(&mut self) -> MpdResult<MpdList> {
+        self.send_channels().and_then(|()| self.read_response())
+    }
+
+    fn subscribe(&mut self, channel: &str) -> MpdResult<()> {
+        self.send_subscribe(channel).and_then(|()| self.read_ok())
+    }
+
+    fn unsubscribe(&mut self, channel: &str) -> MpdResult<()> {
+        self.send_unsubscribe(channel).and_then(|()| self.read_ok())
+    }
+
+    fn read_messages(&mut self) -> MpdResult<Messages> {
+        self.send_read_messages().and_then(|()| self.read_response())
     }
 
     fn send_message(&mut self, channel: &str, content: &str) -> MpdResult<()> {
