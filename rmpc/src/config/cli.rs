@@ -228,6 +228,15 @@ pub enum Command {
         #[arg(short, long, allow_negative_numbers = true)]
         position: Option<QueuePosition>,
     },
+    /// Remove song(s) from the current queue by their zero based index position
+    /// in the queue. Will read positions from stdin if no positions are
+    /// provided as arguments, one song index per line.
+    Remove {
+        /// Zero based index of the song in the queue to remove. Can be
+        /// specified multiple times to remove multiple songs at once.
+        #[arg(short, long)]
+        positions: Vec<usize>,
+    },
     /// Add a song from youtube to the current queue.
     AddYt {
         url: String,

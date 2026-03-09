@@ -1,4 +1,9 @@
-use std::{io::Write, path::PathBuf, sync::Arc};
+use std::{
+    collections::BTreeSet,
+    io::{BufRead, Write},
+    path::PathBuf,
+    sync::Arc,
+};
 
 use anyhow::{Result, bail};
 use itertools::Itertools;
@@ -9,6 +14,7 @@ use rmpc_mpd::{
     mpd_client::{AlbumArtOrder, MpdClient, MpdCommand, ValueChange},
     proto_client::ProtoClient,
     queue_position::QueuePosition,
+    single_or_range::SingleOrRange,
     version::Version,
 };
 
@@ -274,6 +280,38 @@ impl Command {
                 for file in files {
                     client.add(&file.to_string_lossy(), position)?;
                 }
+
+                Ok(())
+            })),
+            Command::Remove { positions } => Ok(Box::new(move |client| {
+                let mut positions: BTreeSet<_> = positions.into_iter().collect();
+                let status = client.get_status()?;
+
+                if positions.is_empty() {
+                    positions = std::io::stdin()
+                        .lock()
+                        .lines()
+                        .map_ok(|line| line.parse())
+                        .flatten()
+                        .try_collect()?;
+                }
+
+                if positions.is_empty() {
+                    return Ok(());
+                }
+
+                client.send_start_cmd_list()?;
+                for idx in positions.into_iter().rev() {
+                    if idx > status.playlistlength.saturating_sub(1) as usize {
+                        bail!(
+                            "Song index {idx} is out of bounds (queue length: {})",
+                            status.playlistlength
+                        );
+                    }
+                    client.send_delete_from_queue(SingleOrRange::single(idx))?;
+                }
+                client.send_execute_cmd_list()?;
+                client.read_ok()?;
 
                 Ok(())
             })),
