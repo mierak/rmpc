@@ -23,7 +23,7 @@ use crate::{
     async_client::AsyncClient,
     ctx::Ctx,
     ext::SenderExt,
-    lua::lualib::hooks::{ON_MESSAGE, ON_MESSAGES, ON_SONG_CHANGE, ON_STATE_CHANGE},
+    lua::lualib::hooks::{ON_IDLE, ON_MESSAGE, ON_MESSAGES, ON_SONG_CHANGE, ON_STATE_CHANGE},
     mpd_ext::MpdExt,
     mpris::Change,
     song::Song,
@@ -184,6 +184,13 @@ pub async fn init(
                             // TODO receiving event without calling client::run will block the event
                             // loop forever
                             client.run(|c| c.get_current_song()).await.ok();
+                        }
+                    }
+
+                    let idle_ev_hooks = hooks.get::<Table>(ON_IDLE)?;
+                    for func in idle_ev_hooks.sequence_values::<mlua::Function>() {
+                        if let Err(err) = func?.call_async::<()>(ev.to_string()).await {
+                            error!(err = ?err, "Failed to call on_idle callback");
                         }
                     }
                 }

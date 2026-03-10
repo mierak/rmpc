@@ -16,11 +16,13 @@ serde = { workspace = true }
 serde_with = { workspace = true }
 serde_json = { workspace = true }
 zbus = { workspace = true }
+md5 = { workspace = true }
 tokio = { workspace = true, features = ["full"] }
 tokio-util = { workspace = true }
 tracing = { workspace = true, features = ["log"] }
 tracing-subscriber = { workspace = true, features = ["fmt", "env-filter"] }
 reqwest = { workspace = true }
+derive_more = { workspace = true }
 # console-subscriber = { workspace = true }
 
 [lints]

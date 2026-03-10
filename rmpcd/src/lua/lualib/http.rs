@@ -1,11 +1,10 @@
 use std::collections::HashMap;
 
-use anyhow::Result;
 use mlua::{ExternalResult, Lua, LuaSerdeExt, Table, Value};
 use serde::{Deserialize, Serialize};
 use tracing::error;
 
-pub fn init(lua: &Lua) -> Result<()> {
+pub fn create(lua: &Lua) -> mlua::Result<Table> {
     let tbl = lua.create_table()?;
 
     let call = lua.create_async_function(async |lua, (url, opts): (String, Option<Value>)| {
@@ -30,9 +29,8 @@ pub fn init(lua: &Lua) -> Result<()> {
     tbl.set("call", call)?;
     tbl.set("get", get)?;
     tbl.set("post", post)?;
-    lua.globals().raw_set("http", tbl)?;
 
-    Ok(())
+    Ok(tbl)
 }
 
 async fn do_call(lua: Lua, url: &str, opts: Option<RequestOpts>) -> mlua::Result<Table> {

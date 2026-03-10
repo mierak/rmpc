@@ -2,7 +2,6 @@ use std::sync::Arc;
 
 use anyhow::Result;
 use rmpc_mpd::{
-    client::Client,
     commands::{IdleEvent, Status},
     mpd_client::MpdClient,
 };
@@ -33,7 +32,17 @@ async fn main() -> Result<()> {
         )
         .init();
 
-    let (lua, lua_config) = lua::init()?;
+    let (idle_tx, idle_rx) = tokio::sync::mpsc::unbounded_channel::<AppEvent>();
+
+    let idle_tx_clone = idle_tx.clone();
+
+    let mpd = Arc::new(AsyncClient::new(move |evs| {
+        if let Err(err) = idle_tx_clone.send(AppEvent::Idle(evs)) {
+            error!(err = ?err, "Failed to send idle event");
+        }
+    }));
+
+    let (lua, lua_config) = lua::init(&mpd)?;
 
     let address = lua_config.get::<String>("address")?;
     let password = lua_config.get::<Option<String>>("password")?;
@@ -41,19 +50,7 @@ async fn main() -> Result<()> {
     let subscribe_channels =
         lua_config.get::<Option<Vec<String>>>("subscribe_channels")?.unwrap_or_default();
 
-    let (idle_tx, idle_rx) = tokio::sync::mpsc::unbounded_channel::<AppEvent>();
-
-    let idle_tx_clone = idle_tx.clone();
-    let mpd = Arc::new(AsyncClient::new(
-        Client::init(address.clone(), password.clone(), "", None, false)?,
-        move |evs| {
-            if let Err(err) = idle_tx_clone.send(AppEvent::Idle(evs)) {
-                error!(err = ?err, "Failed to send idle event");
-            }
-        },
-    ));
-
-    lua::install_mpd(&lua, &mpd)?;
+    mpd.connect(address, password).await?;
 
     if !subscribe_channels.is_empty() {
         info!(channels = ?subscribe_channels, "Subscribing to channels");

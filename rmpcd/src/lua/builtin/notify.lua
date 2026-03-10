@@ -1,4 +1,7 @@
-function rmpcd.notify(new_song)
+local sync = require("rmpcd.sync")
+local process = require("rmpcd.process")
+
+local function notify(new_song)
     local artist
     if new_song.artist and type(new_song.artist) == "table" then
         artist = new_song.artist[1]
@@ -19,3 +22,13 @@ function rmpcd.notify(new_song)
 
     process.spawn({ "notify-send", "Now playing: " .. artist .. " - " .. title })
 end
+
+return {
+    install = function()
+        local debounced = sync.debounce(500, function(_old_song, new_song)
+            notify(new_song)
+        end)
+
+        rmpcd.on("song_change", debounced)
+    end,
+}

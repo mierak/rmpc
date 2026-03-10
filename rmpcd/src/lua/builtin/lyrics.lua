@@ -1,3 +1,9 @@
+local sync = require("rmpcd.sync")
+local fs = require("rmpcd.fs")
+local http = require("rmpcd.http")
+local log = require("rmpcd.log")
+local process = require("rmpcd.process")
+
 local lrclib_url = "https://lrclib.net"
 local lyrics_dir = os.getenv("HOME") .. "/Music"
 
@@ -10,7 +16,7 @@ local function replace_after_last_dot(s, replacement)
     return s:gsub("%.[^.]*$", "." .. replacement, 1)
 end
 
-function rmpcd.lyrics(song)
+local function lyrics(song)
     log.info("Fetching lyrics for " .. song.artist .. " - " .. song.title .. " at path " .. song.file)
     fs.create_dir_all(lyrics_dir .. "/" .. last_path_segment(song.file))
     local lrc_path = lyrics_dir .. "/" .. replace_after_last_dot(song.file, "lrc")
@@ -58,3 +64,13 @@ function rmpcd.lyrics(song)
 
     process.spawn({ "rmpc", "remote", "indexlrc", "--path", lrc_path })
 end
+
+return {
+    install = function()
+        local debounced = sync.debounce(500, function(_old_song, new_song)
+            lyrics(new_song)
+        end)
+
+        rmpcd.on("song_change", debounced)
+    end,
+}
