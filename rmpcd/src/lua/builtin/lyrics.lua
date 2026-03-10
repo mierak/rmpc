@@ -65,6 +65,7 @@ local function lyrics(song)
     process.spawn({ "rmpc", "remote", "indexlrc", "--path", lrc_path })
 end
 
+---@type LyricsModule
 return {
     install = function()
         local debounced = sync.debounce(500, function(_old_song, new_song)

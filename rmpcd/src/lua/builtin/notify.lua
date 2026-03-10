@@ -3,6 +3,9 @@ local process = require("rmpcd.process")
 local mpd = require("rmpcd.mpd")
 local fs = require("rmpcd.fs")
 
+---@param new_song Song
+---@param with_album_art boolean
+---@param album_art_path string
 local function notify(new_song, with_album_art, album_art_path)
     local artist
     if new_song.artist and type(new_song.artist) == "table" then
@@ -41,6 +44,7 @@ local function notify(new_song, with_album_art, album_art_path)
 end
 
 local album_art_path = "/tmp/rmpcd-notify-album-art"
+---@type NotifyModule
 return {
     install = function(args)
         local _args = args or {}
