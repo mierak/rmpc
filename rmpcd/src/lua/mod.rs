@@ -8,7 +8,7 @@ use crate::async_client::AsyncClient;
 
 pub mod lualib;
 
-pub fn init() -> Result<(Lua, Table)> {
+pub fn init(client: &Arc<AsyncClient>) -> Result<(Lua, Table)> {
     let Some(config_dir) = rmpcd_config_dir() else {
         bail!("Could not determine config directory");
     };
@@ -18,14 +18,15 @@ pub fn init() -> Result<(Lua, Table)> {
     let lua = Lua::new();
     let package: Table = lua.globals().get("package")?;
     let package_path = package.get::<String>("path")?;
+    let preload = package.get::<Table>("preload")?;
 
     package.set("path", format!("{rmpcd_pkg_path};{package_path}"))?;
 
     let rmpcd = lua.create_table()?;
     lua.globals().raw_set("rmpcd", &rmpcd)?;
 
-    install_lib(&lua)?;
-    install_builtins(&lua)?;
+    install_lib(&lua, &preload, client)?;
+    install_builtins(&lua, &preload)?;
 
     let file = std::fs::read(config_dir.join("init.lua"))?;
     let lua_config: Table = lua.load(&file).eval()?;
@@ -33,26 +34,52 @@ pub fn init() -> Result<(Lua, Table)> {
     Ok((lua, lua_config))
 }
 
-pub fn install_lib(lua: &Lua) -> mlua::Result<()> {
-    lualib::log::init(lua)?;
-    lualib::sync::init(lua)?;
-    lualib::process::init(lua)?;
+pub fn install_lib(lua: &Lua, preload: &Table, client: &Arc<AsyncClient>) -> mlua::Result<()> {
+    macro_rules! install_lib {
+        ($name:ident) => {
+            let lib = lualib::$name::create(lua)?;
+            preload.raw_set(
+                concat!("rmpcd.", stringify!($name)),
+                lua.create_function(move |_, ()| Ok(lib.clone()))?,
+            )?;
+        };
+    }
     lualib::hooks::init(lua)?;
-    lualib::http::init(lua)?;
-    lualib::fs::init(lua)?;
+
+    let mpd = lualib::mpd::create(lua, client)?;
+    preload.raw_set("rmpcd.mpd", lua.create_function(move |_, ()| Ok(mpd.clone()))?)?;
+
+    install_lib!(log);
+    install_lib!(sync);
+    install_lib!(process);
+    install_lib!(http);
+    install_lib!(fs);
+    install_lib!(util);
+
     Ok(())
 }
 
-pub fn install_mpd(lua: &Lua, client: &Arc<AsyncClient>) -> mlua::Result<()> {
-    lualib::mpd::init(lua, client)?;
-    Ok(())
-}
+pub fn install_builtins(lua: &Lua, preload: &Table) -> mlua::Result<()> {
+    macro_rules! install_builtin {
+        ($name:literal) => {
+            let tbl = lua
+                .load(include_str!(concat!("./builtin/", $name, ".lua")))
+                .set_name($name)
+                .call::<Table>(())?;
+            preload.set(
+                concat!("rmpcd.", $name),
+                lua.create_function(move |_, ()| Ok(tbl.clone()))?,
+            )?;
+        };
+    }
 
-pub fn install_builtins(lua: &Lua) -> mlua::Result<()> {
-    lua.load(include_str!("./builtin/notify.lua")).set_name("notify").exec()?;
+    // Sync modifies the preload table directly
     lua.load(include_str!("./builtin/sync.lua")).set_name("sync").exec()?;
-    lua.load(include_str!("./builtin/playcount.lua")).set_name("playcount").exec()?;
-    lua.load(include_str!("./builtin/lyrics.lua")).set_name("lyrics").exec()?;
+    lua.load(include_str!("./builtin/lastfm.lua")).set_name("lastfm").exec()?;
+
+    install_builtin!("notify");
+    install_builtin!("playcount");
+    install_builtin!("lyrics");
 
     Ok(())
 }

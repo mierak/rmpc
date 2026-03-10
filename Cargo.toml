@@ -69,6 +69,7 @@ tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 console-subscriber = "0.5"
 reqwest = { version = "0.13.2", features = ["json", "query"] }
+md5 = { version = "0.8.0" }
 
 [workspace.lints.clippy]
 pedantic = { level = "deny", priority = -1 }

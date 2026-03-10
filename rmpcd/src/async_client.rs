@@ -9,8 +9,12 @@ use std::{
     thread,
 };
 
-use rmpc_mpd::{commands::IdleEvent, mpd_client::MpdClient as _};
-use tokio::sync::{mpsc, oneshot};
+use rmpc_mpd::{
+    address::{MpdAddress, MpdPassword},
+    commands::IdleEvent,
+    mpd_client::MpdClient as _,
+};
+use tokio::sync::{Mutex, mpsc, oneshot};
 
 pub type MpdClient = rmpc_mpd::client::Client<'static>;
 pub type MpdError = rmpc_mpd::errors::MpdError;
@@ -113,20 +117,18 @@ fn worker_loop(
     });
 }
 
-#[derive(Debug)]
+#[derive(derive_more::Debug)]
 pub struct AsyncClient {
+    rx: Mutex<Option<mpsc::Receiver<Msg>>>,
     tx: mpsc::Sender<Msg>,
     shared: Arc<Shared>,
+    #[debug(skip)]
+    on_idle: Mutex<Option<Box<dyn Fn(Vec<IdleEvent>) + Send + Sync>>>,
 }
 
 impl AsyncClient {
-    pub fn new(
-        client: MpdClient,
-        on_idle: impl Fn(Vec<IdleEvent>) + Send + Sync + 'static,
-    ) -> Self {
+    pub fn new(on_idle: impl Fn(Vec<IdleEvent>) + Send + Sync + 'static) -> Self {
         let (tx, rx) = mpsc::channel(64);
-
-        let interrupt_stream = client.stream.try_clone().expect("Client stream is not cloneable");
 
         let shared = Arc::new(Shared {
             in_idle: AtomicBool::new(false),
@@ -134,10 +136,24 @@ impl AsyncClient {
             wake_cv: Condvar::new(),
         });
 
-        spawn_interrupter(interrupt_stream, shared.clone());
-        worker_loop(client, rx, shared.clone(), on_idle);
+        Self { rx: Mutex::new(Some(rx)), tx, shared, on_idle: Mutex::new(Some(Box::new(on_idle))) }
+    }
 
-        Self { tx, shared }
+    pub async fn connect(
+        &self,
+        address: MpdAddress,
+        password: Option<MpdPassword>,
+    ) -> anyhow::Result<()> {
+        let client = MpdClient::init(address, password, "", None, false)?;
+        let on_idle = self.on_idle.lock().await.take().expect("on_idle callback already taken");
+        let rx = self.rx.lock().await.take().expect("Receiver already taken");
+
+        let interrupt_stream = client.stream.try_clone().expect("Client stream is not cloneable");
+
+        spawn_interrupter(interrupt_stream, self.shared.clone());
+        worker_loop(client, rx, self.shared.clone(), on_idle);
+
+        Ok(())
     }
 
     #[tracing::instrument(skip(f))]

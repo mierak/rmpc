@@ -4,6 +4,9 @@
 This project is in its very early stages and is not ready for daily use. Expect
 changes to basically everything with no regards to backwards compatibility at this point.
 
+> [!WARNING]
+The README is not kept strictly up to date at the moment
+
 A companion MPD client to rmpc intended to run as a daemon.
 
 Features(so far):

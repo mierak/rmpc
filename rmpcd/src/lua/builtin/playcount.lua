@@ -1,4 +1,7 @@
-function rmpcd.playcount(new_song)
+local log = require("rmpcd.log")
+local mpd = require("rmpcd.mpd")
+
+local function playcount(old_song, new_song)
     local sticker, err = mpd.get_song_sticker(new_song.file, "playcount")
     if err then
         log.error("Error retrieving playcount sticker for '%s': %s", new_song.file, err)
@@ -12,3 +15,9 @@ function rmpcd.playcount(new_song)
         mpd.set_song_sticker(new_song.file, "playcount", tostring(count + 1))
     end
 end
+
+return {
+    install = function()
+        rmpcd.on("song_change", playcount)
+    end,
+}

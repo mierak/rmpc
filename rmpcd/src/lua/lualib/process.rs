@@ -1,7 +1,7 @@
-use mlua::Lua;
+use mlua::{Lua, Table};
 use tracing::error;
 
-pub fn init(lua: &Lua) -> mlua::Result<()> {
+pub fn create(lua: &Lua) -> mlua::Result<Table> {
     let tbl = lua.create_table()?;
 
     let spawn_process = lua.create_async_function(
@@ -39,7 +39,6 @@ pub fn init(lua: &Lua) -> mlua::Result<()> {
     )?;
 
     tbl.raw_set("spawn", spawn_process)?;
-    lua.globals().raw_set("process", tbl)?;
 
-    Ok(())
+    Ok(tbl)
 }

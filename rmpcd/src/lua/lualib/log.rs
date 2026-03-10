@@ -1,9 +1,9 @@
 use anyhow::Result;
-use mlua::Lua;
+use mlua::{Lua, Table};
 use tracing::{debug, error, info, trace, warn};
 
-pub fn init(lua: &Lua) -> Result<()> {
-    let logger = lua.create_table()?;
+pub fn create(lua: &Lua) -> Result<Table> {
+    let tbl = lua.create_table()?;
 
     let log_info = lua.create_function(|_, str: String| {
         info!("{str}");
@@ -26,12 +26,11 @@ pub fn init(lua: &Lua) -> Result<()> {
         Ok(())
     })?;
 
-    logger.set("info", log_info)?;
-    logger.set("error", log_error)?;
-    logger.set("debug", log_debug)?;
-    logger.set("warn", log_warn)?;
-    logger.set("trace", log_trace)?;
-    lua.globals().raw_set("log", logger)?;
+    tbl.set("info", log_info)?;
+    tbl.set("error", log_error)?;
+    tbl.set("debug", log_debug)?;
+    tbl.set("warn", log_warn)?;
+    tbl.set("trace", log_trace)?;
 
-    Ok(())
+    Ok(tbl)
 }

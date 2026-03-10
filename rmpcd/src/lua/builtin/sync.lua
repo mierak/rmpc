@@ -1,6 +1,7 @@
+local sync = require("rmpcd.sync")
+
 function sync.debounce(timeout_ms, callback)
     local token = nil
-    print("debounce called with timeout_ms:", timeout_ms)
 
     return function(...)
         if token and token.cancel then

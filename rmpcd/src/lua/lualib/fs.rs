@@ -1,8 +1,7 @@
-use anyhow::Result;
-use mlua::{ExternalError, IntoLuaMulti, Lua};
+use mlua::{ExternalError, IntoLuaMulti, Lua, Table};
 use tracing::error;
 
-pub fn init(lua: &Lua) -> Result<()> {
+pub fn create(lua: &Lua) -> mlua::Result<Table> {
     let tbl = lua.create_table()?;
 
     let exists =
@@ -96,7 +95,6 @@ pub fn init(lua: &Lua) -> Result<()> {
     tbl.raw_set("delete", delete)?;
     tbl.raw_set("remove_dir", remove_dir)?;
     tbl.raw_set("remove_dir_all", remove_dir_all)?;
-    lua.globals().raw_set("fs", tbl)?;
 
-    Ok(())
+    Ok(tbl)
 }

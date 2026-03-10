@@ -1,9 +1,9 @@
-use mlua::{Function, IntoLua, Lua};
+use mlua::{Function, IntoLua, Lua, Table};
 use tokio::select;
 use tokio_util::sync::CancellationToken;
 use tracing::{error, trace};
 
-pub fn init(lua: &Lua) -> mlua::Result<()> {
+pub fn create(lua: &Lua) -> mlua::Result<Table> {
     let tbl = lua.create_table()?;
 
     let set_timeout = lua.create_async_function(
@@ -31,9 +31,8 @@ pub fn init(lua: &Lua) -> mlua::Result<()> {
     )?;
 
     tbl.raw_set("set_timeout", set_timeout)?;
-    lua.globals().raw_set("sync", tbl)?;
 
-    Ok(())
+    Ok(tbl)
 }
 
 struct TimeoutHandle {

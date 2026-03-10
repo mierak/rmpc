@@ -5,3 +5,4 @@ pub mod log;
 pub mod mpd;
 pub mod process;
 pub mod sync;
+pub mod util;
