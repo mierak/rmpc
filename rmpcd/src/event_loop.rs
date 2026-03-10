@@ -23,10 +23,12 @@ use crate::{
     async_client::AsyncClient,
     ctx::Ctx,
     ext::SenderExt,
-    lua::lualib::hooks::{ON_IDLE, ON_MESSAGE, ON_MESSAGES, ON_SONG_CHANGE, ON_STATE_CHANGE},
+    lua::lualib::{
+        hooks::{ON_IDLE, ON_MESSAGE, ON_MESSAGES, ON_SONG_CHANGE, ON_STATE_CHANGE},
+        mpd::types::Song,
+    },
     mpd_ext::MpdExt,
     mpris::Change,
-    song::Song,
 };
 
 static IS_PLAYING: AtomicBool = AtomicBool::new(false);
@@ -183,7 +185,7 @@ pub async fn init(
                             debug!(?ev, "Event currently not supported");
                             // TODO receiving event without calling client::run will block the event
                             // loop forever
-                            client.run(|c| c.get_current_song()).await.ok();
+                            client.run(|_| Ok(())).await.ok();
                         }
                     }
 

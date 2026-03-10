@@ -1,7 +1,9 @@
 local sync = require("rmpcd.sync")
 local process = require("rmpcd.process")
+local mpd = require("rmpcd.mpd")
+local fs = require("rmpcd.fs")
 
-local function notify(new_song)
+local function notify(new_song, with_album_art, album_art_path)
     local artist
     if new_song.artist and type(new_song.artist) == "table" then
         artist = new_song.artist[1]
@@ -20,13 +22,31 @@ local function notify(new_song)
         title = "Unknown Title"
     end
 
-    process.spawn({ "notify-send", "Now playing: " .. artist .. " - " .. title })
+    if not with_album_art then
+        process.spawn({ "notify-send", "Now playing: " .. artist .. " - " .. title })
+        return
+    end
+
+    local bytes, err = mpd.read_picture(new_song.file)
+    if err ~= nil then
+        bytes, err = mpd.album_art(new_song.file)
+    end
+
+    if err ~= nil then
+        process.spawn({ "notify-send", "Now playing: " .. artist .. " - " .. title })
+    else
+        fs.write(album_art_path, bytes)
+        process.spawn({ "notify-send", "-i", album_art_path, "Now playing: " .. artist .. " - " .. title })
+    end
 end
 
+local album_art_path = "/tmp/rmpcd-notify-album-art"
 return {
-    install = function()
+    install = function(args)
+        local _args = args or {}
+
         local debounced = sync.debounce(500, function(_old_song, new_song)
-            notify(new_song)
+            notify(new_song, _args.with_album_art or true, _args.album_art_path or album_art_path)
         end)
 
         rmpcd.on("song_change", debounced)
