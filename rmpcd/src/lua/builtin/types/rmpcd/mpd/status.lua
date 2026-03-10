@@ -1,0 +1,27 @@
+---@class MpdStatus
+---@field partition string
+---@field volume integer
+---@field repeat boolean
+---@field random boolean
+---@field single OnOffOneshot
+---@field consume OnOffOneshot
+---@field playlist integer|nil
+---@field playlist_length integer
+---@field state PlaybackState
+---@field song integer|nil
+---@field song_id integer|nil
+---@field next_song integer|nil
+---@field next_song_id integer|nil
+---@field elapsed number in milliseconds
+---@field duration number in milliseconds
+---@field bitrate integer|nil
+---@field xfade integer|nil
+---@field mix_ramp_db string|nil
+---@field mix_ramp_delay string|nil
+---@field audio string|nil
+---@field updating_db integer|nil
+---@field error string|nil
+---@field last_loaded_playlist string|nil
+
+---@alias OnOffOneshot "on" | "off" | "oneshot"
+---@alias PlaybackState "play" | "pause" | "stop"

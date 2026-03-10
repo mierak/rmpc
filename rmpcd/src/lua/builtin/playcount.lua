@@ -16,6 +16,7 @@ local function playcount(old_song, new_song)
     end
 end
 
+---@type PlaycountModule
 return {
     install = function()
         rmpcd.on("song_change", playcount)

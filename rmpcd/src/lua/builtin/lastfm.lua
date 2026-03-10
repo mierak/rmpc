@@ -5,8 +5,8 @@ local auth_url = "http://ws.audioscrobbler.com/2.0/?method=auth.gettoken&api_key
 
 local is_authenticated = false
 local is_authenticating = false
-local token = "-qp1U07LoZzKFPeCgVzkNBSf9jj8Hk9R"
-local session_key = "_nB4ZcZo21R_WGn9vC3SeIm-RmX_uZYG"
+local token = ""
+local session_key = ""
 
 local function lastfm_api_sig(params, shared_secret)
     local keys = {}

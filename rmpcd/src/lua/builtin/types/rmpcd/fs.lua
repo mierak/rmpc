@@ -1,0 +1,17 @@
+---@meta
+---@module "rmpcd.fs"
+
+---@class Fs
+---@field exists fun(path: string): (boolean, string|nil)
+---@field create_dir_all fun(path: string): (boolean, string|nil)
+---@field create_dir fun(path: string): (boolean, string|nil)
+---@field write fun(path: string, contents: integer[]): (boolean, string|nil)
+---@field write_str fun(path: string, contents: string): (boolean, string|nil)
+---@field delete fun(path: string): (boolean, string|nil)
+---@field remove_dir fun(path: string): (boolean, string|nil)
+---@field remove_dir_all fun(path: string): (boolean, string|nil)
+
+---@type Fs
+---@diagnostic disable-next-line: missing-fields
+local M = {}
+return M
