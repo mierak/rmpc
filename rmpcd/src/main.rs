@@ -18,7 +18,6 @@ mod ext;
 mod lua;
 mod mpd_ext;
 mod mpris;
-mod song;
 
 #[tokio::main]
 async fn main() -> Result<()> {

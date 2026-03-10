@@ -3,13 +3,12 @@ use std::{str::FromStr, sync::Arc};
 use anyhow::Result;
 use mlua::{IntoLuaMulti, Lua, LuaSerdeExt, Table, Value};
 use rmpc_mpd::{
-    commands::{Volume, status::OnOffOneshot as MpdOnOffOneShot, volume::Bound},
+    commands::{Volume, volume::Bound},
     mpd_client::{MpdClient, ValueChange as MpdValueChange},
 };
-use serde::Deserialize;
 use serde_with::DeserializeFromStr;
 
-use crate::async_client::AsyncClient;
+use crate::{async_client::AsyncClient, lua::lualib::mpd::types::OnOffOneshot};
 
 pub fn init(lua: &Lua, mpd: &Table, client: &Arc<AsyncClient>) -> Result<()> {
     let c = Arc::clone(client);
@@ -259,24 +258,6 @@ pub fn init(lua: &Lua, mpd: &Table, client: &Arc<AsyncClient>) -> Result<()> {
     mpd.raw_set("stop", stop)?;
 
     Ok(())
-}
-
-#[derive(Deserialize)]
-#[serde(rename_all = "lowercase")]
-enum OnOffOneshot {
-    On,
-    Off,
-    Oneshot,
-}
-
-impl From<OnOffOneshot> for MpdOnOffOneShot {
-    fn from(value: OnOffOneshot) -> Self {
-        match value {
-            OnOffOneshot::On => MpdOnOffOneShot::On,
-            OnOffOneshot::Off => MpdOnOffOneShot::Off,
-            OnOffOneshot::Oneshot => MpdOnOffOneShot::Oneshot,
-        }
-    }
 }
 
 #[derive(DeserializeFromStr)]
