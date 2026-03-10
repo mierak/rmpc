@@ -7,7 +7,7 @@ use rmpc_mpd::{
     mpd_client::MpdClient,
 };
 use tokio::sync::RwLock;
-use tracing::{error, info};
+use tracing::{error, info, level_filters::LevelFilter};
 use tracing_subscriber::EnvFilter;
 
 use crate::{async_client::AsyncClient, ctx::Ctx};
@@ -28,7 +28,9 @@ async fn main() -> Result<()> {
         .with_file(true)
         .with_writer(std::io::stderr)
         .with_ansi(true)
-        .with_env_filter(EnvFilter::from_default_env())
+        .with_env_filter(
+            EnvFilter::builder().with_default_directive(LevelFilter::DEBUG.into()).from_env_lossy(),
+        )
         .init();
 
     let (lua, lua_config) = lua::init()?;

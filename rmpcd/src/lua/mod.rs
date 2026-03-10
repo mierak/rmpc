@@ -52,6 +52,7 @@ pub fn install_builtins(lua: &Lua) -> mlua::Result<()> {
     lua.load(include_str!("./builtin/notify.lua")).set_name("notify").exec()?;
     lua.load(include_str!("./builtin/sync.lua")).set_name("sync").exec()?;
     lua.load(include_str!("./builtin/playcount.lua")).set_name("playcount").exec()?;
+    lua.load(include_str!("./builtin/lyrics.lua")).set_name("lyrics").exec()?;
 
     Ok(())
 }
