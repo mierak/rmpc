@@ -27,7 +27,10 @@ async fn main() -> Result<()> {
         .with_writer(std::io::stderr)
         .with_ansi(true)
         .with_env_filter(
-            EnvFilter::builder().with_default_directive(LevelFilter::DEBUG.into()).from_env_lossy(),
+            EnvFilter::builder()
+                .with_default_directive(LevelFilter::INFO.into())
+                .from_env_lossy()
+                .add_directive("rmpcd=debug".parse()?),
         )
         .init();
 
@@ -41,7 +44,7 @@ async fn main() -> Result<()> {
         }
     }));
 
-    let (lua, lua_config) = lua::init(&mpd)?;
+    let (lua, lua_config) = lua::init(&mpd).await?;
 
     let address = lua_config.get::<String>("address")?;
     let password = lua_config.get::<Option<String>>("password")?;

@@ -1,5 +1,6 @@
 ---@class Song
 ---@field file string
+---@field duration integer
 ---@field artist? string | string[]
 ---@field artistsort? string | string[]
 ---@field album? string | string[]

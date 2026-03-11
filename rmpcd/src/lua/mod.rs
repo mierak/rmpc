@@ -8,7 +8,7 @@ use crate::async_client::AsyncClient;
 
 pub mod lualib;
 
-pub fn init(client: &Arc<AsyncClient>) -> Result<(Lua, Table)> {
+pub async fn init(client: &Arc<AsyncClient>) -> Result<(Lua, Table)> {
     let Some(config_dir) = rmpcd_config_dir() else {
         bail!("Could not determine config directory");
     };
@@ -29,7 +29,7 @@ pub fn init(client: &Arc<AsyncClient>) -> Result<(Lua, Table)> {
     install_builtins(&lua, &preload)?;
 
     let file = std::fs::read(config_dir.join("init.lua"))?;
-    let lua_config: Table = lua.load(&file).eval()?;
+    let lua_config: Table = lua.load(&file).eval_async().await?;
 
     Ok((lua, lua_config))
 }
@@ -75,11 +75,11 @@ pub fn install_builtins(lua: &Lua, preload: &Table) -> mlua::Result<()> {
 
     // Sync modifies the preload table directly
     lua.load(include_str!("./builtin/sync.lua")).set_name("sync").exec()?;
-    lua.load(include_str!("./builtin/lastfm.lua")).set_name("lastfm").exec()?;
 
     install_builtin!("notify");
     install_builtin!("playcount");
     install_builtin!("lyrics");
+    install_builtin!("lastfm");
 
     Ok(())
 }

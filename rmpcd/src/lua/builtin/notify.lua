@@ -35,7 +35,7 @@ local function notify(new_song, with_album_art, album_art_path)
         bytes, err = mpd.album_art(new_song.file)
     end
 
-    if err ~= nil then
+    if err ~= nil or bytes == nil then
         process.spawn({ "notify-send", "Now playing: " .. artist .. " - " .. title })
     else
         fs.write(album_art_path, bytes)
@@ -50,6 +50,10 @@ return {
         local _args = args or {}
 
         local debounced = sync.debounce(500, function(_old_song, new_song)
+            if new_song == nil then
+                return
+            end
+
             notify(new_song, _args.with_album_art or true, _args.album_art_path or album_art_path)
         end)
 

@@ -5,6 +5,7 @@ use serde::Serialize;
 #[derive(Serialize, PartialEq, Eq)]
 pub struct Song {
     pub file: String,
+    pub duration: u128,
     pub artist: Option<MetadataTag>,
     pub artistsort: Option<MetadataTag>,
     pub album: Option<MetadataTag>,
@@ -46,6 +47,7 @@ impl From<&MpdSong> for Song {
     fn from(value: &MpdSong) -> Self {
         Self {
             file: value.file.clone(),
+            duration: value.duration.map(|d| d.as_millis()).unwrap_or_default(),
             artist: value.metadata.get("artist").cloned(),
             artistsort: value.metadata.get("artistsort").cloned(),
             album: value.metadata.get("album").cloned(),
