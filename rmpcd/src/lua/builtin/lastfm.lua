@@ -1,12 +1,8 @@
--- Very much a WIP and not really working
-local API_KEY = ""
-local SHARED_SECRET = ""
-local auth_url = "http://ws.audioscrobbler.com/2.0/?method=auth.gettoken&api_key=" .. API_KEY .. "&format=json"
-
-local is_authenticated = false
-local is_authenticating = false
-local token = ""
-local session_key = ""
+local util = require("rmpcd.util")
+local http = require("rmpcd.http")
+local log = require("rmpcd.log")
+local process = require("rmpcd.process")
+local sync = require("rmpcd.sync")
 
 local function lastfm_api_sig(params, shared_secret)
     local keys = {}
@@ -26,10 +22,17 @@ local function lastfm_api_sig(params, shared_secret)
     return util.md5(base)
 end
 
-local function lastfm_update_now_playing(artist, track, album, duration_seconds)
+---@param apy_key string
+---@param shared_secret string
+---@param session_key string
+---@param artist string|string[]
+---@param track string|string[]
+---@param album string|string[]
+---@param duration_seconds number
+local function lastfm_update_now_playing(apy_key, shared_secret, session_key, artist, track, album, duration_seconds)
     local params = {
         method = "track.updateNowPlaying",
-        api_key = API_KEY,
+        api_key = apy_key,
         sk = session_key,
         artist = artist,
         track = track,
@@ -43,66 +46,143 @@ local function lastfm_update_now_playing(artist, track, album, duration_seconds)
         params.duration = tostring(duration_seconds)
     end
 
-    params.api_sig = lastfm_api_sig(params, SHARED_SECRET)
+    params.api_sig = lastfm_api_sig(params, shared_secret)
 
     local resp = http.post("https://ws.audioscrobbler.com/2.0/", {
-        headers = {}, -- optional
-        body = nil, -- nothing in body
-        params = params, -- becomes querystring
+        headers = {},
+        body = nil,
+        params = params,
     })
 
     if resp.code ~= 200 then
         log.error("Last.fm updateNowPlaying failed: HTTP " .. resp.code)
-        util.dump_table(resp)
-        return nil, resp
+    end
+end
+
+---@param api_key string
+---@param shared_secret string
+---@param token string
+---@return string|nil session_key
+local function get_session_key(api_key, shared_secret, token)
+    log.info("Waiting for browser auth...")
+    local params = {
+        api_key = api_key,
+        method = "auth.getSession",
+        token = token,
+        format = "json",
+    }
+
+    params.api_sig = lastfm_api_sig(params, shared_secret)
+
+    local session_response = http.get("https://ws.audioscrobbler.com/2.0/", { params = params })
+    util.dump_table(session_response)
+
+    if session_response.code == 200 then
+        return session_response:json().session.key
     end
 
-    return resp:json(), resp
+    return nil
 end
 
-function auth()
-    is_authenticating = true
-    local response = http.get(auth_url)
-    if response.code ~= 200 then
-        log.error("Failed to get Last.fm auth token: HTTP " .. response.code)
-        return
-    end
+---@type LastFmModule
+return {
+    install = function(args)
+        local response = http.get("https://ws.audioscrobbler.com/2.0", {
+            params = {
+                method = "auth.getToken",
+                api_key = args.api_key,
+                format = "json",
+            },
+        })
 
-    token = response:json().token
-    util.dump_table(response)
+        if response.code ~= 200 then
+            log.error("Failed to get Last.fm auth token: HTTP " .. response.code)
+            return
+        end
 
-    process.spawn({ "xdg-open", "http://www.last.fm/api/auth/?api_key=" .. API_KEY .. "&token=" .. token })
-    is_authenticated = true
-    is_authenticating = false
-end
+        local token = response:json().token
+        local session_key
 
-function rmpcd.lastfm(song)
-    lastfm_update_now_playing(song.artist, song.title, song.album, song.duration)
-    return
+        process.spawn({ "xdg-open", "https://www.last.fm/api/auth/?api_key=" .. args.api_key .. "&token=" .. token })
 
-    -- if is_authenticating then
-    --     log.info("Already authenticating with Last.fm, please complete the authentication in your browser")
-    --     return
-    -- end
-    -- if not is_authenticated then
-    --     auth()
-    --     return
-    -- end
-    --
-    -- local api_sig = "api_key" .. API_KEY .. "method" .. "auth.getSessiontoken" .. token .. SHARED_SECRET
-    -- local api_sig_hash = util.md5(api_sig)
-    --
-    -- -- Fetch session token
-    -- local session_response = http.get(
-    --     "http://ws.audioscrobbler.com/2.0/?method=auth.getSession&api_key="
-    --         .. API_KEY
-    --         .. "&token="
-    --         .. token
-    --         .. "&api_sig="
-    --         .. api_sig_hash
-    --         .. "&format=json"
-    -- )
-    -- session_key = session_response:json().session.key
-    --
-    -- util.dump_table(session_response)
-end
+        ---@param sk string
+        ---@param old_song Song
+        ---@param song_start integer
+        local function scrobble(sk, old_song, song_start)
+            local params = {
+                method = "track.scrobble",
+                api_key = args.api_key,
+                sk = sk,
+                artist = old_song.artist,
+                track = old_song.title,
+                album = old_song.album,
+                timestamp = tostring(song_start),
+                format = "json",
+            }
+
+            params.api_sig = lastfm_api_sig(params, args.shared_secret)
+            local resp = http.post("https://ws.audioscrobbler.com/2.0/", {
+                params = params,
+            })
+
+            if resp.code ~= 200 then
+                log.error("Last.fm scrobble failed: HTTP " .. resp.code)
+            end
+        end
+
+        ---@param sk string
+        local function register(sk)
+            local song_start
+            local current_song
+
+            rmpcd.on("song_change", function(old_song, song)
+                log.info("Browser auth done, scrobbling")
+
+                -- Only update now playing if we still have a song
+                if song ~= nil then
+                    lastfm_update_now_playing(
+                        args.api_key,
+                        args.shared_secret,
+                        sk,
+                        song.artist,
+                        song.title,
+                        song.album,
+                        song.duration
+                    )
+                end
+                local current_time = os.time()
+
+                if song_start ~= nil and current_time - song_start > 30 then
+                    scrobble(sk, old_song, song_start)
+                end
+
+                song_start = current_time
+                current_song = song
+            end)
+
+            rmpcd.on("state_change", function(old_state, new_state)
+                if new_state == "stop" and old_state == "play" then
+                    local current_time = os.time()
+
+                    if song_start ~= nil and current_time - song_start > 30 then
+                        scrobble(sk, current_song, song_start)
+                    end
+
+                    song_start = nil
+                    current_song = nil
+                end
+            end)
+        end
+
+        session_key = get_session_key(args.api_key, args.shared_secret, token)
+        if session_key == nil then
+            sync.set_interval(5000, function(handle)
+                session_key = get_session_key(args.api_key, args.shared_secret, token)
+                if session_key ~= nil then
+                    register(session_key)
+                    handle.cancel()
+                end
+            end)
+        end
+    end,
+}

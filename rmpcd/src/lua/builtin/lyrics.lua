@@ -69,6 +69,10 @@ end
 return {
     install = function()
         local debounced = sync.debounce(500, function(_old_song, new_song)
+            if new_song == nil then
+                return
+            end
+
             lyrics(new_song)
         end)
 

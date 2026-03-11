@@ -16,7 +16,7 @@ use tokio::sync::{
     RwLock,
     mpsc::{UnboundedReceiver, UnboundedSender},
 };
-use tracing::{debug, error, warn};
+use tracing::{debug, error, trace, warn};
 
 use crate::{
     AppEvent,
@@ -49,7 +49,7 @@ pub async fn init(
     let hooks = lua.globals().get::<Table>("rmpcd")?.get::<Table>("hooks")?;
 
     loop {
-        debug!("Waiting for events...");
+        trace!("Waiting for events...");
         let Some(ev) = rx.recv().await else {
             warn!("Idle task ended");
             break;
@@ -65,8 +65,16 @@ pub async fn init(
                 let ro_status = &ro_mpd_state.status;
                 let ro_song = &ro_mpd_state.current_song;
                 if ro_song != &song {
-                    let old_song = lua.to_value(&ro_song.as_ref().map(Song::from))?;
-                    let new_song = lua.to_value(&song.as_ref().map(Song::from))?;
+                    let old_song = ro_song
+                        .as_ref()
+                        .map(|v| -> mlua::Result<_> { lua.to_value(&Song::from(v)) })
+                        .transpose()?
+                        .unwrap_or(mlua::Value::Nil);
+                    let new_song = song
+                        .as_ref()
+                        .map(|v| -> mlua::Result<_> { lua.to_value(&Song::from(v)) })
+                        .transpose()?
+                        .unwrap_or(mlua::Value::Nil);
 
                     album_art = if let Some(s) = &song {
                         let uri = s.file.clone();
@@ -212,7 +220,7 @@ pub fn start_update_loop(client: Arc<AsyncClient>, tx: UnboundedSender<AppEvent>
             if !IS_PLAYING.load(Ordering::Relaxed) {
                 break;
             }
-            debug!("Tick: checking status...");
+            trace!("Tick: checking status...");
 
             match client.run(|c| c.get_status()).await {
                 Ok(s) => tx.send_safe(AppEvent::StatusUpdate(s.clone())),
