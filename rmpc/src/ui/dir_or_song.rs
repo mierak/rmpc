@@ -251,6 +251,12 @@ impl CmpByProp {
                 (Ok(a), Ok(b)) => {
                     Self { ordering: a.cmp(&b), first_empty: false, second_empty: false }
                 }
+                (Ok(_), Err(_)) => {
+                    Self { ordering: Ordering::Less, first_empty: false, second_empty: false }
+                }
+                (Err(_), Ok(_)) => {
+                    Self { ordering: Ordering::Greater, first_empty: false, second_empty: false }
+                }
                 _ => Self::opt_str(
                     Some(a),
                     Some(b),
@@ -400,6 +406,8 @@ impl CmpByProp {
 #[allow(clippy::unwrap_used)]
 mod ordtest {
     use std::{
+        cmp::Ordering,
+        collections::HashMap,
         sync::{LazyLock, atomic::AtomicU32},
         time::Duration,
     };
@@ -408,9 +416,12 @@ mod ordtest {
     use rmpc_mpd::commands::{Song, metadata_tag::MetadataTag};
 
     use super::DirOrSong;
-    use crate::config::{
-        sort_mode::{SortMode, SortOptions},
-        theme::properties::SongProperty,
+    use crate::{
+        config::{
+            sort_mode::{SortMode, SortOptions},
+            theme::properties::SongProperty,
+        },
+        ui::dir_or_song::CmpByProp,
     };
 
     static LAST_ID: AtomicU32 = AtomicU32::new(1);
@@ -911,5 +922,38 @@ mod ordtest {
             dir("c"),
             dir("d"),
         ]);
+    }
+
+    #[test]
+    fn disc_transitivity_test() {
+        fn song_with_disc(disc: &str) -> Song {
+            Song {
+                id: new_id(),
+                file: format!("file-{disc}"),
+                duration: Some(Duration::from_secs(1)),
+                metadata: HashMap::from([(
+                    "disc".to_string(),
+                    MetadataTag::Single(disc.to_string()),
+                )]),
+                last_modified: NOW.to_rfc3339().parse().unwrap(),
+                added: None,
+            }
+        }
+
+        let a = song_with_disc("2");
+        let b = song_with_disc("10");
+        let c = song_with_disc("1a");
+
+        let ab = CmpByProp::song_cmp(&a, &b, &SongProperty::Disc, false, false, false).ordering;
+        let bc = CmpByProp::song_cmp(&b, &c, &SongProperty::Disc, false, false, false).ordering;
+        let ac = CmpByProp::song_cmp(&a, &c, &SongProperty::Disc, false, false, false).ordering;
+
+        assert_eq!(ab, Ordering::Less, "expected 2 < 10 numerically");
+        assert_eq!(bc, Ordering::Less, r#"expected "10" < "1a" lexicographically"#);
+        assert_eq!(
+            ac,
+            Ordering::Less,
+            "transitivity requires: if a<b and b<c then a<c, but got ac={ac:?}"
+        );
     }
 }
