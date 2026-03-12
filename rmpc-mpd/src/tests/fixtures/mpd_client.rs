@@ -651,6 +651,22 @@ impl MpdClient for TestMpdClient {
         todo!("Not yet implemented")
     }
 
+    fn channels(&mut self) -> MpdResult<MpdList> {
+        todo!("Not yet implemented")
+    }
+
+    fn subscribe(&mut self, _channel: &str) -> MpdResult<()> {
+        todo!("Not yet implemented")
+    }
+
+    fn unsubscribe(&mut self, _channel: &str) -> MpdResult<()> {
+        todo!("Not yet implemented")
+    }
+
+    fn read_messages(&mut self) -> MpdResult<crate::commands::messages::Messages> {
+        todo!("Not yet implemented")
+    }
+
     fn send_message(&mut self, _channel: &str, _content: &str) -> MpdResult<()> {
         todo!("Not yet implemented")
     }
