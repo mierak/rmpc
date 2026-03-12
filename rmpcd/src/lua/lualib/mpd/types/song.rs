@@ -1,8 +1,9 @@
-use rmpc_mpd::commands::{Song as MpdSong, metadata_tag::MetadataTag};
-use serde::Serialize;
+use mlua::UserData;
+use rmpc_mpd::commands::Song as MpdSong;
 
-#[serde_with::skip_serializing_none]
-#[derive(Serialize, PartialEq, Eq)]
+use crate::lua::lualib::mpd::types::{MetadataTag, MetadataTagExt};
+
+#[derive(PartialEq, Eq)]
 pub struct Song {
     pub file: String,
     pub duration: u128,
@@ -48,44 +49,110 @@ impl From<&MpdSong> for Song {
         Self {
             file: value.file.clone(),
             duration: value.duration.map(|d| d.as_millis()).unwrap_or_default(),
-            artist: value.metadata.get("artist").cloned(),
-            artistsort: value.metadata.get("artistsort").cloned(),
-            album: value.metadata.get("album").cloned(),
-            albumsort: value.metadata.get("albumsort").cloned(),
-            albumartist: value.metadata.get("albumartist").cloned(),
-            albumartistsort: value.metadata.get("albumartistsort").cloned(),
-            title: value.metadata.get("title").cloned(),
-            titlesort: value.metadata.get("titlesort").cloned(),
-            track: value.metadata.get("track").cloned(),
-            name: value.metadata.get("name").cloned(),
-            genre: value.metadata.get("genre").cloned(),
-            mood: value.metadata.get("mood").cloned(),
-            date: value.metadata.get("date").cloned(),
-            originaldate: value.metadata.get("originaldate").cloned(),
-            composer: value.metadata.get("composer").cloned(),
-            composersort: value.metadata.get("composersort").cloned(),
-            performer: value.metadata.get("performer").cloned(),
-            conductor: value.metadata.get("conductor").cloned(),
-            work: value.metadata.get("work").cloned(),
-            ensemble: value.metadata.get("ensemble").cloned(),
-            movement: value.metadata.get("movement").cloned(),
-            movementnumber: value.metadata.get("movementnumber").cloned(),
+            artist: value.metadata.get("artist").to_metadata_tag(),
+            artistsort: value.metadata.get("artistsort").to_metadata_tag(),
+            album: value.metadata.get("album").to_metadata_tag(),
+            albumsort: value.metadata.get("albumsort").to_metadata_tag(),
+            albumartist: value.metadata.get("albumartist").to_metadata_tag(),
+            albumartistsort: value.metadata.get("albumartistsort").to_metadata_tag(),
+            title: value.metadata.get("title").to_metadata_tag(),
+            titlesort: value.metadata.get("titlesort").to_metadata_tag(),
+            track: value.metadata.get("track").to_metadata_tag(),
+            name: value.metadata.get("name").to_metadata_tag(),
+            genre: value.metadata.get("genre").to_metadata_tag(),
+            mood: value.metadata.get("mood").to_metadata_tag(),
+            date: value.metadata.get("date").to_metadata_tag(),
+            originaldate: value.metadata.get("originaldate").to_metadata_tag(),
+            composer: value.metadata.get("composer").to_metadata_tag(),
+            composersort: value.metadata.get("composersort").to_metadata_tag(),
+            performer: value.metadata.get("performer").to_metadata_tag(),
+            conductor: value.metadata.get("conductor").to_metadata_tag(),
+            work: value.metadata.get("work").to_metadata_tag(),
+            ensemble: value.metadata.get("ensemble").to_metadata_tag(),
+            movement: value.metadata.get("movement").to_metadata_tag(),
+            movementnumber: value.metadata.get("movementnumber").to_metadata_tag(),
             showmovement: value
                 .metadata
                 .get("showmovement")
                 .and_then(|v| v.first().parse::<bool>().ok()),
-            location: value.metadata.get("location").cloned(),
-            grouping: value.metadata.get("grouping").cloned(),
-            comment: value.metadata.get("comment").cloned(),
-            disc: value.metadata.get("disc").cloned(),
-            label: value.metadata.get("label").cloned(),
-            musicbrainz_artistid: value.metadata.get("musicbrainz_artistid").cloned(),
-            musicbrainz_albumid: value.metadata.get("musicbrainz_albumid").cloned(),
-            musicbrainz_albumartistid: value.metadata.get("musicbrainz_albumartistid").cloned(),
-            musicbrainz_trackid: value.metadata.get("musicbrainz_trackid").cloned(),
-            musicbrainz_releasegroupid: value.metadata.get("musicbrainz_releasegroupid").cloned(),
-            musicbrainz_releasetrackid: value.metadata.get("musicbrainz_releasetrackid").cloned(),
-            musicbrainz_workid: value.metadata.get("musicbrainz_workid").cloned(),
+            location: value.metadata.get("location").to_metadata_tag(),
+            grouping: value.metadata.get("grouping").to_metadata_tag(),
+            comment: value.metadata.get("comment").to_metadata_tag(),
+            disc: value.metadata.get("disc").to_metadata_tag(),
+            label: value.metadata.get("label").to_metadata_tag(),
+            musicbrainz_artistid: value.metadata.get("musicbrainz_artistid").to_metadata_tag(),
+            musicbrainz_albumid: value.metadata.get("musicbrainz_albumid").to_metadata_tag(),
+            musicbrainz_albumartistid: value
+                .metadata
+                .get("musicbrainz_albumartistid")
+                .to_metadata_tag(),
+            musicbrainz_trackid: value.metadata.get("musicbrainz_trackid").to_metadata_tag(),
+            musicbrainz_releasegroupid: value
+                .metadata
+                .get("musicbrainz_releasegroupid")
+                .to_metadata_tag(),
+            musicbrainz_releasetrackid: value
+                .metadata
+                .get("musicbrainz_releasetrackid")
+                .to_metadata_tag(),
+            musicbrainz_workid: value.metadata.get("musicbrainz_workid").to_metadata_tag(),
         }
+    }
+}
+
+impl UserData for Song {
+    fn add_fields<F: mlua::UserDataFields<Self>>(fields: &mut F) {
+        fields.add_field_method_get("file", |_, this| Ok(this.file.clone()));
+        fields.add_field_method_get("duration", |_, this| Ok(this.duration));
+        fields.add_field_method_get("artist", |_, this| Ok(this.artist.clone()));
+        fields.add_field_method_get("artist_sort", |_, this| Ok(this.artistsort.clone()));
+        fields.add_field_method_get("album", |_, this| Ok(this.album.clone()));
+        fields.add_field_method_get("album_sort", |_, this| Ok(this.albumsort.clone()));
+        fields.add_field_method_get("album_artist", |_, this| Ok(this.albumartist.clone()));
+        fields
+            .add_field_method_get("album_artist_sort", |_, this| Ok(this.albumartistsort.clone()));
+        fields.add_field_method_get("title", |_, this| Ok(this.title.clone()));
+        fields.add_field_method_get("title_sort", |_, this| Ok(this.titlesort.clone()));
+        fields.add_field_method_get("track", |_, this| Ok(this.track.clone()));
+        fields.add_field_method_get("name", |_, this| Ok(this.name.clone()));
+        fields.add_field_method_get("genre", |_, this| Ok(this.genre.clone()));
+        fields.add_field_method_get("mood", |_, this| Ok(this.mood.clone()));
+        fields.add_field_method_get("date", |_, this| Ok(this.date.clone()));
+        fields.add_field_method_get("original_date", |_, this| Ok(this.originaldate.clone()));
+        fields.add_field_method_get("composer", |_, this| Ok(this.composer.clone()));
+        fields.add_field_method_get("composer_sort", |_, this| Ok(this.composersort.clone()));
+        fields.add_field_method_get("performer", |_, this| Ok(this.performer.clone()));
+        fields.add_field_method_get("conductor", |_, this| Ok(this.conductor.clone()));
+        fields.add_field_method_get("work", |_, this| Ok(this.work.clone()));
+        fields.add_field_method_get("ensemble", |_, this| Ok(this.ensemble.clone()));
+        fields.add_field_method_get("movement", |_, this| Ok(this.movement.clone()));
+        fields.add_field_method_get("movement_number", |_, this| Ok(this.movementnumber.clone()));
+        fields.add_field_method_get("show_movement", |_, this| Ok(this.showmovement));
+        fields.add_field_method_get("location", |_, this| Ok(this.location.clone()));
+        fields.add_field_method_get("grouping", |_, this| Ok(this.grouping.clone()));
+        fields.add_field_method_get("comment", |_, this| Ok(this.comment.clone()));
+        fields.add_field_method_get("disc", |_, this| Ok(this.disc.clone()));
+        fields.add_field_method_get("label", |_, this| Ok(this.label.clone()));
+        fields.add_field_method_get("musicbrainz_artist_id", |_, this| {
+            Ok(this.musicbrainz_artistid.clone())
+        });
+        fields.add_field_method_get("musicbrainz_album_id", |_, this| {
+            Ok(this.musicbrainz_albumid.clone())
+        });
+        fields.add_field_method_get("musicbrainz_album_artist_id", |_, this| {
+            Ok(this.musicbrainz_albumartistid.clone())
+        });
+        fields.add_field_method_get("musicbrainz_track_id", |_, this| {
+            Ok(this.musicbrainz_trackid.clone())
+        });
+        fields.add_field_method_get("musicbrainz_release_group_id", |_, this| {
+            Ok(this.musicbrainz_releasegroupid.clone())
+        });
+        fields.add_field_method_get("musicbrainz_release_track_id", |_, this| {
+            Ok(this.musicbrainz_releasetrackid.clone())
+        });
+        fields.add_field_method_get("musicbrainz_work_id", |_, this| {
+            Ok(this.musicbrainz_workid.clone())
+        });
     }
 }

@@ -1,38 +1,46 @@
 ---@class Song
 ---@field file string
----@field duration integer
----@field artist? string | string[]
----@field artistsort? string | string[]
----@field album? string | string[]
----@field albumsort? string | string[]
----@field albumartist? string | string[]
----@field albumartistsort? string | string[]
----@field title? string | string[]
----@field titlesort? string | string[]
----@field track? string | string[]
----@field name? string | string[]
----@field genre? string | string[]
----@field mood? string | string[]
----@field date? string | string[]
----@field originaldate? string | string[]
----@field composer? string | string[]
----@field composersort? string | string[]
----@field performer? string | string[]
----@field conductor? string | string[]
----@field work? string | string[]
----@field ensemble? string | string[]
----@field movement? string | string[]
----@field movementnumber? string | string[]
----@field showmovement? boolean
----@field location? string | string[]
----@field grouping? string | string[]
----@field comment? string | string[]
----@field disc? string | string[]
----@field label? string | string[]
----@field musicbrainz_artistid? string | string[]
----@field musicbrainz_albumid? string | string[]
----@field musicbrainz_albumartistid? string | string[]
----@field musicbrainz_trackid? string | string[]
----@field musicbrainz_releasegroupid? string | string[]
----@field musicbrainz_releasetrackid? string | string[]
----@field musicbrainz_workid? string | string[]
+---@field duration integer Song duration in milliseconds
+---@field artist? MetadataValue
+---@field artist_sort? MetadataValue
+---@field album? MetadataValue
+---@field album_sort? MetadataValue
+---@field album_artist? MetadataValue
+---@field album_artist_sort? MetadataValue
+---@field title? MetadataValue
+---@field title_sort? MetadataValue
+---@field track? MetadataValue
+---@field name? MetadataValue
+---@field genre? MetadataValue
+---@field mood? MetadataValue
+---@field date? MetadataValue
+---@field original_date? MetadataValue
+---@field composer? MetadataValue
+---@field composer_sort? MetadataValue
+---@field performer? MetadataValue
+---@field conductor? MetadataValue
+---@field work? MetadataValue
+---@field ensemble? MetadataValue
+---@field movement? MetadataValue
+---@field movement_number? MetadataValue
+---@field show_movement? boolean
+---@field location? MetadataValue
+---@field grouping? MetadataValue
+---@field comment? MetadataValue
+---@field disc? MetadataValue
+---@field label? MetadataValue
+---@field musicbrainz_artist_id? MetadataValue
+---@field musicbrainz_album_id? MetadataValue
+---@field musicbrainz_album_artist_id? MetadataValue
+---@field musicbrainz_track_id? MetadataValue
+---@field musicbrainz_release_group_id? MetadataValue
+---@field musicbrainz_release_track_id? MetadataValue
+---@field musicbrainz_work_id? MetadataValue
+
+---@class MetadataValue
+---Represents a tag that may contain one or many values.
+---@field first fun(self: MetadataValue): string
+---@field last fun(self: MetadataValue): string
+---@field join fun(self: MetadataValue, sep?: string): string
+---@field values fun(self: MetadataValue): string[]
+---@operator concat(MetadataValue|string|number): string

@@ -2,28 +2,14 @@ local sync = require("rmpcd.sync")
 local process = require("rmpcd.process")
 local mpd = require("rmpcd.mpd")
 local fs = require("rmpcd.fs")
+local log = require("rmpcd.log")
 
 ---@param new_song Song
 ---@param with_album_art boolean
 ---@param album_art_path string
 local function notify(new_song, with_album_art, album_art_path)
-    local artist
-    if new_song.artist and type(new_song.artist) == "table" then
-        artist = new_song.artist[1]
-    elseif new_song.artist and type(new_song.artist) == "string" then
-        artist = new_song.artist
-    else
-        artist = "Unknown Artist"
-    end
-
-    local title
-    if new_song.title and type(new_song.title) == "table" then
-        title = new_song.title[1]
-    elseif new_song.title and type(new_song.title) == "string" then
-        title = new_song.title
-    else
-        title = "Unknown Title"
-    end
+    local artist = (new_song.artist and new_song.artist:first()) or "Unknown Artist"
+    local title = (new_song.title and new_song.title:first()) or "Unknown Title"
 
     if not with_album_art then
         process.spawn({ "notify-send", "Now playing: " .. artist .. " - " .. title })
@@ -49,14 +35,30 @@ return {
     install = function(args)
         local _args = args or {}
 
-        local debounced = sync.debounce(500, function(_old_song, new_song)
-            if new_song == nil then
-                return
-            end
+        local debounced = sync.debounce(
+            500,
+            ---@param _old_song Song | nil
+            ---@param new_song Song | nil
+            ---@diagnostic disable-next-line: unused-local
+            function(_old_song, new_song)
+                log.info("Notifying")
+                if new_song == nil then
+                    log.info("No new song, skipping notification")
+                    return
+                end
 
-            notify(new_song, _args.with_album_art or true, _args.album_art_path or album_art_path)
-        end)
+                notify(new_song, _args.with_album_art or true, _args.album_art_path or album_art_path)
+                log.info("Notification sent")
+            end
+        )
 
         rmpcd.on("song_change", debounced)
+        -- rmpcd.on("song_change", function(_old_song, new_song)
+        --     if new_song == nil then
+        --         return
+        --     end
+        --
+        --     notify(new_song, _args.with_album_art or true, _args.album_art_path or album_art_path)
+        -- end)
     end,
 }
