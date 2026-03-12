@@ -1,6 +1,5 @@
 use std::{
     collections::HashSet,
-    ops::Sub,
     path::PathBuf,
     sync::{Arc, LazyLock},
     time::{Duration, Instant},
@@ -69,7 +68,9 @@ fn main_task<B: Backend + std::io::Write>(
     let mut render_wanted = false;
     let max_fps = f64::from(ctx.config.max_fps);
     let mut min_frame_duration = Duration::from_secs_f64(1f64 / max_fps);
-    let mut last_render = std::time::Instant::now().sub(Duration::from_secs(10));
+    let mut last_render = std::time::Instant::now()
+        .checked_sub(Duration::from_secs(10))
+        .unwrap_or_else(std::time::Instant::now);
     let mut additional_evs = HashSet::new();
     let mut connected = true;
     ui.before_show(area, &mut ctx).expect("Initial render init to succeed");

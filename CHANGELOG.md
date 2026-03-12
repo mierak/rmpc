@@ -16,6 +16,7 @@ keybinds if they contained either `{` or `}`. You will now need to escape these 
 - Added option to directly clear rating in the `Rate` keybind
 - Added `quit_closes_modal`
 - `remove` to the CLI allowing you to remove songs from the queue
+- `Pause` and `Unpause` actions
 
 ### Changed
 
