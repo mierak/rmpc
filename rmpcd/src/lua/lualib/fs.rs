@@ -1,4 +1,4 @@
-use mlua::{ExternalError, IntoLuaMulti, Lua, Table};
+use mlua::{ExternalError, IntoLuaMulti, Lua, Table, Value};
 use tracing::error;
 
 pub fn create(lua: &Lua) -> mlua::Result<Table> {
@@ -87,11 +87,32 @@ pub fn create(lua: &Lua) -> mlua::Result<Table> {
         }
     })?;
 
+    let read =
+        lua.create_async_function(async |lua, path: String| match tokio::fs::read(path).await {
+            Ok(contents) => contents.into_lua_multi(&lua),
+            Err(err) => {
+                error!(err = ?err, "Failed to read file");
+                (Value::Nil, err.into_lua_err()).into_lua_multi(&lua)
+            }
+        })?;
+
+    let read_str = lua.create_async_function(async |lua, path: String| {
+        match tokio::fs::read_to_string(path).await {
+            Ok(contents) => contents.into_lua_multi(&lua),
+            Err(err) => {
+                error!(err = ?err, "Failed to read file");
+                (Value::Nil, err.into_lua_err()).into_lua_multi(&lua)
+            }
+        }
+    })?;
+
     tbl.raw_set("exists", exists)?;
     tbl.raw_set("create_dir_all", create_dir_all)?;
     tbl.raw_set("create_dir", create_dir)?;
     tbl.raw_set("write", write)?;
     tbl.raw_set("write_str", write_str)?;
+    tbl.raw_set("read", read)?;
+    tbl.raw_set("read_str", read_str)?;
     tbl.raw_set("delete", delete)?;
     tbl.raw_set("remove_dir", remove_dir)?;
     tbl.raw_set("remove_dir_all", remove_dir_all)?;

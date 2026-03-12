@@ -7,7 +7,7 @@ use std::{
 };
 
 use anyhow::Result;
-use mlua::{LuaSerdeExt, Table};
+use mlua::{IntoLua, LuaSerdeExt, Table};
 use rmpc_mpd::{
     commands::{IdleEvent, State},
     mpd_client::{AlbumArtOrder, MpdClient},
@@ -65,16 +65,8 @@ pub async fn init(
                 let ro_status = &ro_mpd_state.status;
                 let ro_song = &ro_mpd_state.current_song;
                 if ro_song != &song {
-                    let old_song = ro_song
-                        .as_ref()
-                        .map(|v| -> mlua::Result<_> { lua.to_value(&Song::from(v)) })
-                        .transpose()?
-                        .unwrap_or(mlua::Value::Nil);
-                    let new_song = song
-                        .as_ref()
-                        .map(|v| -> mlua::Result<_> { lua.to_value(&Song::from(v)) })
-                        .transpose()?
-                        .unwrap_or(mlua::Value::Nil);
+                    let old_song = ro_song.as_ref().map(Song::from).into_lua(&lua)?;
+                    let new_song = song.as_ref().map(Song::from).into_lua(&lua)?;
 
                     album_art = if let Some(s) = &song {
                         let uri = s.file.clone();
@@ -96,8 +88,14 @@ pub async fn init(
                 }
 
                 if ro_status.state != new_status.state {
-                    let old_state = lua.to_value(&ro_status.state)?;
-                    let new_state = lua.to_value(&new_status.state)?;
+                    // TODO lowercasing
+                    let state_to_str = |state| match state {
+                        State::Play => "play",
+                        State::Pause => "pause",
+                        State::Stop => "stop",
+                    };
+                    let old_state = lua.to_value(&state_to_str(ro_status.state))?;
+                    let new_state = lua.to_value(&state_to_str(new_status.state))?;
 
                     let state_hooks = hooks.get::<Table>(ON_STATE_CHANGE)?;
 
