@@ -537,6 +537,26 @@ impl<'ui> Ui<'ui> {
                         });
                     }
                 }
+                GlobalAction::Pause => {
+                    if matches!(ctx.status.state, State::Play) {
+                        ctx.command(move |client| {
+                            client.pause()?;
+                            Ok(())
+                        });
+                    } else {
+                        status_warn!("Can't pause when not playing");
+                    }
+                }
+                GlobalAction::Unpause => {
+                    if matches!(ctx.status.state, State::Pause) {
+                        ctx.command(move |client| {
+                            client.unpause()?;
+                            Ok(())
+                        });
+                    } else {
+                        status_warn!("Can't unpause when not paused");
+                    }
+                }
                 GlobalAction::VolumeUp => {
                     let step = ctx.config.volume_step;
                     ctx.command(move |client| {
