@@ -5,7 +5,7 @@ use crate::{
     from_mpd::{FromMpd, LineHandled},
 };
 
-#[derive(Debug, Default, Serialize)]
+#[derive(Debug, Clone, Default, Serialize)]
 pub struct Messages(pub Vec<(String, Vec<String>)>);
 
 impl FromMpd for Messages {

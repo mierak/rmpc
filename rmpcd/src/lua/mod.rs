@@ -1,21 +1,23 @@
-use std::sync::Arc;
+use std::{path::Path, sync::Arc};
 
-use anyhow::{Result, bail};
+use anyhow::Result;
 use mlua::{Lua, Table};
-use rmpc_shared::paths::rmpcd_config_dir;
+use tokio::sync::RwLock;
 
-use crate::async_client::AsyncClient;
+use crate::{async_client::AsyncClient, lua::plugin::LuaPluginEntry};
 
 pub mod lualib;
+pub mod plugin;
 
-pub async fn init(client: &Arc<AsyncClient>) -> Result<(Lua, Table)> {
-    let Some(config_dir) = rmpcd_config_dir() else {
-        bail!("Could not determine config directory");
-    };
-    let rmpcd_pkg_path =
-        format!("{}/?.lua;{}/?/init.lua", config_dir.display(), config_dir.display());
-
+pub fn create(
+    cfg_dir: &Path,
+    client: &Arc<AsyncClient>,
+    plugins: Option<&Arc<RwLock<Vec<Arc<RwLock<LuaPluginEntry>>>>>>,
+) -> Result<Lua> {
     let lua = Lua::new();
+
+    let rmpcd_pkg_path = format!("{}/?.lua;{}/?/init.lua", cfg_dir.display(), cfg_dir.display());
+
     let package: Table = lua.globals().get("package")?;
     let package_path = package.get::<String>("path")?;
     let preload = package.get::<Table>("preload")?;
@@ -25,16 +27,25 @@ pub async fn init(client: &Arc<AsyncClient>) -> Result<(Lua, Table)> {
     let rmpcd = lua.create_table()?;
     lua.globals().raw_set("rmpcd", &rmpcd)?;
 
-    install_lib(&lua, &preload, client)?;
+    install_lib(&lua, &preload, client, plugins)?;
     install_builtins(&lua, &preload)?;
 
-    let file = std::fs::read(config_dir.join("init.lua"))?;
-    let lua_config: Table = lua.load(&file).eval_async().await?;
-
-    Ok((lua, lua_config))
+    Ok(lua)
 }
 
-pub fn install_lib(lua: &Lua, preload: &Table, client: &Arc<AsyncClient>) -> mlua::Result<()> {
+pub async fn eval_config(lua: &Lua, cfg_dir: &Path) -> Result<Table> {
+    let file = std::fs::read(cfg_dir.join("init.lua"))?;
+    let lua_config: Table = lua.load(&file).eval_async().await?;
+
+    Ok(lua_config)
+}
+
+pub fn install_lib(
+    lua: &Lua,
+    preload: &Table,
+    client: &Arc<AsyncClient>,
+    plugins: Option<&Arc<RwLock<Vec<Arc<RwLock<LuaPluginEntry>>>>>>,
+) -> mlua::Result<()> {
     macro_rules! install_lib {
         ($name:ident) => {
             let lib = lualib::$name::create(lua)?;
@@ -44,7 +55,7 @@ pub fn install_lib(lua: &Lua, preload: &Table, client: &Arc<AsyncClient>) -> mlu
             )?;
         };
     }
-    lualib::hooks::init(lua)?;
+    lualib::hooks::init(lua, plugins)?;
 
     let mpd = lualib::mpd::create(lua, client)?;
     preload.raw_set("rmpcd.mpd", lua.create_function(move |_, ()| Ok(mpd.clone()))?)?;

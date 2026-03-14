@@ -5,10 +5,10 @@ pub trait SenderExt<T> {
     fn send_safe(&self, message: T);
 }
 
-impl<T> SenderExt<T> for UnboundedSender<T> {
+impl<T: std::fmt::Debug> SenderExt<T> for UnboundedSender<T> {
     fn send_safe(&self, message: T) {
         if let Err(err) = self.send(message) {
-            error!(err = ?err, "Failed to send message");
+            error!(?err, msg = ?err.0, "Failed to send message");
         }
     }
 }

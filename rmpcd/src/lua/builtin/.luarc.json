@@ -1,4 +1,9 @@
 {
+    "diagnostics": {
+        "unusedLocalExclude": [
+            "_*"
+        ]
+    },
     "workspace.library": [
         "./types"
     ]

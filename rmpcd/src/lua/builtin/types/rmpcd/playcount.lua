@@ -1,7 +1,7 @@
 ---@meta
 ---@module "rmpcd.playcount"
 
----@class PlaycountModule
----@field install fun()
+---@class PlaycountPlugin: RmpcPlugin
+
 local M = {}
 return M

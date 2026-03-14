@@ -3,7 +3,7 @@ use rmpc_mpd::commands::Song as MpdSong;
 
 use crate::lua::lualib::mpd::types::{MetadataTag, MetadataTagExt};
 
-#[derive(PartialEq, Eq)]
+#[derive(Debug, PartialEq, Eq, Clone)]
 pub struct Song {
     pub file: String,
     pub duration: u128,
