@@ -1,9 +1,14 @@
 local process = require("rmpcd.process")
 local mpd = require("rmpcd.mpd")
 local fs = require("rmpcd.fs")
+local log = require("rmpcd.log")
 
----@class NotifyPlugin
-local M = {}
+---@type NotifyPlugin
+local M = {
+    enabled = true,
+    with_album_art = true,
+    album_art_path = "/tmp/rmpcd-notify-album-art",
+}
 
 ---@param new_song Song
 ---@param with_album_art boolean
@@ -30,19 +35,36 @@ local function notify(new_song, with_album_art, album_art_path)
     end
 end
 
----@param args { with_album_art: boolean | nil, album_art_path: string | nil } | nil
 M.setup = function(self, args)
-    local _args = args or {}
-    self.with_album_art = _args.with_album_art or true
-    self.album_art_path = _args.album_art_path or "/tmp/rmpcd-notify-album-art"
+    self.with_album_art = (args.with_album_art ~= nil) and args.with_album_art or true
+    self.album_art_path = args.album_art_path or "/tmp/rmpcd-notify-album-art"
+    self.enabled = (args.enabled ~= nil) and args.enabled or true
 end
 
 M.song_change = function(self, _old_song, new_song)
+    if not self.enabled then
+        return
+    end
+
     if new_song == nil then
         return
     end
 
     notify(new_song, self.with_album_art or true, self.album_art_path)
+end
+
+M.subscribed_channels = { "rmpcd.notify" }
+M.message = function(self, _channel, message)
+    if message == "enable" then
+        log.info("Enabling notify plugin")
+        self.enabled = true
+    elseif message == "disable" then
+        log.info("Disabling notify plugin")
+        self.enabled = false
+    elseif message == "toggle" then
+        log.info("Toggling notify plugin to: " .. tostring(not self.enabled))
+        self.enabled = not self.enabled
+    end
 end
 
 return M

@@ -2,9 +2,33 @@ local log = require("rmpcd.log")
 local mpd = require("rmpcd.mpd")
 
 ---@type PlaycountPlugin
-local M = {}
+local M = {
+    enabled = true,
+}
+
+M.setup = function(_self, args)
+    _self.enabled = (args.enabled ~= nil) and args.enabled or true
+end
+
+M.subscribed_channels = { "rmpcd.playcount" }
+M.message = function(self, _channel, message)
+    if message == "enable" then
+        log.info("Enabling playcount plugin")
+        self.enabled = true
+    elseif message == "disable" then
+        log.info("Disabling playcount plugin")
+        self.enabled = false
+    elseif message == "toggle" then
+        log.info("Toggling notify playcount to: " .. tostring(not self.enabled))
+        self.enabled = not self.enabled
+    end
+end
 
 M.song_change = function(_self, _old_song, new_song)
+    if not _self.enabled then
+        return
+    end
+
     if new_song == nil then
         return
     end

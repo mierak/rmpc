@@ -258,11 +258,11 @@ local function should_scrobble(song_start, current_time, song)
     return false
 end
 
----@param args { api_key: string, shared_secret: string, update_now_playing?: boolean }
 M.setup = function(self, args)
     self.api_key = args.api_key
     self.shared_secret = args.shared_secret
-    self.update_now_playing = args.update_now_playing or false
+    self.update_now_playing = (args.update_now_playing ~= nil) and args.update_now_playing or false
+    self.enabled = (args.update_now_playing ~= nil) and args.enabled or true
 
     self.scrobble_queue = Deque.new()
 
@@ -350,6 +350,26 @@ M.state_change = function(self, old, new)
     end
 
     process_scrobble_queue(self.api_key, self.session_key, self.shared_secret, self.scrobble_queue)
+end
+
+M.subscribed_channels = { "rmpcd.lastfm" }
+M.message = function(self, _channel, message)
+    if message == "enable" then
+        log.info("Enabling lastfm plugin")
+        self.enabled = true
+    elseif message == "disable" then
+        log.info("Disabling lastfm plugin")
+        self.enabled = false
+    elseif message == "toggle" then
+        log.info("Toggling lastfm plugin to: " .. tostring(not self.enabled))
+        self.enabled = not self.enabled
+    end
+
+    if not self.enabled then
+        self.current_song = nil
+        self.song_start = nil
+        return
+    end
 end
 
 return M

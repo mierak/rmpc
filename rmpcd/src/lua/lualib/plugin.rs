@@ -7,7 +7,6 @@ use crate::lua::plugin::LuaPluginEntry;
 
 pub const ON_SONG_CHANGE: &str = "song_change";
 pub const ON_STATE_CHANGE: &str = "state_change";
-pub const ON_MESSAGES: &str = "messages";
 pub const ON_MESSAGE: &str = "message";
 pub const ON_IDLE: &str = "idle_event";
 pub const ON_SHUTDOWN: &str = "shutdown";

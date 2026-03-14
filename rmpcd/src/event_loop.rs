@@ -24,7 +24,7 @@ use crate::{
     ext::SenderExt,
     lua::{
         lualib::mpd::types::Song,
-        plugin::{self, LuaPlugin, PluginEvent, PluginStore},
+        plugin::{self, LuaPlugin, PluginStore, PluginsEvent},
     },
     mpd_ext::MpdExt,
     mpris::Change,
@@ -41,7 +41,7 @@ pub async fn init(
     mpris_tx: Option<UnboundedSender<Change>>,
     plugin_store: PluginStore<LuaPlugin>,
 ) -> Result<()> {
-    let (tx, rx) = tokio::sync::mpsc::unbounded_channel::<PluginEvent>();
+    let (tx, rx) = tokio::sync::mpsc::unbounded_channel::<PluginsEvent>();
 
     let plugin_handle =
         tokio::spawn(async move { plugin::init_plugin_loop(rx, plugin_store).await });
@@ -63,7 +63,7 @@ pub async fn init(
             },
             _ = shutdown_rx.recv() => {
                 info!("Shutdown signal received, stopping event loop");
-                tx.send_safe(PluginEvent::Shutdown);
+                tx.send_safe(PluginsEvent::Shutdown);
                 break;
             }
         };
@@ -88,16 +88,16 @@ pub async fn init(
                         None
                     };
 
-                    tx.send_safe(PluginEvent::SongChange {
+                    tx.send_safe(PluginsEvent::SongChange {
                         old: ro_song.as_ref().map(Song::from),
                         new: song.as_ref().map(Song::from),
                     });
                 }
 
                 if ro_status.state != new_status.state {
-                    tx.send_safe(PluginEvent::StateChange {
-                        old: ro_status.clone(),
-                        new: new_status.clone(),
+                    tx.send_safe(PluginsEvent::StateChange {
+                        old: ro_status.clone().into(),
+                        new: new_status.clone().into(),
                     });
                 }
 
@@ -156,8 +156,9 @@ pub async fn init(
                             }
                         }
                         IdleEvent::Message => {
-                            let messages = client.run(|c| c.read_messages()).await?;
-                            tx.send_safe(PluginEvent::Message { messages });
+                            let messages =
+                                client.run(|c| c.read_messages()).await?.0.into_iter().collect();
+                            tx.send_safe(PluginsEvent::Messages { messages });
                         }
                         ev => {
                             debug!(?ev, "Event currently not supported");
@@ -167,7 +168,7 @@ pub async fn init(
                         }
                     }
 
-                    tx.send_safe(PluginEvent::Idle { event: ev });
+                    tx.send_safe(PluginsEvent::Idle { event: ev });
                 }
             }
         }

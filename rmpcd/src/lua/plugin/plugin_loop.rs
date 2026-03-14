@@ -1,19 +1,21 @@
+use std::collections::HashMap;
+
 use anyhow::Result;
-use rmpc_mpd::commands::{IdleEvent, Status, messages::Messages};
+use rmpc_mpd::commands::IdleEvent;
 use tokio::sync::mpsc::UnboundedReceiver;
 use tracing::{error, trace, warn};
 
 use crate::{
     ext::SenderExt,
     lua::{
-        lualib::mpd::types::Song,
-        plugin::{LuaPlugin, PluginStore, triggers::Triggers},
+        lualib::mpd::types::{Song, Status},
+        plugin::{LuaPlugin, PluginStore, lua_plugin::PluginEvent, triggers::Triggers},
     },
 };
 
 #[derive(derive_more::Debug, Clone)]
 #[allow(clippy::large_enum_variant)]
-pub enum PluginEvent {
+pub enum PluginsEvent {
     SongChange {
         #[debug(skip)]
         old: Option<Song>,
@@ -26,9 +28,9 @@ pub enum PluginEvent {
         #[debug(skip)]
         new: Status,
     },
-    Message {
+    Messages {
         #[debug(skip)]
-        messages: Messages,
+        messages: HashMap<String, Vec<String>>,
     },
     Idle {
         event: IdleEvent,
@@ -37,7 +39,7 @@ pub enum PluginEvent {
 }
 
 pub async fn init(
-    mut rx: UnboundedReceiver<PluginEvent>,
+    mut rx: UnboundedReceiver<PluginsEvent>,
     store: PluginStore<LuaPlugin>,
 ) -> Result<()> {
     loop {
@@ -49,29 +51,44 @@ pub async fn init(
         trace!("Received plugin event: {:?}", ev);
 
         match &ev {
-            PluginEvent::SongChange { .. } => {
+            PluginsEvent::SongChange { old, new } => {
                 for plugin in store.iter_with(Triggers::SongChange) {
-                    plugin.tx.send_safe(ev.clone());
+                    plugin
+                        .tx
+                        .send_safe(PluginEvent::SongChange { old: old.clone(), new: new.clone() });
                 }
             }
-            PluginEvent::StateChange { .. } => {
+            PluginsEvent::StateChange { old, new } => {
                 for plugin in store.iter_with(Triggers::StateChange) {
-                    plugin.tx.send_safe(ev.clone());
+                    plugin
+                        .tx
+                        .send_safe(PluginEvent::StateChange { old: old.clone(), new: new.clone() });
                 }
             }
-            PluginEvent::Message { .. } => {
+            PluginsEvent::Messages { messages } => {
                 for plugin in store.iter_with(Triggers::Message) {
-                    plugin.tx.send_safe(ev.clone());
+                    let iter = messages
+                        .iter()
+                        .filter(|(channel, _)| plugin.subscribed_channels.contains(*channel));
+
+                    for (channel, messages) in iter {
+                        for message in messages {
+                            plugin.tx.send_safe(PluginEvent::Message {
+                                channel: channel.clone(),
+                                message: message.clone(),
+                            });
+                        }
+                    }
                 }
             }
-            PluginEvent::Idle { .. } => {
+            PluginsEvent::Idle { event } => {
                 for plugin in store.iter_with(Triggers::Idle) {
-                    plugin.tx.send_safe(ev.clone());
+                    plugin.tx.send_safe(PluginEvent::Idle { event: *event });
                 }
             }
-            PluginEvent::Shutdown => {
+            PluginsEvent::Shutdown => {
                 for plugin in store.all() {
-                    plugin.tx.send_safe(ev.clone());
+                    plugin.tx.send_safe(PluginEvent::Shutdown);
                 }
 
                 // Remove all plugins from the registry and join them

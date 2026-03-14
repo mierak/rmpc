@@ -55,7 +55,8 @@ pub fn install_lib(
             )?;
         };
     }
-    lualib::hooks::init(lua, plugins)?;
+
+    lualib::plugin::init(lua, plugins)?;
 
     let mpd = lualib::mpd::create(lua, client)?;
     preload.raw_set("rmpcd.mpd", lua.create_function(move |_, ()| Ok(mpd.clone()))?)?;
