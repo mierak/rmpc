@@ -25,6 +25,13 @@ Address has the same syntax as [rmpc](https://rmpc.mierak.dev/configuration/#add
 
 Check `rmpcd/src/lua/builtin` for usage examples and type definitions.
 
+Each of the builtin plugins are built in a way that they can be disabled at
+runtime by sending a message to MPD channel for the corresponding plugin.
+For example with rmpc's CLI:
+- Disable Lastfm scrobbling: `rmpc sendmessage rmpcd.lastfm disable`
+- Enable Lastfm scrobbling: `rmpc sendmessage rmpcd.lastfm enable`
+- Toggle Lastfm scrobbling: `rmpc sendmessage rmpcd.lastfm toggle`
+
 Example:
 ```lua
 --@type Config
@@ -32,6 +39,8 @@ local config = {}
 
 config.address = "@mpd"
 config.mpris = false
+
+-- If you wish to subscribe to additional MPD channels
 config.subscribe_channels = { "test" }
 
 -- Automatically increment play count on song change

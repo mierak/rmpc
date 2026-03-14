@@ -6,8 +6,10 @@ local process = require("rmpcd.process")
 local lrclib_url = "https://lrclib.net"
 local lyrics_dir = os.getenv("HOME") .. "/Music"
 
----@class LyricsPlugin
-local M = {}
+---@type LyricsPlugin
+local M = {
+    enabled = true,
+}
 
 local function last_path_segment(s)
     local before = s:match("^(.*)/[^/]*$")
@@ -18,7 +20,29 @@ local function replace_after_last_dot(s, replacement)
     return s:gsub("%.[^.]*$", "." .. replacement, 1)
 end
 
+M.setup = function(_self, args)
+    _self.enabled = (args.enabled ~= nil) and args.enabled or true
+end
+
+M.subscribed_channels = { "rmpcd.lyrics" }
+M.message = function(self, _channel, message)
+    if message == "enable" then
+        log.info("Enabling lyrics plugin")
+        self.enabled = true
+    elseif message == "disable" then
+        log.info("Disabling lyrics plugin")
+        self.enabled = false
+    elseif message == "toggle" then
+        log.info("Toggling lyrics plugin to: " .. tostring(not self.enabled))
+        self.enabled = not self.enabled
+    end
+end
+
 M.song_change = function(_self, _old_song, new_song)
+    if not _self.enabled then
+        return
+    end
+
     if new_song == nil then
         return
     end

@@ -17,7 +17,6 @@ impl<T> PluginStore<T> {
         for (flag, slot) in [
             (Triggers::SongChange, flag_to_slot(Triggers::SongChange)),
             (Triggers::StateChange, flag_to_slot(Triggers::StateChange)),
-            (Triggers::Messages, flag_to_slot(Triggers::Messages)),
             (Triggers::Message, flag_to_slot(Triggers::Message)),
             (Triggers::Idle, flag_to_slot(Triggers::Idle)),
             (Triggers::Shutdown, flag_to_slot(Triggers::Shutdown)),

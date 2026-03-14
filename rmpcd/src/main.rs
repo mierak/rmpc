@@ -75,16 +75,17 @@ async fn main() -> Result<()> {
     let address = lua_config.get::<String>("address")?;
     let password = lua_config.get::<Option<String>>("password")?;
     let (address, password) = rmpc_mpd::address::resolve(None, None, address, password);
-    let subscribe_channels =
-        lua_config.get::<Option<Vec<String>>>("subscribe_channels")?.unwrap_or_default();
+    let subscribed_channels =
+        lua_config.get::<Option<Vec<String>>>("subscribed_channels")?.unwrap_or_default();
 
     mpd.connect(address, password).await?;
 
-    if !subscribe_channels.is_empty() {
-        info!(channels = ?subscribe_channels, "Subscribing to channels");
-        for channel in subscribe_channels {
-            mpd.run(move |c| c.subscribe(&channel)).await?;
-        }
+    for channel in
+        plugin_store.all().flat_map(|p| &p.subscribed_channels).chain(subscribed_channels.iter())
+    {
+        info!(channel, "Subscribing to channel");
+        let channel = channel.clone();
+        mpd.run(move |c| c.subscribe(&channel)).await?;
     }
 
     let status = mpd.run(|c| c.get_status()).await?;

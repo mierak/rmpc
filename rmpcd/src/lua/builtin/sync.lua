@@ -1,3 +1,6 @@
+---@diagnostic disable: undefined-field
+---@diagnostic disable: inject-field
+
 local sync = require("rmpcd.sync")
 
 function sync.debounce(timeout_ms, callback)

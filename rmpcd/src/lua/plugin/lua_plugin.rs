@@ -1,12 +1,12 @@
 use std::{
-    collections::HashMap,
+    collections::HashSet,
     path::{Path, PathBuf},
     sync::Arc,
 };
 
 use anyhow::{Context, Result, bail};
 use mlua::{IntoLua, Lua, LuaSerdeExt, Table};
-use rmpc_mpd::commands::State;
+use rmpc_mpd::commands::IdleEvent;
 use tokio::sync::{
     RwLock,
     mpsc::{UnboundedReceiver, UnboundedSender},
@@ -17,22 +17,45 @@ use crate::{
     async_client::AsyncClient,
     lua::{
         self,
-        lualib::hooks::{
-            ON_IDLE,
-            ON_MESSAGE,
-            ON_MESSAGES,
-            ON_SHUTDOWN,
-            ON_SONG_CHANGE,
-            ON_STATE_CHANGE,
+        lualib::{
+            mpd::types::{Song, State, Status},
+            plugin::{ON_IDLE, ON_MESSAGE, ON_SHUTDOWN, ON_SONG_CHANGE, ON_STATE_CHANGE},
         },
-        plugin::{entry::LuaPluginEntry, plugin_loop::PluginEvent, triggers::Triggers},
+        plugin::{entry::LuaPluginEntry, triggers::Triggers},
     },
 };
+
+#[derive(derive_more::Debug, Clone)]
+#[allow(clippy::large_enum_variant)]
+pub enum PluginEvent {
+    SongChange {
+        #[debug(skip)]
+        old: Option<Song>,
+        #[debug(skip)]
+        new: Option<Song>,
+    },
+    StateChange {
+        #[debug(skip)]
+        old: Status,
+        #[debug(skip)]
+        new: Status,
+    },
+    Message {
+        channel: String,
+        #[debug(skip)]
+        message: String,
+    },
+    Idle {
+        event: IdleEvent,
+    },
+    Shutdown,
+}
 
 #[derive(derive_more::Debug)]
 pub struct LuaPlugin {
     pub path: PathBuf,
     pub triggers: Triggers,
+    pub subscribed_channels: HashSet<String>,
     #[debug(skip)]
     pub tx: UnboundedSender<PluginEvent>,
     #[debug(skip)]
@@ -95,7 +118,6 @@ impl LuaPlugin {
         let song_change = state.contains_key(ON_SONG_CHANGE)?;
         let state_change = state.contains_key(ON_STATE_CHANGE)?;
         let message = state.contains_key(ON_MESSAGE)?;
-        let messages = state.contains_key(ON_MESSAGES)?;
         let idle = state.contains_key(ON_IDLE)?;
         let shutdown = state.contains_key(ON_SHUTDOWN)?;
         let mut triggers = Triggers::empty();
@@ -108,9 +130,6 @@ impl LuaPlugin {
         if message {
             triggers |= Triggers::Message;
         }
-        if messages {
-            triggers |= Triggers::Messages;
-        }
         if idle {
             triggers |= Triggers::Idle;
         }
@@ -122,11 +141,17 @@ impl LuaPlugin {
             bail!("Plugin must have at least one trigger");
         }
 
-        let setup: Option<mlua::Function> = state.get("setup")?;
-        if let Some(setup) = setup {
+        if let Some(setup) = state.get::<Option<mlua::Function>>("setup")? {
             let args = lua.to_value(&serde_json::from_str::<serde_json::Value>(&plugin.args)?)?;
             setup.call_async::<()>((&state, args)).await?;
         }
+
+        let subscribed_channels = state.get::<Option<Vec<String>>>("subscribed_channels")?;
+        let subscribed_channels = if let Some(channels) = subscribed_channels {
+            channels.into_iter().collect()
+        } else {
+            HashSet::new()
+        };
 
         let (tx, rx) = tokio::sync::mpsc::unbounded_channel();
         let handle = tokio::task::spawn({
@@ -134,7 +159,7 @@ impl LuaPlugin {
             async move { Self::actor_loop(name, &lua, &state, rx).await }
         });
 
-        return Ok(Self { path: plugin.path.clone(), triggers, tx, handle });
+        return Ok(Self { path: plugin.path.clone(), triggers, subscribed_channels, tx, handle });
     }
 
     async fn actor_loop(
@@ -191,30 +216,12 @@ impl LuaPlugin {
                     error!(err = ?err, "Failed to call plugin callback for state change");
                 }
             }
-            PluginEvent::Message { messages } => {
+            PluginEvent::Message { channel, message } => {
                 let func: Option<mlua::Function> = state.get(ON_MESSAGE)?;
                 if let Some(func) = func {
-                    trace!(name, ON_MESSAGES, "Running plugin callback");
-                    for (channel, messages) in &messages.0 {
-                        let channel = lua.to_value(channel)?;
-                        for message in messages {
-                            let message = message.clone();
-                            if let Err(err) =
-                                func.call_async::<()>((state, &channel, message)).await
-                            {
-                                error!(err = ?err, "Failed to call plugin on messages callback");
-                            }
-                        }
-                    }
-                }
-
-                let func: Option<mlua::Function> = state.get(ON_MESSAGES)?;
-                if let Some(func) = func {
                     trace!(name, ON_MESSAGE, "Running plugin callback");
-                    let messages: HashMap<String, Vec<String>> = messages.0.into_iter().collect();
-                    let messages = lua.to_value(&messages)?;
-                    if let Err(err) = func.call_async::<()>((state, messages)).await {
-                        error!(err = ?err, "Failed to call plugin on message callback");
+                    if let Err(err) = func.call_async::<()>((state, channel, message)).await {
+                        error!(err = ?err, "Failed to call plugin on messages callback");
                     }
                 }
             }
