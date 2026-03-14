@@ -13,7 +13,11 @@ A companion MPD client to rmpc intended to run as a daemon.
 Features(so far):
 * Fully configurable with Lua
 * MPRIS server implementation
-* on song change and on playback state change hooks
+* Plugin support with custom API
+* Builtin [LastFM plugin](https://github.com/mierak/rmpc/blob/master/rmpcd/src/lua/builtin/lastfm.lua)
+* Builtin [Playcount tracking plugin](https://github.com/mierak/rmpc/blob/master/rmpcd/src/lua/builtin/playcount.lua)
+* Builtin [Notification plugin](https://github.com/mierak/rmpc/blob/master/rmpcd/src/lua/builtin/notify.lua)
+* Builtin [Lyrics download plugin](https://github.com/mierak/rmpc/blob/master/rmpcd/src/lua/builtin/lyrics.lua)
 
 ## Usage
 
