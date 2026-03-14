@@ -23,6 +23,8 @@ tracing = { workspace = true, features = ["log"] }
 tracing-subscriber = { workspace = true, features = ["fmt", "env-filter"] }
 reqwest = { workspace = true }
 derive_more = { workspace = true }
+bitflags = { workspace = true }
+ctrlc = { workspace = true }
 # console-subscriber = { workspace = true }
 
 [lints]

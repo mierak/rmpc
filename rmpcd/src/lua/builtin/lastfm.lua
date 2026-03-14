@@ -5,6 +5,10 @@ local process = require("rmpcd.process")
 local sync = require("rmpcd.sync")
 local fs = require("rmpcd.fs")
 
+---@type LastFmPlugin
+---@diagnostic disable-next-line: missing-fields
+local M = {}
+
 local function lastfm_api_sig(params, shared_secret)
     local keys = {}
     for k, _ in pairs(params) do
@@ -254,103 +258,98 @@ local function should_scrobble(song_start, current_time, song)
     return false
 end
 
----@type LastFmModule
-return {
-    install = function(args)
-        ---@type Deque<{ song: Song, timestamp: integer }>
-        local scrobble_queue = Deque.new()
+---@param args { api_key: string, shared_secret: string, update_now_playing?: boolean }
+M.setup = function(self, args)
+    self.api_key = args.api_key
+    self.shared_secret = args.shared_secret
+    self.update_now_playing = args.update_now_playing or false
 
-        ---@param sk string
-        local function register(sk)
-            ---@type integer | nil
-            local song_start
-            ---@type Song | nil
-            local current_song
+    self.scrobble_queue = Deque.new()
 
-            rmpcd.on("song_change", function(old_song, song)
-                if song ~= nil and (args.update_now_playing or false) then
-                    lastfm_update_now_playing(args.api_key, args.shared_secret, sk, song, song.duration)
+    local cached_session_key, err = fs.read_str("/tmp/rmpcd-lastfm-session-key")
+    if cached_session_key ~= nil and err == nil then
+        log.info("Using cached Last.fm session key")
+        self.session_key = cached_session_key
+        return
+    else
+        log.info("No cached Last.fm session key found, starting auth flow")
+    end
+
+    local response = http.get("https://ws.audioscrobbler.com/2.0", {
+        params = {
+            method = "auth.getToken",
+            api_key = args.api_key,
+            format = "json",
+        },
+    })
+
+    if response.code ~= 200 then
+        log.error("Failed to get Last.fm auth token: HTTP " .. response.code)
+        return
+    end
+
+    local token = response:json().token
+
+    process.spawn({ "xdg-open", "https://www.last.fm/api/auth/?api_key=" .. args.api_key .. "&token=" .. token })
+
+    local session_key = get_session_key(args.api_key, args.shared_secret, token)
+    if session_key == nil then
+        sync.set_interval(5000, function(handle)
+            session_key = get_session_key(args.api_key, args.shared_secret, token)
+
+            if session_key ~= nil then
+                handle.cancel()
+                local _, sk_write_err = fs.write_str("/tmp/rmpcd-lastfm-session-key", session_key)
+                if sk_write_err ~= nil then
+                    log.error("Failed to write Last.fm session key to file: " .. sk_write_err)
                 end
 
-                local current_time = os.time()
+                self.session_key = session_key
+            end
+        end)
+    end
+end
 
-                if old_song ~= nil and song_start ~= nil and should_scrobble(song_start, current_time, old_song) then
-                    local last = scrobble_queue:peek_right()
-                    if last == nil or (last ~= nil and last.timestamp < song_start) then
-                        scrobble_queue.push_right(scrobble_queue, { song = old_song, timestamp = song_start })
-                    end
-                end
+M.song_change = function(self, old, new)
+    if new ~= nil and (self.update_now_playing or false) then
+        lastfm_update_now_playing(self.api_key, self.shared_secret, self.session_key, new, new.duration)
+    end
 
-                song_start = current_time
-                current_song = song
+    local current_time = os.time()
 
-                process_scrobble_queue(args.api_key, sk, args.shared_secret, scrobble_queue)
-            end)
+    if old ~= nil and self.song_start ~= nil and should_scrobble(self.song_start, current_time, old) then
+        local last = self.scrobble_queue:peek_right()
+        if last == nil or (last ~= nil and last.timestamp < self.song_start) then
+            self.scrobble_queue:push_right({ song = old, timestamp = self.song_start })
+        end
+    end
 
-            rmpcd.on("state_change", function(old_state, new_state)
-                if new_state ~= "play" and old_state == "play" then
-                    local current_time = os.time()
+    self.song_start = current_time
+    self.current_song = new
 
-                    if
-                        current_song ~= nil
-                        and song_start ~= nil
-                        and should_scrobble(song_start, current_time, current_song)
-                    then
-                        local last = scrobble_queue:peek_right()
-                        if last == nil or (last ~= nil and last.timestamp < song_start) then
-                            scrobble_queue.push_right(scrobble_queue, { song = current_song, timestamp = song_start })
-                        end
-                    end
+    process_scrobble_queue(self.api_key, self.session_key, self.shared_secret, self.scrobble_queue)
+end
 
-                    song_start = nil
-                    current_song = nil
-                end
+M.state_change = function(self, old, new)
+    if new ~= "play" and old == "play" then
+        local current_time = os.time()
 
-                process_scrobble_queue(args.api_key, sk, args.shared_secret, scrobble_queue)
-            end)
+        if
+            self.current_song ~= nil
+            and self.song_start ~= nil
+            and should_scrobble(self.song_start, current_time, self.current_song)
+        then
+            local last = self.scrobble_queue:peek_right()
+            if last == nil or (last ~= nil and last.timestamp < self.song_start) then
+                self.scrobble_queue:push_right({ song = self.current_song, timestamp = self.song_start })
+            end
         end
 
-        local cached_session_key, err = fs.read_str("/tmp/rmpcd-lastfm-session-key")
-        if cached_session_key ~= nil and err == nil then
-            log.info("Using cached Last.fm session key")
-            register(cached_session_key)
-            return
-        else
-            log.info("No cached Last.fm session key found, starting auth flow")
-        end
+        self.song_start = nil
+        self.current_song = nil
+    end
 
-        local response = http.get("https://ws.audioscrobbler.com/2.0", {
-            params = {
-                method = "auth.getToken",
-                api_key = args.api_key,
-                format = "json",
-            },
-        })
+    process_scrobble_queue(self.api_key, self.session_key, self.shared_secret, self.scrobble_queue)
+end
 
-        if response.code ~= 200 then
-            log.error("Failed to get Last.fm auth token: HTTP " .. response.code)
-            return
-        end
-
-        local token = response:json().token
-
-        process.spawn({ "xdg-open", "https://www.last.fm/api/auth/?api_key=" .. args.api_key .. "&token=" .. token })
-
-        local session_key = get_session_key(args.api_key, args.shared_secret, token)
-        if session_key == nil then
-            sync.set_interval(5000, function(handle)
-                session_key = get_session_key(args.api_key, args.shared_secret, token)
-
-                if session_key ~= nil then
-                    handle.cancel()
-                    local _, sk_write_err = fs.write_str("/tmp/rmpcd-lastfm-session-key", session_key)
-                    if sk_write_err ~= nil then
-                        log.error("Failed to write Last.fm session key to file: " .. sk_write_err)
-                    end
-
-                    register(session_key)
-                end
-            end)
-        end
-    end,
-}
+return M

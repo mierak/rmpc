@@ -1,8 +1,9 @@
-local sync = require("rmpcd.sync")
 local process = require("rmpcd.process")
 local mpd = require("rmpcd.mpd")
 local fs = require("rmpcd.fs")
-local log = require("rmpcd.log")
+
+---@class NotifyPlugin
+local M = {}
 
 ---@param new_song Song
 ---@param with_album_art boolean
@@ -29,36 +30,19 @@ local function notify(new_song, with_album_art, album_art_path)
     end
 end
 
-local album_art_path = "/tmp/rmpcd-notify-album-art"
----@type NotifyModule
-return {
-    install = function(args)
-        local _args = args or {}
+---@param args { with_album_art: boolean | nil, album_art_path: string | nil } | nil
+M.setup = function(self, args)
+    local _args = args or {}
+    self.with_album_art = _args.with_album_art or true
+    self.album_art_path = _args.album_art_path or "/tmp/rmpcd-notify-album-art"
+end
 
-        local debounced = sync.debounce(
-            500,
-            ---@param _old_song Song | nil
-            ---@param new_song Song | nil
-            ---@diagnostic disable-next-line: unused-local
-            function(_old_song, new_song)
-                log.info("Notifying")
-                if new_song == nil then
-                    log.info("No new song, skipping notification")
-                    return
-                end
+M.song_change = function(self, _old_song, new_song)
+    if new_song == nil then
+        return
+    end
 
-                notify(new_song, _args.with_album_art or true, _args.album_art_path or album_art_path)
-                log.info("Notification sent")
-            end
-        )
+    notify(new_song, self.with_album_art or true, self.album_art_path)
+end
 
-        rmpcd.on("song_change", debounced)
-        -- rmpcd.on("song_change", function(_old_song, new_song)
-        --     if new_song == nil then
-        --         return
-        --     end
-        --
-        --     notify(new_song, _args.with_album_art or true, _args.album_art_path or album_art_path)
-        -- end)
-    end,
-}
+return M

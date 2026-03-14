@@ -1,7 +1,7 @@
 ---@meta
 ---@module "rmpcd.lyrics"
 
----@class LyricsModule
----@field install fun()
+--- @class LyricsPlugin: RmpcPlugin
+
 local M = {}
 return M

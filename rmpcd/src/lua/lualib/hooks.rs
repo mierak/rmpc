@@ -1,42 +1,65 @@
-use mlua::{Function, Lua, Table};
-use tracing::info;
+use std::{path::PathBuf, sync::Arc};
+
+use mlua::{ExternalResult, Lua, Table};
+use tokio::sync::RwLock;
+
+use crate::lua::plugin::LuaPluginEntry;
 
 pub const ON_SONG_CHANGE: &str = "song_change";
 pub const ON_STATE_CHANGE: &str = "state_change";
 pub const ON_MESSAGES: &str = "messages";
 pub const ON_MESSAGE: &str = "message";
 pub const ON_IDLE: &str = "idle_event";
+pub const ON_SHUTDOWN: &str = "shutdown";
 
-pub fn init(lua: &Lua) -> mlua::Result<()> {
+pub fn init(
+    lua: &Lua,
+    plugins: Option<&Arc<RwLock<Vec<Arc<RwLock<LuaPluginEntry>>>>>>,
+) -> mlua::Result<()> {
     let rmpcd = lua.globals().get::<Table>("rmpcd")?;
-    let hooks = lua.create_table()?;
-    rmpcd.raw_set("hooks", &hooks)?;
-    hooks.raw_set(ON_SONG_CHANGE, lua.create_table()?)?;
-    hooks.raw_set(ON_STATE_CHANGE, lua.create_table()?)?;
-    hooks.raw_set(ON_MESSAGES, lua.create_table()?)?;
-    hooks.raw_set(ON_MESSAGE, lua.create_table()?)?;
-    hooks.raw_set(ON_IDLE, lua.create_table()?)?;
 
-    let on = lua.create_function(|lua, (hook, func): (String, Function)| {
-        let rmpcd = lua.globals().get::<Table>("rmpcd")?;
-        let hooks = rmpcd.raw_get::<Table>("hooks")?;
+    if let Some(plugins) = plugins {
+        let plugins_clone = plugins.clone();
 
-        if !matches!(
-            hook.as_str(),
-            ON_SONG_CHANGE | ON_STATE_CHANGE | ON_MESSAGES | ON_MESSAGE | ON_IDLE
-        ) {
-            return Err(mlua::Error::external(format!("Unknown hook type: {hook}")));
-        }
+        let install = lua.create_async_function(move |lua, args: mlua::String| {
+            let p = plugins_clone.clone();
+            async move {
+                let mut path = PathBuf::new();
+                let str = args.to_str()?;
+                let split = str.split('.');
 
-        let hooks_arr = hooks.raw_get::<Table>(hook.as_str())?;
+                if split.clone().count() == 0 {
+                    return Err(mlua::Error::external("Plugin name cannot be empty"));
+                }
 
-        info!(hook = %hook, "Registering hook");
-        hooks_arr.raw_set(hooks_arr.raw_len() + 1, func)?;
+                for segment in split {
+                    path.push(segment);
+                }
+                path.set_extension("lua");
 
-        Ok(())
-    })?;
+                let entry = LuaPluginEntry::new(path, String::from("{}"));
+                let entry = Arc::new(RwLock::new(entry));
+                let entry_clone = entry.clone();
+                p.write().await.push(entry);
 
-    rmpcd.raw_set("on", on)?;
+                let tbl = lua.create_table()?;
+                let setup = lua.create_async_function(
+                    move |_lua, (_self, args): (mlua::Value, mlua::Value)| {
+                        let entry_clone = entry_clone.clone();
+                        async move {
+                            let json = serde_json::to_string(&args).into_lua_err()?;
+                            entry_clone.write().await.args = json;
+                            Ok(())
+                        }
+                    },
+                )?;
+                tbl.raw_set("setup", setup)?;
+
+                Ok(tbl)
+            }
+        })?;
+        rmpcd.raw_set("install", install)?;
+    }
 
     Ok(())
 }

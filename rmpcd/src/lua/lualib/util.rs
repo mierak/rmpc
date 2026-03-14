@@ -23,7 +23,7 @@ pub fn create(lua: &Lua) -> mlua::Result<Table> {
     Ok(tbl)
 }
 
-fn dump(v: &Value, indent: usize, seen: &mut HashSet<usize>) -> String {
+pub fn dump(v: &Value, indent: usize, seen: &mut HashSet<usize>) -> String {
     match v {
         Value::Nil => "nil".into(),
         Value::Boolean(b) => b.to_string(),

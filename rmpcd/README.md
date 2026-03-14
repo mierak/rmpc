@@ -27,11 +27,6 @@ Check `rmpcd/src/lua/builtin` for usage examples and type definitions.
 
 Example:
 ```lua
-local notify = require("rmpcd.notify")
-local playcount = require("rmpcd.playcount")
-local lastfm = require("rmpcd.lastfm")
-local lyrics = require("rmpcd.lyrics")
-
 --@type Config
 local config = {}
 
@@ -39,22 +34,23 @@ config.address = "@mpd"
 config.mpris = false
 config.subscribe_channels = { "test" }
 
--- Install the auto lyrics download builtin
-lyrics.install()
-
--- Install notification on song change builtin
-notify.install()
+-- Automatically increment play count on song change
+rmpcd.install("#builtin.playcount")
 
 -- Install last fm scrobbling builtin
 -- For now you have to request an API key yourself due to LastFM's insane API
 -- design https://www.last.fm/api/account/create
-lastfm.install({
-	api_key = "<your api key>",
-	shared_secret = "<your shared secret>",
+rmpcd.install("#builtin.lastfm"):setup({
+	api_key = "<your api key here>",
+	shared_secret = "<your secret here>",
+	update_now_playing = false,
 })
 
--- Automatically increment play count on song change
-playcount.install()
+-- Install notification on song change builtin
+rmpcd.install("#builtin.notify")
+
+-- Install the auto lyrics download builtin
+rmpcd.install("#builtin.lyrics")
 
 return config
 ```
