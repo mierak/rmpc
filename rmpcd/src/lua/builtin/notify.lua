@@ -1,8 +1,3 @@
-local process = require("rmpcd.process")
-local mpd = require("rmpcd.mpd")
-local fs = require("rmpcd.fs")
-local log = require("rmpcd.log")
-
 ---@type NotifyPlugin
 local M = {
     enabled = true,

@@ -25,6 +25,8 @@ Address has the same syntax as [rmpc](https://rmpc.mierak.dev/configuration/#add
 
 Check `rmpcd/src/lua/builtin` for usage examples and type definitions.
 
+Plugins run completely isolated from each other, they have separate global state etc.
+
 Each of the builtin plugins are built in a way that they can be disabled at
 runtime by sending a message to MPD channel for the corresponding plugin.
 For example with rmpc's CLI:
@@ -78,3 +80,6 @@ from rmpcd directly.
     ]
 }
 ```
+
+## A small list of todos
+- reconnect MPD client upon disconnection

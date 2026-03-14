@@ -30,7 +30,9 @@
 
 ---@alias ValueChange string e.g. "+5", "-10", "50"
 
----@type Mpd
----@diagnostic disable-next-line: missing-fields
-local M = {}
-return M
+---@class _G
+---@field mpd Mpd
+
+local mpd = {}
+_G.mpd = mpd
+return mpd
