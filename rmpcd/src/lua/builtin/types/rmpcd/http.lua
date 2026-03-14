@@ -1,5 +1,4 @@
 ---@meta
----@module "rmpcd.http"
 
 ---@alias HttpMethod
 ---| "GET" | "POST" | "PUT" | "DELETE" | "PATCH" | "HEAD" | "OPTIONS" | "CONNECT" | "TRACE"
@@ -32,6 +31,11 @@
 ---@field post fun(url: string, opts?: HttpPostOpts): HttpResponse
 
 ---@type RmpcdHttp
----@diagnostic disable-next-line: missing-fields
-local M = {}
-return M
+---@diagnostic disable-next-line: lowercase-global
+
+---@class _G
+---@field http RmpcdHttp
+
+local http = {}
+_G.http = http
+return http

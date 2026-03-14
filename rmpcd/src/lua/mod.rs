@@ -27,7 +27,7 @@ pub fn create(
     let rmpcd = lua.create_table()?;
     lua.globals().raw_set("rmpcd", &rmpcd)?;
 
-    install_lib(&lua, &preload, client, plugins)?;
+    install_lib(&lua, client, plugins)?;
     install_builtins(&lua, &preload)?;
 
     Ok(lua)
@@ -42,24 +42,20 @@ pub async fn eval_config(lua: &Lua, cfg_dir: &Path) -> Result<Table> {
 
 pub fn install_lib(
     lua: &Lua,
-    preload: &Table,
     client: &Arc<AsyncClient>,
     plugins: Option<&Arc<RwLock<Vec<Arc<RwLock<LuaPluginEntry>>>>>>,
 ) -> mlua::Result<()> {
     macro_rules! install_lib {
         ($name:ident) => {
-            let lib = lualib::$name::create(lua)?;
-            preload.raw_set(
-                concat!("rmpcd.", stringify!($name)),
-                lua.create_function(move |_, ()| Ok(lib.clone()))?,
-            )?;
+            let lib = crate::lua::lualib::$name::create(lua)?;
+            lua.globals().raw_set(stringify!($name), lib)?;
         };
     }
 
     lualib::plugin::init(lua, plugins)?;
 
     let mpd = lualib::mpd::create(lua, client)?;
-    preload.raw_set("rmpcd.mpd", lua.create_function(move |_, ()| Ok(mpd.clone()))?)?;
+    lua.globals().raw_set("mpd", mpd)?;
 
     install_lib!(log);
     install_lib!(sync);

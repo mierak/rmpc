@@ -1,10 +1,3 @@
-local util = require("rmpcd.util")
-local http = require("rmpcd.http")
-local log = require("rmpcd.log")
-local process = require("rmpcd.process")
-local sync = require("rmpcd.sync")
-local fs = require("rmpcd.fs")
-
 ---@type LastFmPlugin
 ---@diagnostic disable-next-line: missing-fields
 local M = {}

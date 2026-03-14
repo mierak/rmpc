@@ -1,5 +1,4 @@
 ---@meta
----@module "rmpcd.fs"
 
 ---@class Fs
 ---@field exists fun(path: string): (boolean, string|nil)
@@ -13,7 +12,9 @@
 ---@field remove_dir fun(path: string): (boolean, string|nil)
 ---@field remove_dir_all fun(path: string): (boolean, string|nil)
 
----@type Fs
----@diagnostic disable-next-line: missing-fields
-local M = {}
-return M
+---@class _G
+---@field fs Fs
+
+local fs = {}
+_G.fs = fs
+return fs

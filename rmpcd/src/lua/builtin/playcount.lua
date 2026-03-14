@@ -1,6 +1,3 @@
-local log = require("rmpcd.log")
-local mpd = require("rmpcd.mpd")
-
 ---@type PlaycountPlugin
 local M = {
     enabled = true,

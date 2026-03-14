@@ -1,5 +1,4 @@
 ---@meta
----@module "rmpcd.sync"
 
 ---@class TimeoutHandle
 ---@field cancel fun()
@@ -10,6 +9,11 @@
 -- ---@field debounce fun(timeout_ms: integer, callback: fun(...: any)): fun(...: any)
 
 ---@type Sync
----@diagnostic disable-next-line: missing-fields
-local M = {}
-return M
+---@diagnostic disable-next-line: lowercase-global
+
+---@class _G
+---@field sync Sync
+
+local sync = {}
+_G.sync = sync
+return sync

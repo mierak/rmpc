@@ -1,8 +1,3 @@
-local fs = require("rmpcd.fs")
-local http = require("rmpcd.http")
-local log = require("rmpcd.log")
-local process = require("rmpcd.process")
-
 local lrclib_url = "https://lrclib.net"
 local lyrics_dir = os.getenv("HOME") .. "/Music"
 
