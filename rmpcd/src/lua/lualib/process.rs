@@ -1,35 +1,38 @@
 use mlua::{Lua, Table};
-use tracing::error;
+use tracing::{debug, error};
 
 pub fn create(lua: &Lua) -> mlua::Result<Table> {
     let tbl = lua.create_table()?;
 
     let spawn_process = lua.create_async_function(
         async |_, cmd: Vec<String>| -> mlua::Result<(Option<u32>, Option<String>)> {
-            let Some(first) = cmd.first().cloned() else {
+            let Some((program, args)) = cmd.split_first() else {
                 return Ok((None, Some("No command provided".to_string())));
             };
 
-            let mut child = tokio::process::Command::new(&first)
-                .args(cmd[1..].iter())
+            debug!(program = %program, args = ?args, "Running command");
+
+            let mut child = tokio::process::Command::new(program)
+                .args(args)
                 .kill_on_drop(true)
                 .spawn()
                 .map_err(mlua::Error::external)?;
             let pid = child.id();
 
+            let program = program.clone();
             tokio::task::spawn(async move {
                 match child.wait().await {
                     Ok(status) => {
                         if !status.success() {
                             error!(
                                 status = %status,
-                                program = %first,
+                                program = %program,
                                 "Process exited with non-zero status"
                             );
                         }
                     }
                     Err(err) => {
-                        error!(err = ?err, program = %first, "Failed to wait on child process");
+                        error!(err = ?err, program = %program, "Failed to wait on child process");
                     }
                 }
             });
