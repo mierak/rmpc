@@ -4,6 +4,7 @@
 ---@field dump_table fun(tbl: table)
 ---@field md5 fun(data: string): string
 ---@field which fun(prog: string): boolean
+---@field nil_or_null fun(value: any): boolean
 
 ---@type Util
 ---@diagnostic disable-next-line: lowercase-global

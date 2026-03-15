@@ -197,7 +197,7 @@ impl LuaPlugin {
                 let func: mlua::Function = state.get(ON_SONG_CHANGE)?;
 
                 if let Err(err) = func.call_async::<()>((state, old, new)).await {
-                    error!(err = ?err, "Failed to call plugin callback for song change");
+                    error!("Failed to call plugin callback for song change\n{err}");
                 }
             }
             PluginEvent::StateChange { old, new } => {
@@ -213,7 +213,7 @@ impl LuaPlugin {
                 let func: mlua::Function = state.get(ON_STATE_CHANGE)?;
 
                 if let Err(err) = func.call_async::<()>((state, old, new)).await {
-                    error!(err = ?err, "Failed to call plugin callback for state change");
+                    error!("Failed to call plugin callback for state change\n{err}");
                 }
             }
             PluginEvent::Message { channel, message } => {
@@ -221,7 +221,7 @@ impl LuaPlugin {
                 if let Some(func) = func {
                     trace!(name, ON_MESSAGE, "Running plugin callback");
                     if let Err(err) = func.call_async::<()>((state, channel, message)).await {
-                        error!(err = ?err, "Failed to call plugin on messages callback");
+                        error!("Failed to call plugin on messages callback\n{err}");
                     }
                 }
             }
@@ -230,7 +230,7 @@ impl LuaPlugin {
 
                 let func: mlua::Function = state.get(ON_IDLE)?;
                 if let Err(err) = func.call_async::<()>((state, ON_IDLE, event.to_string())).await {
-                    error!(err = ?err, "Failed to call plugin callback for idle event");
+                    error!("Failed to call plugin callback for idle event\n{err}");
                 }
             }
             PluginEvent::Shutdown => {
@@ -240,7 +240,7 @@ impl LuaPlugin {
                     debug!(name, "Running plugin shutdown callback");
 
                     if let Err(err) = func.call_async::<()>(state).await {
-                        error!(err = ?err, "Failed to call plugin shutdown callback");
+                        error!("Failed to call plugin shutdown callback\n{err}");
                     }
                 }
                 return Ok(false);

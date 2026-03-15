@@ -69,6 +69,7 @@ M.song_change = function(_self, _old_song, new_song)
     })
 
     if result.code == 404 then
+        log.info("Lyrics not found for " .. new_song.artist .. " - " .. new_song.title)
         process.spawn({
             "rmpc",
             "remote",
@@ -87,7 +88,16 @@ M.song_change = function(_self, _old_song, new_song)
     end
 
     local json = result:json()
-    if json.syncedLyrics == nil or json.syncedLyrics == "null" or json.syncedLyrics == "" then
+    if util.nil_or_null(json.syncedLyrics) or json.syncedLyrics == "" then
+        log.info("Synced lyrics not found for " .. new_song.artist .. " - " .. new_song.title)
+        process.spawn({
+            "rmpc",
+            "remote",
+            "status",
+            "--level",
+            "warn",
+            "Synced lyrics for '" .. new_song.artist .. " - " .. new_song.title .. "' not found",
+        })
         return
     end
 

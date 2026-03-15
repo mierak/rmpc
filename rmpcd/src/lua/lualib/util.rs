@@ -19,9 +19,12 @@ pub fn create(lua: &Lua) -> mlua::Result<Table> {
 
     let which = lua.create_function(|_, data: String| Ok(which::which(data).is_ok()))?;
 
+    let nil_or_null = lua.create_function(|_, val: Value| Ok(val.is_nil() || val.is_null()))?;
+
     tbl.set("dump_table", dump_table)?;
     tbl.set("md5", md5)?;
     tbl.set("which", which)?;
+    tbl.set("nil_or_null", nil_or_null)?;
 
     Ok(tbl)
 }
