@@ -34,6 +34,12 @@ M.setup = function(self, args)
     self.with_album_art = (args.with_album_art ~= nil) and args.with_album_art or true
     self.album_art_path = args.album_art_path or "/tmp/rmpcd-notify-album-art"
     self.enabled = (args.enabled ~= nil) and args.enabled or true
+
+    local notify_send = util.which("notify-send")
+    if not notify_send then
+        log.error("notify-send not found in PATH, disabling notify plugin")
+        self.enabled = false
+    end
 end
 
 M.song_change = function(self, _old_song, new_song)

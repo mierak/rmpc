@@ -15,8 +15,14 @@ local function replace_after_last_dot(s, replacement)
     return s:gsub("%.[^.]*$", "." .. replacement, 1)
 end
 
-M.setup = function(_self, args)
-    _self.enabled = (args.enabled ~= nil) and args.enabled or true
+M.setup = function(self, args)
+    self.enabled = (args.enabled ~= nil) and args.enabled or true
+
+    local rmpc = util.which("rmpc")
+    if not rmpc then
+        log.error("rmpc not found in PATH, disabling lyrics plugin")
+        self.enabled = false
+    end
 end
 
 M.subscribed_channels = { "rmpcd.lyrics" }
@@ -91,7 +97,6 @@ M.song_change = function(_self, _old_song, new_song)
     lrc = lrc .. "[ti:" .. new_song.title .. "]\n"
     lrc = lrc .. json.syncedLyrics
     log.info("Saving lyrics to " .. lrc_path)
-    log.debug("Lyrics content:\n" .. lrc)
     fs.write_str(lrc_path, lrc)
 
     process.spawn({ "rmpc", "remote", "indexlrc", "--path", lrc_path })

@@ -17,8 +17,11 @@ pub fn create(lua: &Lua) -> mlua::Result<Table> {
         Ok(format!("{digest:x}"))
     })?;
 
+    let which = lua.create_function(|_, data: String| Ok(which::which(data).is_ok()))?;
+
     tbl.set("dump_table", dump_table)?;
     tbl.set("md5", md5)?;
+    tbl.set("which", which)?;
 
     Ok(tbl)
 }

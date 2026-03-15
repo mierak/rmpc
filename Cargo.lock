@@ -3354,6 +3354,7 @@ dependencies = [
  "tokio-util",
  "tracing",
  "tracing-subscriber",
+ "which",
  "zbus",
 ]
 
