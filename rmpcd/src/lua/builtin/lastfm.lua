@@ -257,6 +257,12 @@ M.setup = function(self, args)
     self.update_now_playing = (args.update_now_playing ~= nil) and args.update_now_playing or false
     self.enabled = (args.update_now_playing ~= nil) and args.enabled or true
 
+    local xdg_open = util.which("xdg-open")
+    if not xdg_open then
+        log.error("xdg-open not found in PATH, disabling lastfm plugin")
+        self.enabled = false
+    end
+
     self.scrobble_queue = Deque.new()
 
     local cached_session_key, err = fs.read_str("/tmp/rmpcd-lastfm-session-key")

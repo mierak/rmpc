@@ -36,15 +36,14 @@ impl<T> PluginStore<T> {
     }
 
     pub fn iter_with(&self, flag: Triggers) -> impl Iterator<Item = &T> {
-        // It is a logical error to call this with more flags
-        debug_assert!(flag.bits().is_power_of_two());
-
         let slot = flag_to_slot(flag);
         self.by_flag[slot].iter().map(|&i| &self.items[i])
     }
 }
 
+#[inline]
 fn flag_to_slot(flag: Triggers) -> usize {
+    // It is a logical error to call this with more flags
     debug_assert!(flag.bits().is_power_of_two());
     flag.bits().trailing_zeros() as usize
 }

@@ -25,6 +25,7 @@ reqwest = { workspace = true }
 derive_more = { workspace = true }
 bitflags = { workspace = true }
 ctrlc = { workspace = true }
+which = { workspace = true }
 # console-subscriber = { workspace = true }
 
 [lints]
