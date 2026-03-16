@@ -15,7 +15,7 @@ use tokio::{
         mpsc::{UnboundedReceiver, UnboundedSender},
     },
 };
-use tracing::{debug, error, info, trace, warn};
+use tracing::{error, info, trace, warn};
 
 use crate::{
     AppEvent,
@@ -161,7 +161,7 @@ pub async fn init(
                             tx.send_safe(PluginsEvent::Messages { messages });
                         }
                         ev => {
-                            debug!(?ev, "Event currently not supported");
+                            trace!(?ev, "Event currently not supported");
                             // TODO receiving event without calling client::run will block the event
                             // loop forever
                             client.run(|_| Ok(())).await.ok();

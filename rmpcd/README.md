@@ -38,6 +38,11 @@ For example with rmpc's CLI:
 - Enable Lastfm scrobbling: `rmpc sendmessage rmpcd.lastfm enable`
 - Toggle Lastfm scrobbling: `rmpc sendmessage rmpcd.lastfm toggle`
 
+Custom plugins can be installed by `rmpcd.install`ing them as you would
+`require` normal lua modules. If you have `plugin.lua` next to your `init.lua`
+for example you can install it ith `rmpcd.install("plugin")` or
+`plugins/custom.lua` can be installed by `rmpcd.install("plugins.custom")`.
+
 Example:
 ```lua
 --@type Config

@@ -7,7 +7,7 @@
 ---@field update_now_playing? boolean Whether to update the now playing status on song change
 ---@field enabled? boolean Whether to enable scrobbling on startup
 
----@class LastFmPlugin: RmpcPlugin<LastFmArgs>
+---@class LastFmPlugin: RmpcdPlugin<LastFmArgs>
 ---@field enabled boolean
 ---@field session_key string | nil
 ---@field scrobble_queue Deque<{ song: Song, timestamp: integer }>

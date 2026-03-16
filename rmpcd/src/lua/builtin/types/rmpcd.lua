@@ -1,14 +1,14 @@
 ---@alias IdleEvent "player" | "mixer" | "options" | "playlist" | "database" | "update" | "stored_playlist" | "sticker" | "subscription" | "shelf"
 
 ---@class RmpcdGlobal
----@field install fun(path: string): RmpcPlugin
+---@field install fun(path: string): RmpcdPlugin
 ---@field install fun(path: "#builtin.lastfm"): LastFmPlugin
 ---@field install fun(path: "#builtin.notify"): NotifyPlugin
 ---@field install fun(path: "#builtin.playcount"): PlaycountPlugin
 ---@field install fun(path: "#builtin.lyrics"): LyricsPlugin
 
 ---@generic Args
----@class RmpcPlugin<Args>
+---@class RmpcdPlugin<Args>
 ---@field subscribed_channels string[]|nil
 ---@field setup fun(self, args: Args)|nil
 ---@field song_change fun(self, old_song: Song|nil, new_song: Song|nil)|nil

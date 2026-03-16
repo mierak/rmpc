@@ -30,6 +30,11 @@ local function notify(new_song, with_album_art, album_art_path)
     end
 end
 
+---@param _new_song Song
+---@param _with_album_art boolean
+---@param _album_art_path string
+local function notify_debounced(_new_song, _with_album_art, _album_art_path) end
+
 M.setup = function(self, args)
     self.with_album_art = (args.with_album_art ~= nil) and args.with_album_art or true
     self.album_art_path = args.album_art_path or "/tmp/rmpcd-notify-album-art"
@@ -39,6 +44,13 @@ M.setup = function(self, args)
     if not notify_send then
         log.error("notify-send not found in PATH, disabling notify plugin")
         self.enabled = false
+    end
+
+    local debounce_delay = args.debounce_delay or 1000
+    if debounce_delay < 0 then
+        notify_debounced = notify
+    else
+        notify_debounced = sync.debounce(debounce_delay, notify)
     end
 end
 
@@ -51,7 +63,7 @@ M.song_change = function(self, _old_song, new_song)
         return
     end
 
-    notify(new_song, self.with_album_art or true, self.album_art_path)
+    notify_debounced(new_song, self.with_album_art or true, self.album_art_path)
 end
 
 M.subscribed_channels = { "rmpcd.notify" }

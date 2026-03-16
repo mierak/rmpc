@@ -3,8 +3,9 @@
 
 ---@class LyricsArgs
 ---@field enabled? boolean
+---@field debounce_delay? integer
 
----@class LyricsPlugin: RmpcPlugin<LyricsArgs>
+---@class LyricsPlugin: RmpcdPlugin<LyricsArgs>
 ---@field enabled boolean
 
 local M = {}

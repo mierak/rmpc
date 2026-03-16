@@ -25,9 +25,13 @@ use crate::{
     },
 };
 
-#[derive(derive_more::Debug, Clone)]
+#[derive(derive_more::Debug)]
 #[allow(clippy::large_enum_variant)]
 pub enum PluginEvent {
+    Callback {
+        func: mlua::Function,
+        args: Option<mlua::MultiValue>,
+    },
     SongChange {
         #[debug(skip)]
         old: Option<Song>,
@@ -113,6 +117,12 @@ impl LuaPlugin {
         client: &Arc<AsyncClient>,
     ) -> Result<Self> {
         let lua = lua::create(cfg_dir, client, None)?;
+        let (tx, rx) = tokio::sync::mpsc::unbounded_channel();
+        {
+            let tx = tx.clone();
+            lua.set_app_data(tx);
+        }
+
         let state: Table = lua.load(content.as_ref()).set_name(name).eval_async().await?;
 
         let song_change = state.contains_key(ON_SONG_CHANGE)?;
@@ -153,7 +163,6 @@ impl LuaPlugin {
             HashSet::new()
         };
 
-        let (tx, rx) = tokio::sync::mpsc::unbounded_channel();
         let handle = tokio::task::spawn({
             let name = name.to_string();
             async move { Self::actor_loop(name, &lua, &state, rx).await }
@@ -189,6 +198,13 @@ impl LuaPlugin {
         event: PluginEvent,
     ) -> Result<bool> {
         match event {
+            PluginEvent::Callback { func, args } => {
+                trace!(name, "Running plugin callback");
+
+                if let Err(err) = func.call_async::<()>(args.unwrap_or_default()).await {
+                    error!("Failed to call plugin callback for song change\n{err}");
+                }
+            }
             PluginEvent::SongChange { old, new } => {
                 trace!(name, ON_SONG_CHANGE, "Running plugin callback");
                 let old = old.clone().into_lua(lua)?;

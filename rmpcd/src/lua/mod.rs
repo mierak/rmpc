@@ -4,7 +4,10 @@ use anyhow::Result;
 use mlua::{Lua, Table};
 use tokio::sync::RwLock;
 
-use crate::{async_client::AsyncClient, lua::plugin::LuaPluginEntry};
+use crate::{
+    async_client::AsyncClient,
+    lua::plugin::{LuaPluginEntry, PluginEvent},
+};
 
 pub mod lualib;
 pub mod plugin;
@@ -15,6 +18,11 @@ pub fn create(
     plugins: Option<&Arc<RwLock<Vec<Arc<RwLock<LuaPluginEntry>>>>>>,
 ) -> Result<Lua> {
     let lua = Lua::new();
+    let (tx, _rx) = tokio::sync::mpsc::unbounded_channel::<PluginEvent>();
+    {
+        let tx = tx.clone();
+        lua.set_app_data(tx);
+    }
 
     let rmpcd_pkg_path = format!("{}/?.lua;{}/?/init.lua", cfg_dir.display(), cfg_dir.display());
 
@@ -80,9 +88,6 @@ pub fn install_builtins(lua: &Lua, preload: &Table) -> mlua::Result<()> {
             )?;
         };
     }
-
-    // Sync modifies the preload table directly
-    lua.load(include_str!("./builtin/sync.lua")).set_name("sync").exec()?;
 
     install_builtin!("notify");
     install_builtin!("playcount");
