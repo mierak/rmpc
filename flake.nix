@@ -147,7 +147,12 @@
         # Development shell, initialized either with `nix develop` or using direnv. Crane
         # automatically sets up all the rust-specific packages & environment variables,
         # so nothing else needs to be added.
-        devShells.default = craneLib.devShell {};
+        devShells.default = craneLib.devShell {
+          # For some reason rust-analyzer isn't included in the default shell.
+          buildInputs = with pkgs; [
+            rust-analyzer
+          ];
+        };
       }
     );
 }
