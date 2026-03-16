@@ -14,6 +14,7 @@ use crate::shared::ext::vec::VecExt;
 pub struct CavaThemeFile {
     pub bar_symbols: Vec<char>,
     pub inverted_bar_symbols: Vec<char>,
+    pub inverted_bar_as_mask: bool,
     pub bg_color: Option<String>,
     pub bar_color: CavaColorFile,
     pub bar_spacing: u16,
@@ -26,6 +27,7 @@ impl Default for CavaThemeFile {
         Self {
             bar_symbols: "▁▂▃▄▅▆▇█".chars().collect(),
             inverted_bar_symbols: "▔🮂🮃▀🮄🮅🮆█".chars().collect(),
+            inverted_bar_as_mask: false,
             bg_color: None,
             bar_color: CavaColorFile::Single("blue".into()),
             bar_spacing: 1,
@@ -39,6 +41,7 @@ impl Default for CavaThemeFile {
 pub struct CavaTheme {
     pub bar_symbols: Vec<String>,
     pub inverted_bar_symbols: Vec<String>,
+    pub inverted_bar_as_mask: bool,
     pub bar_symbols_count: usize,
     pub inverted_bar_symbols_count: usize,
     pub bg_color: CrosstermColor,
@@ -55,6 +58,7 @@ impl Default for CavaTheme {
             inverted_bar_symbols_count: 8,
             bar_symbols: "▁▂▃▄▅▆▇█".chars().map(|c| c.to_string()).collect(),
             inverted_bar_symbols: "▔🮂🮃▀🮄🮅🮆█".chars().map(|c| c.to_string()).collect(),
+            inverted_bar_as_mask: false,
             bg_color: CrosstermColor::Black,
             bar_color: CavaColor::Single(CrosstermColor::Blue),
             bar_spacing: 1,
@@ -118,6 +122,7 @@ impl CavaThemeFile {
                 .into_iter()
                 .map(|c| c.to_string().repeat(self.bar_width as usize))
                 .collect(),
+            inverted_bar_as_mask: self.inverted_bar_as_mask,
             bar_spacing: self.bar_spacing,
             bar_width: self.bar_width,
             orientation: self.orientation,

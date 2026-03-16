@@ -167,10 +167,11 @@ impl CavaPane {
                         let char_index = (fill_amount * theme.inverted_bar_symbols_count as f32)
                             .floor() as usize;
                         let fill_char = theme.inverted_bar_symbols[char_index].as_str();
-                        queue!(
-                            writer,
-                            PrintStyledContent(fill_char.with(color).on(theme.bg_color))
-                        )?;
+                        let mut content = fill_char.with(color).on(theme.bg_color);
+                        if theme.inverted_bar_as_mask {
+                            content = content.reverse();
+                        }
+                        queue!(writer, PrintStyledContent(content))?;
                     }
                 }
             }
