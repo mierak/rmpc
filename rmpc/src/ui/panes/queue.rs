@@ -14,7 +14,8 @@ use ratatui::{
 use rmpc_mpd::{
     client::Client,
     commands::Song,
-    mpd_client::MpdClient,
+    mpd_client::{MpdClient, MpdCommand},
+    proto_client::ProtoClient,
     queue_position::QueuePosition,
     single_or_range::SingleOrRange,
 };
@@ -35,8 +36,11 @@ use crate::{
                 DeleteKind,
                 RateKind,
                 SaveKind,
+                Sort,
+                SortOpts,
             },
         },
+        sort_mode::{SortMode, SortOptions},
         theme::{
             AlbumSeparator,
             properties::{Property, SongProperty},
@@ -258,6 +262,41 @@ impl QueuePane {
             .build();
 
         modal!(ctx, modal);
+    }
+
+    fn sort(opts: SortOpts, ctx: &Ctx) -> Result<()> {
+        let opts = SortOptions {
+            mode: SortMode::Format(opts.tags),
+            group_by_type: false,
+            reverse: opts.descending,
+            ignore_leading_the: false,
+            fold_case: true,
+        };
+
+        let mut evald = ctx
+            .queue
+            .iter()
+            .map(|song| (song.id, song))
+            .sorted_by(|a, b| a.1.with_custom_sort(&opts).cmp(&b.1.with_custom_sort(&opts)))
+            .collect_vec();
+
+        if ctx.queue.iter().map(|song| (song.id, song)).zip(evald.iter()).all(|(a, b)| a.0 == b.0) {
+            evald.reverse();
+        }
+
+        let swaps = QueueHeaderPane::calculate_swaps(evald.as_slice(), ctx)?;
+
+        ctx.command(move |client| {
+            client.send_start_cmd_list()?;
+            for swap in swaps {
+                client.send_swap_position(swap.0, swap.1)?;
+            }
+            client.send_execute_cmd_list()?;
+            client.read_ok()?;
+            Ok(())
+        });
+
+        Ok(())
     }
 }
 
@@ -791,6 +830,37 @@ impl Pane for QueuePane {
                 }
                 QueueActions::SortByColumn(idx) => {
                     QueueHeaderPane::sort_by_column(self.column_formats.as_slice(), *idx, ctx)?;
+                    ctx.render()?;
+                }
+                QueueActions::Sort { kind: Sort::Modal(opts) } => {
+                    let modal = MenuModal::new(ctx)
+                        .select_section(ctx, |mut sect| {
+                            for opt in opts {
+                                sect.add_item(opt.0.clone(), opt.0.clone());
+
+                                let opts = opts.clone();
+                                sect.action(move |ctx, value| {
+                                    let Some((_, opts)) = opts.iter().find(|opt| opt.0 == value)
+                                    else {
+                                        // shouldn't happen since the options are generated from
+                                        // the same list, but just in case
+                                        status_error!("Invalid option selected");
+                                        return Ok(());
+                                    };
+
+                                    Self::sort(opts.clone(), ctx)
+                                });
+                            }
+
+                            Some(sect)
+                        })
+                        .list_section(ctx, |section| Some(section.item("Cancel", |_ctx| Ok(()))))
+                        .build();
+
+                    modal!(ctx, modal);
+                }
+                QueueActions::Sort { kind: Sort::Tags(opts) } => {
+                    Self::sort(opts.clone(), ctx)?;
                     ctx.render()?;
                 }
                 QueueActions::Unused => {}

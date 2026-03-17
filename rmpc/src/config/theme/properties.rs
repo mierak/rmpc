@@ -31,7 +31,7 @@ pub enum SongPropertyFile {
     Other(String),
 }
 
-#[derive(Debug, Clone, Display, Hash, Eq, PartialEq)]
+#[derive(Debug, Clone, strum::Display, Hash, Eq, PartialEq)]
 pub enum SongProperty {
     Filename,
     File,
@@ -48,6 +48,7 @@ pub enum SongProperty {
     Channels(),
     Added(),
     LastModified(),
+    #[strum(to_string = "Other(\"{0}\")")]
     Other(String),
 }
 

@@ -18,6 +18,7 @@ keybinds if they contained either `{` or `}`. You will now need to escape these 
 - `remove` to the CLI allowing you to remove songs from the queue
 - `Pause` and `Unpause` actions
 - `inverted_bar_as_mask` option to cava
+- `Sort` queue keybind
 
 ### Changed
 
