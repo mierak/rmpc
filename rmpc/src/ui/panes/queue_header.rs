@@ -38,28 +38,14 @@ impl QueueHeaderPane {
         Self { area: Rect::default(), column_widths, column_formats, song: Song::default() }
     }
 
-    fn calculate_swaps<T: AsRef<str>>(
-        mut desired: Vec<(u32, T)>,
-        ctx: &Ctx,
-    ) -> Result<Vec<(usize, usize)>> {
-        let cmp = StringCompare::builder().fold_case(true).build();
-        let is_non_decreasing = desired.is_sorted_by(|(_, a), (_, b)| {
-            matches!(cmp.compare(a.as_ref(), b.as_ref()), Ordering::Less | Ordering::Equal)
-        });
-
-        if is_non_decreasing {
-            desired.sort_by(|(_, a), (_, b)| cmp.compare(a.as_ref(), b.as_ref()).reverse());
-        } else {
-            desired.sort_by(|(_, a), (_, b)| cmp.compare(a.as_ref(), b.as_ref()));
-        }
-
+    pub fn calculate_swaps<T>(evald: &[(u32, T)], ctx: &Ctx) -> Result<Vec<(usize, usize)>> {
         let mut current: Vec<u32> = ctx.queue.iter().map(|s| s.id).collect();
         let mut index: HashMap<u32, usize> =
             current.iter().enumerate().map(|(i, id)| (*id, i)).collect();
         let mut swaps = Vec::new();
 
         for i in 0..current.len() {
-            let target_id = desired[i].0;
+            let target_id = evald[i].0;
             if current[i] == target_id {
                 continue; // already at the correct position
             }
@@ -85,69 +71,76 @@ impl QueueHeaderPane {
         idx: usize,
         ctx: &Ctx,
     ) -> Result<()> {
-        let swaps = match column_formats.get(idx).as_ref().map(|v| &v.kind) {
-            Some(PropertyKindOrText::Text(_)) => {
+        if let Some(format) = column_formats.get(idx) {
+            let mut evald = Self::evaluate_content(format, ctx);
+            let cmp = StringCompare::builder().fold_case(true).build();
+            let is_non_decreasing = evald.is_sorted_by(|(_, a), (_, b)| {
+                matches!(cmp.compare(a.as_ref(), b.as_ref()), Ordering::Less | Ordering::Equal)
+            });
+
+            if is_non_decreasing {
+                evald.sort_by(|(_, a), (_, b)| cmp.compare(a.as_ref(), b.as_ref()).reverse());
+            } else {
+                evald.sort_by(|(_, a), (_, b)| cmp.compare(a.as_ref(), b.as_ref()));
+            }
+
+            let swaps = Self::calculate_swaps(evald.as_slice(), ctx)?;
+
+            ctx.command(move |client| {
+                client.send_start_cmd_list()?;
+                for swap in swaps {
+                    client.send_swap_position(swap.0, swap.1)?;
+                }
+                client.send_execute_cmd_list()?;
+                client.read_ok()?;
+                Ok(())
+            });
+        } else {
+            log::error!("Invalid column index for sorting: {idx}");
+        }
+
+        Ok(())
+    }
+
+    pub fn evaluate_content(format: &Property<SongProperty>, ctx: &Ctx) -> Vec<(u32, String)> {
+        match &format.kind {
+            PropertyKindOrText::Text(_) => {
                 // Do nothing, everything is a constant text
                 Vec::new()
             }
-            Some(PropertyKindOrText::Sticker(sticker_name)) => {
-                let evald = ctx
-                    .queue
-                    .iter()
-                    .map(|song| {
-                        (
-                            song.id,
-                            ctx.song_stickers(&song.file)
-                                .and_then(|s| s.get(sticker_name))
-                                .map(|s| s.as_str())
-                                .unwrap_or_default(),
-                        )
-                    })
-                    .collect_vec();
-
-                Self::calculate_swaps(evald, ctx)?
-            }
-            Some(PropertyKindOrText::Property(_))
-            | Some(PropertyKindOrText::Group(_))
-            | Some(PropertyKindOrText::Transform(_)) => {
-                let evald = ctx
-                    .queue
-                    .iter()
-                    .map(|song| {
-                        (
-                            song.id,
-                            column_formats[idx]
-                                .as_string(
-                                    Some(song),
-                                    "",
-                                    ctx.config.theme.multiple_tag_resolution_strategy,
-                                    ctx,
-                                )
-                                .unwrap_or_default(),
-                        )
-                    })
-                    .collect_vec();
-
-                Self::calculate_swaps(evald, ctx)?
-            }
-            None => {
-                // Should not really ever happen. But no reason to handle this as a hard error.
-                log::warn!("Tried to sort by non-existing column index {idx}");
-                Vec::new()
-            }
-        };
-
-        ctx.command(move |client| {
-            client.send_start_cmd_list()?;
-            for swap in swaps {
-                client.send_swap_position(swap.0, swap.1)?;
-            }
-            client.send_execute_cmd_list()?;
-            client.read_ok()?;
-            Ok(())
-        });
-
-        Ok(())
+            PropertyKindOrText::Sticker(sticker_name) => ctx
+                .queue
+                .iter()
+                .map(|song| {
+                    (
+                        song.id,
+                        ctx.song_stickers(&song.file)
+                            .and_then(|s| s.get(sticker_name))
+                            .cloned()
+                            .unwrap_or_default(),
+                    )
+                })
+                .collect_vec(),
+            PropertyKindOrText::Property(_)
+            | PropertyKindOrText::Group(_)
+            | PropertyKindOrText::Transform(_) => ctx
+                .queue
+                .iter()
+                .map(|song| {
+                    (
+                        song.id,
+                        format
+                            .as_string(
+                                Some(song),
+                                "",
+                                ctx.config.theme.multiple_tag_resolution_strategy,
+                                ctx,
+                            )
+                            .unwrap_or_default(),
+                    )
+                })
+                .collect_vec(),
+        }
     }
 }
 

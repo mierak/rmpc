@@ -36,7 +36,7 @@ impl KeyTreeNode {
 
         if matches!(mode, InputModeDiscriminants::Normal) {
             for seq in &cfg.queue {
-                root.insert(&seq.0.0, Actions::Queue(*seq.1));
+                root.insert(&seq.0.0, Actions::Queue(seq.1.clone()));
             }
         }
 

@@ -349,9 +349,12 @@ pub enum QueueActionsFile {
     JumpToCurrent,
     Shuffle,
     SortByColumn(usize),
+    Sort {
+        kind: SortFile,
+    },
 }
 
-#[derive(Debug, Display, Clone, Copy, EnumDiscriminants, PartialEq, Eq)]
+#[derive(Debug, Display, Clone, EnumDiscriminants, PartialEq, Eq)]
 #[strum_discriminants(derive(VariantArray))]
 pub enum QueueActions {
     Delete,
@@ -361,6 +364,7 @@ pub enum QueueActions {
     Shuffle,
     Unused,
     SortByColumn(usize),
+    Sort { kind: Sort },
 }
 
 impl TryFrom<QueueActionsFile> for QueueActions {
@@ -384,6 +388,22 @@ impl TryFrom<QueueActionsFile> for QueueActions {
 
                 Ok(QueueActions::SortByColumn(idx))
             }
+            QueueActionsFile::Sort { kind } => {
+                let kind = match kind {
+                    SortFile::Modal(items) => {
+                        let items = items
+                            .into_iter()
+                            .map(|(label, item)| -> anyhow::Result<_> {
+                                Ok((label, item.try_into()?))
+                            })
+                            .try_collect()?;
+                        Sort::Modal(items)
+                    }
+                    SortFile::Tags(content) => Sort::Tags(content.try_into()?),
+                };
+
+                Ok(QueueActions::Sort { kind })
+            }
         }
     }
 }
@@ -402,6 +422,12 @@ impl ToDescription for QueueActions {
             QueueActions::SortByColumn(idx) => {
                 format!("Sort the queue by the {idx}. column").into()
             }
+            QueueActions::Sort { kind } => match kind {
+                Sort::Modal(opts) => format!("Open sort modal with {} options", opts.len()).into(),
+                Sort::Tags(opts) => {
+                    format!("Sort the queue by [{}]", opts.tags.iter().join(", ")).into()
+                }
+            },
         }
     }
 }
@@ -783,6 +809,39 @@ pub enum CopyContentsKindFile {
 pub enum CopyContentsKind {
     Modal(Vec<(String, CopyContents)>),
     Content(CopyContents),
+}
+
+#[derive(Debug, serde::Serialize, serde::Deserialize, Clone, PartialEq, Eq)]
+pub struct SortOptsFile {
+    descending: bool,
+    tags: Vec<SongPropertyFile>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct SortOpts {
+    pub descending: bool,
+    pub tags: Vec<SongProperty>,
+}
+
+impl TryFrom<SortOptsFile> for SortOpts {
+    type Error = anyhow::Error;
+
+    fn try_from(value: SortOptsFile) -> Result<Self, Self::Error> {
+        let content = value.tags.into_iter().map(|prop| prop.into()).collect();
+        Ok(SortOpts { descending: value.descending, tags: content })
+    }
+}
+
+#[derive(Debug, serde::Serialize, serde::Deserialize, Clone, PartialEq, Eq)]
+pub enum SortFile {
+    Modal(#[serde(default)] Vec<(String, SortOptsFile)>),
+    Tags(SortOptsFile),
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum Sort {
+    Modal(Vec<(String, SortOpts)>),
+    Tags(SortOpts),
 }
 
 impl Default for CopyContentsKindFile {
