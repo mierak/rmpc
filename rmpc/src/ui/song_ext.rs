@@ -328,6 +328,9 @@ impl SongExt for Song {
             SongProperty::Album => {
                 self.metadata.get("album").map(|v| strategy.resolve(v, tag_separator))
             }
+            SongProperty::AlbumArtist => {
+                self.metadata.get("albumartist").map(|v| strategy.resolve(v, tag_separator))
+            }
             SongProperty::Duration => self.duration.map(|d| Cow::Owned(d.to_string())),
             SongProperty::Other(name) => {
                 self.metadata.get(name).map(|v| strategy.resolve(v, tag_separator))
