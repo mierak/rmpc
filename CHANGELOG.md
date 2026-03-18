@@ -19,6 +19,7 @@ keybinds if they contained either `{` or `}`. You will now need to escape these 
 - `Pause` and `Unpause` actions
 - `inverted_bar_as_mask` option to cava
 - `Sort` queue keybind
+- `AlbumArtist` added to song properties.
 
 ### Changed
 

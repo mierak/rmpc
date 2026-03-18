@@ -349,6 +349,13 @@ impl CmpByProp {
                 ignore_the,
                 ignore_the_other,
             ),
+            SongProperty::AlbumArtist => CmpByProp::opt_str(
+                a.metadata.get("albumartist").map(|v| v.join("")),
+                b.metadata.get("albumartist").map(|v| v.join("")),
+                fold_case,
+                ignore_the,
+                ignore_the_other,
+            ),
             SongProperty::Other(prop) => CmpByProp::opt_str(
                 a.metadata.get(prop).map(|v| v.join("")),
                 b.metadata.get(prop).map(|v| v.join("")),
