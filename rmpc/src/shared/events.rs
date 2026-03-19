@@ -33,7 +33,7 @@ use crate::{
             YtDlpSearchItem,
         },
     },
-    ui::{UiAppEvent, image::facade::EncodeData},
+    ui::{UiAppEvent, UiEvent, image::facade::EncodeData},
 };
 
 #[derive(Debug)]
@@ -148,7 +148,8 @@ pub(crate) enum AppEvent {
         rows: u16,
     },
     WorkDone(Result<WorkDone>),
-    UiEvent(UiAppEvent),
+    UiAppEvent(UiAppEvent),
+    UiEvent(UiEvent),
     Reconnected,
     LostConnection,
     TmuxHook {

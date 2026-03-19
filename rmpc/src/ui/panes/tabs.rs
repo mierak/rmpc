@@ -122,7 +122,7 @@ impl Pane for TabsPane<'_> {
             return Ok(());
         }
 
-        ctx.app_event_sender.send(AppEvent::UiEvent(UiAppEvent::ChangeTab(tab_name.clone())))?;
+        ctx.app_event_sender.send(AppEvent::UiAppEvent(UiAppEvent::ChangeTab(tab_name.clone())))?;
 
         Ok(())
     }

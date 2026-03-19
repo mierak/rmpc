@@ -26,6 +26,7 @@
     directories_sort: SortFormat(group_by_type: true, reverse: false),
     auto_open_downloads: true,
     quit_closes_modal: false,
+    queue_disable_current_item_style_timeout_ms: None,
     album_art: (
         method: Auto,
         max_size_px: (width: 1200, height: 1200),

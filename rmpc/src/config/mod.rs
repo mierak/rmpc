@@ -88,6 +88,7 @@ pub struct Config {
     pub duration_format: DurationFormat,
     pub on_exit: Option<Arc<Vec<String>>>,
     pub quit_closes_modal: bool,
+    pub queue_disable_current_item_style_timeout_ms: Option<Duration>,
 }
 
 impl Default for Config {
@@ -157,6 +158,7 @@ pub struct ConfigFile {
     pub duration_format: String,
     pub on_exit: Option<Vec<String>>,
     pub quit_closes_modal: bool,
+    pub queue_disable_current_item_style_timeout_ms: Option<u64>,
 }
 
 #[derive(Debug, Serialize, Deserialize, Copy, Clone, PartialEq, Eq)]
@@ -229,6 +231,7 @@ impl Default for ConfigFile {
             duration_format: "%m:%S".to_string(),
             on_exit: None,
             quit_closes_modal: false,
+            queue_disable_current_item_style_timeout_ms: None,
         }
     }
 }
@@ -381,6 +384,9 @@ impl ConfigFile {
                 Arc::new(arr.into_iter().map(|v| tilde_expand(&v).into_owned()).collect_vec())
             }),
             quit_closes_modal: self.quit_closes_modal,
+            queue_disable_current_item_style_timeout_ms: self
+                .queue_disable_current_item_style_timeout_ms
+                .map(Duration::from_millis),
         };
 
         if skip_album_art_check {

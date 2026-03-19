@@ -20,6 +20,7 @@ keybinds if they contained either `{` or `}`. You will now need to escape these 
 - `inverted_bar_as_mask` option to cava
 - `Sort` queue keybind
 - `AlbumArtist` added to song properties.
+- Added `queue_disable_current_item_style_timeout_ms`
 
 ### Changed
 

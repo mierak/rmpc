@@ -1115,6 +1115,7 @@ pub enum UiEvent {
     ImageEncoded { data: EncodeData },
     ImageEncodeFailed { err: anyhow::Error },
     DownloadsUpdated,
+    DisableQueueHighlight,
 }
 
 impl TryFrom<IdleEvent> for UiEvent {
