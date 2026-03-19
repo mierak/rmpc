@@ -28,7 +28,6 @@ pub fn create(
 
     let package: Table = lua.globals().get("package")?;
     let package_path = package.get::<String>("path")?;
-    let preload = package.get::<Table>("preload")?;
 
     package.set("path", format!("{rmpcd_pkg_path};{package_path}"))?;
 
@@ -36,7 +35,7 @@ pub fn create(
     lua.globals().raw_set("rmpcd", &rmpcd)?;
 
     install_lib(&lua, client, plugins)?;
-    install_builtins(&lua, &preload)?;
+    install_builtins(&lua)?;
 
     Ok(lua)
 }
@@ -75,17 +74,12 @@ pub fn install_lib(
     Ok(())
 }
 
-pub fn install_builtins(lua: &Lua, preload: &Table) -> mlua::Result<()> {
+pub fn install_builtins(lua: &Lua) -> mlua::Result<()> {
     macro_rules! install_builtin {
         ($name:literal) => {
-            let tbl = lua
-                .load(include_str!(concat!("./builtin/", $name, ".lua")))
-                .set_name($name)
+            lua.load(include_str!(concat!("./builtin/", $name, ".lua")))
+                .set_name(concat!("#builtin/", $name, ".lua"))
                 .call::<Table>(())?;
-            preload.set(
-                concat!("rmpcd.", $name),
-                lua.create_function(move |_, ()| Ok(tbl.clone()))?,
-            )?;
         };
     }
 

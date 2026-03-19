@@ -35,6 +35,7 @@ pub enum PluginsEvent {
     Idle {
         event: IdleEvent,
     },
+    Reconnect,
     Shutdown,
 }
 
@@ -84,6 +85,11 @@ pub async fn init(
             PluginsEvent::Idle { event } => {
                 for plugin in store.iter_with(Triggers::Idle) {
                     plugin.tx.send_safe(PluginEvent::Idle { event: *event });
+                }
+            }
+            PluginsEvent::Reconnect => {
+                for plugin in store.all() {
+                    plugin.tx.send_safe(PluginEvent::Reconnect);
                 }
             }
             PluginsEvent::Shutdown => {

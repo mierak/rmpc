@@ -19,7 +19,14 @@ use crate::{
         self,
         lualib::{
             mpd::types::{Song, State, Status},
-            plugin::{ON_IDLE, ON_MESSAGE, ON_SHUTDOWN, ON_SONG_CHANGE, ON_STATE_CHANGE},
+            plugin::{
+                ON_IDLE,
+                ON_MESSAGE,
+                ON_RECONNECT,
+                ON_SHUTDOWN,
+                ON_SONG_CHANGE,
+                ON_STATE_CHANGE,
+            },
         },
         plugin::{entry::LuaPluginEntry, triggers::Triggers},
     },
@@ -52,6 +59,7 @@ pub enum PluginEvent {
     Idle {
         event: IdleEvent,
     },
+    Reconnect,
     Shutdown,
 }
 
@@ -66,38 +74,38 @@ pub struct LuaPlugin {
     pub handle: tokio::task::JoinHandle<()>,
 }
 
+const LASTFM: &str = include_str!("../builtin/lastfm.lua");
+const NOTIFY: &str = include_str!("../builtin/notify.lua");
+const PLAYCOUNT: &str = include_str!("../builtin/playcount.lua");
+const LYRICS: &str = include_str!("../builtin/lyrics.lua");
+
+fn get_builtin(name: &str) -> Option<&'static str> {
+    match name {
+        "lastfm.lua" => Some(LASTFM),
+        "notify.lua" => Some(NOTIFY),
+        "playcount.lua" => Some(PLAYCOUNT),
+        "lyrics.lua" => Some(LYRICS),
+        _ => None,
+    }
+}
+
 impl LuaPlugin {
     pub async fn load(
         cfg_dir: &Path,
         plugin: &Arc<RwLock<LuaPluginEntry>>,
         client: &Arc<AsyncClient>,
     ) -> Result<LuaPlugin> {
-        let lastfm = include_str!("../builtin/lastfm.lua");
-        let notify = include_str!("../builtin/notify.lua");
-        let playcount = include_str!("../builtin/playcount.lua");
-        let lyrics = include_str!("../builtin/lyrics.lua");
-
         let plugin = plugin.read().await;
         let mut components = plugin.path.components();
         if components.next().is_some_and(|c| c.as_os_str() == "#builtin") {
-            match components.next() {
-                Some(c) if c.as_os_str() == "lastfm.lua" => {
-                    return Self::load_single(lastfm, "lastfm", cfg_dir, &plugin, client).await;
-                }
-                Some(c) if c.as_os_str() == "notify.lua" => {
-                    return Self::load_single(notify, "notify", cfg_dir, &plugin, client).await;
-                }
-                Some(c) if c.as_os_str() == "playcount.lua" => {
-                    return Self::load_single(playcount, "playcount", cfg_dir, &plugin, client)
-                        .await;
-                }
-                Some(c) if c.as_os_str() == "lyrics.lua" => {
-                    return Self::load_single(lyrics, "lyrics", cfg_dir, &plugin, client).await;
-                }
-                c => {
-                    bail!("Unknown builtin plugin: {c:?}");
-                }
+            if let Some(name) = components.next().map(|p| p.as_os_str().to_string_lossy())
+                && let Some(content) = get_builtin(&name)
+            {
+                let name = format!("#builtin/{name}");
+                return Self::load_single(content, &name, cfg_dir, &plugin, client).await;
             }
+
+            bail!("Invalid builtin plugin path: {}", plugin.path.display());
         }
 
         let plugin_path = cfg_dir.join(&plugin.path);
@@ -247,6 +255,17 @@ impl LuaPlugin {
                 let func: mlua::Function = state.get(ON_IDLE)?;
                 if let Err(err) = func.call_async::<()>((state, ON_IDLE, event.to_string())).await {
                     error!("Failed to call plugin callback for idle event\n{err}");
+                }
+            }
+            PluginEvent::Reconnect => {
+                let func: Option<mlua::Function> = state.get(ON_RECONNECT)?;
+
+                if let Some(func) = func {
+                    trace!(name, "Running plugin reconnect callback");
+
+                    if let Err(err) = func.call_async::<()>(state).await {
+                        error!("Failed to call plugin reconnect callback\n{err}");
+                    }
                 }
             }
             PluginEvent::Shutdown => {

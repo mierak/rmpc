@@ -30,6 +30,7 @@ async fn main() -> Result<()> {
 
     tracing_subscriber::fmt()
         .with_line_number(true)
+        .with_target(false)
         .with_file(true)
         .with_writer(std::io::stderr)
         .with_ansi(true)
@@ -49,12 +50,20 @@ async fn main() -> Result<()> {
     let (idle_tx, idle_rx) = tokio::sync::mpsc::unbounded_channel::<AppEvent>();
 
     let idle_tx_clone = idle_tx.clone();
+    let idle_tx_clone2 = idle_tx.clone();
 
-    let mpd = Arc::new(AsyncClient::new(move |evs| {
-        if let Err(err) = idle_tx_clone.send(AppEvent::Idle(evs)) {
-            error!(err = ?err, "Failed to send idle event");
-        }
-    }));
+    let mpd = Arc::new(AsyncClient::new(
+        move |evs| {
+            if let Err(err) = idle_tx_clone.send(AppEvent::Idle(evs)) {
+                error!(err = ?err, "Failed to send idle event");
+            }
+        },
+        move || {
+            if let Err(err) = idle_tx_clone2.send(AppEvent::Reconnected) {
+                error!(err = ?err, "Failed to send reconnected event");
+            }
+        },
+    ));
 
     let Some(cfg_dir) = rmpcd_config_dir() else {
         bail!("Could not determine config directory");
@@ -115,4 +124,5 @@ async fn main() -> Result<()> {
 enum AppEvent {
     Idle(Vec<IdleEvent>),
     StatusUpdate(Status),
+    Reconnected,
 }
