@@ -67,6 +67,7 @@ pub async fn init(
                 break;
             }
         };
+        trace!(?ev, "Received event");
 
         match ev {
             AppEvent::StatusUpdate(new_status) => {
@@ -170,6 +171,9 @@ pub async fn init(
 
                     tx.send_safe(PluginsEvent::Idle { event: ev });
                 }
+            }
+            AppEvent::Reconnected => {
+                tx.send_safe(PluginsEvent::Reconnect);
             }
         }
     }

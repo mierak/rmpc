@@ -89,6 +89,3 @@ from rmpcd directly.
     ]
 }
 ```
-
-## A small list of todos
-- reconnect MPD client upon disconnection

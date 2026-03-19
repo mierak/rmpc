@@ -1,10 +1,11 @@
 local lrclib_url = "https://lrclib.net"
-local lyrics_dir = os.getenv("HOME") .. "/Music"
 
 ---@type LyricsPlugin
 local M = {
     enabled = true,
     debounce_delay = 500,
+    lyrics_dir = os.getenv("HOME") .. "/Music",
+    checked_uris = {},
 }
 
 local function last_path_segment(s)
@@ -16,11 +17,12 @@ local function replace_after_last_dot(s, replacement)
     return s:gsub("%.[^.]*$", "." .. replacement, 1)
 end
 
+---@param self LyricsPlugin
 ---@param song Song
-local function download(song)
+local function download(self, song)
     log.info("Fetching lyrics for " .. song.artist .. " - " .. song.title .. " at path " .. song.file)
-    fs.create_dir_all(lyrics_dir .. "/" .. last_path_segment(song.file))
-    local lrc_path = lyrics_dir .. "/" .. replace_after_last_dot(song.file, "lrc")
+    fs.create_dir_all(self.lyrics_dir .. "/" .. last_path_segment(song.file))
+    local lrc_path = self.lyrics_dir .. "/" .. replace_after_last_dot(song.file, "lrc")
 
     if fs.exists(lrc_path) then
         log.info("Lyrics file already exists at " .. lrc_path .. ", skipping download")
@@ -82,11 +84,16 @@ local function download(song)
     process.spawn({ "rmpc", "remote", "indexlrc", "--path", lrc_path })
 end
 
+---@param _self LyricsPlugin
 ---@param _song Song
-local function download_debounced(_song) end
+local function download_debounced(_self, _song) end
 
 M.setup = function(self, args)
     self.enabled = (args.enabled ~= nil) and args.enabled or true
+
+    if args.lyrics_dir ~= nil then
+        self.lyrics_dir = args.lyrics_dir
+    end
 
     local rmpc = util.which("rmpc")
     if not rmpc then
@@ -125,7 +132,14 @@ M.song_change = function(self, _old_song, new_song)
         return
     end
 
-    download_debounced(new_song)
+    if self.checked_uris[new_song.file] then
+        log.info("Already checked for lyrics for " .. new_song.file .. ", skipping")
+        return
+    else
+        self.checked_uris[new_song.file] = true
+    end
+
+    download_debounced(self, new_song)
 end
 
 return M

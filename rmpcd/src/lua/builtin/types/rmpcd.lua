@@ -16,6 +16,7 @@
 ---@field message fun(self, channel: string, message: string)|nil
 ---@field idle_event fun(self, event: IdleEvent)|nil
 ---@field shutdown fun(self)|nil
+---@field reconnect fun(self)|nil
 
 ---@type RmpcdGlobal
 ---@diagnostic disable-next-line: lowercase-global
