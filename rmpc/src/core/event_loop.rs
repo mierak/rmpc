@@ -327,6 +327,11 @@ fn main_task<B: Backend + std::io::Write>(
                 AppEvent::RequestRender => {
                     render_wanted = true;
                 }
+                AppEvent::UiEvent(ev) => {
+                    if let Err(err) = ui.on_event(ev, &mut ctx) {
+                        log::error!(error:? = err; "UI failed to handle ui event");
+                    }
+                }
                 AppEvent::WorkDone(Ok(result)) => match result {
                     WorkDone::AlbumArtLoaded { result } => match result {
                         LoadAlbumArtResult::Loaded { file, data } => {
@@ -662,7 +667,7 @@ fn main_task<B: Backend + std::io::Write>(
                     }
                     render_wanted = true;
                 }
-                AppEvent::UiEvent(event) => match ui.on_ui_app_event(event, &mut ctx) {
+                AppEvent::UiAppEvent(event) => match ui.on_ui_app_event(event, &mut ctx) {
                     Ok(()) => {}
                     Err(err) => {
                         status_error!(err:?; "Error: {}", err.to_status());

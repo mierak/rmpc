@@ -166,7 +166,7 @@ pub(crate) fn init(
                 }
 
                 try_skip!(
-                    event_tx.send(AppEvent::UiEvent(crate::ui::UiAppEvent::PopConfigErrorModal)),
+                    event_tx.send(AppEvent::UiAppEvent(crate::ui::UiAppEvent::PopConfigErrorModal)),
                     "Failed to pop config error modal"
                 );
 
