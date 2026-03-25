@@ -80,7 +80,7 @@ pub struct ConfigResult {
     pub theme_path: Option<PathBuf>,
 }
 
-pub fn read_config_and_theme(args: &mut Args) -> Result<ConfigResult, ConfigReadError> {
+pub fn read_config_and_theme(args: &Args) -> Result<ConfigResult, ConfigReadError> {
     if args.clean {
         return Ok(ConfigResult {
             config: Config::default_with_album_art_check()?,
@@ -120,7 +120,7 @@ pub fn read_config_and_theme(args: &mut Args) -> Result<ConfigResult, ConfigRead
 
     Ok(ConfigResult {
         config: config
-            .into_config(theme, args.address.take(), args.password.take(), false)
+            .into_config(theme, args.address.clone(), args.password.clone(), false)
             .map_err(ConfigReadError::Conversion)?,
         config_path: Some(chosen_config_path),
         theme_path,

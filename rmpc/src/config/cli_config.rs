@@ -37,6 +37,12 @@ pub struct CliConfig {
     pub extra_yt_dlp_args: Vec<String>,
 }
 
+impl CliConfig {
+    pub fn default_cli(address_cli: Option<String>, password_cli: Option<String>) -> CliConfig {
+        CliConfigFile::default().into_config(address_cli, password_cli)
+    }
+}
+
 impl Default for CliConfig {
     fn default() -> Self {
         CliConfigFile::default().into_config(None, None)
