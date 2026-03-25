@@ -308,15 +308,19 @@ fn main() -> Result<()> {
         }
         Some(cmd) => {
             logging::init_console().expect("Logger to initialize");
-            let config = read_cli_config(args.config.as_deref(), args.address, args.password)
-                .unwrap_or_else(|err| {
-                    eprintln!("Error: Failed to read config");
-                    eprintln!("Caused by:");
-                    eprintln!("  {err}");
-                    eprintln!("\nUsing the default values");
+            let config = read_cli_config(
+                args.config.as_deref(),
+                args.address.clone(),
+                args.password.clone(),
+            )
+            .unwrap_or_else(|err| {
+                eprintln!("Error: Failed to read config");
+                eprintln!("Caused by:");
+                eprintln!("  {err}");
+                eprintln!("\nUsing the default values");
 
-                    CliConfig::default()
-                });
+                CliConfig::default_cli(args.address, args.password)
+            });
 
             let result = cmd.execute(&config)?;
             let mut client = Client::init(
@@ -340,7 +344,7 @@ fn main() -> Result<()> {
                 .name("dependency_check".to_string())
                 .spawn(|| DEPENDENCIES.iter().for_each(|d| d.log()))?;
 
-            let ConfigResult { config, config_path, theme_path } = read_config_and_theme(&mut args)
+            let ConfigResult { config, config_path, theme_path } = read_config_and_theme(&args)
                 .unwrap_or_else(|err| {
                     if let ConfigReadError::ConfigNotFound = err {
                         // Config not being found is not considered an error. But the user should

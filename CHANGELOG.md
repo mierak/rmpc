@@ -38,6 +38,7 @@ keybinds
 - `preview_metadata_group_style` not being applied in the search pane
 - modals ignoring `text_color`
 - Fixed potential panic in sorting when mixixng numerical and non numerical values for some song properties
+- password and address override parameter not working for rmpc's CLI
 
 
 ## [0.11.0] - 2026-02-01
