@@ -145,15 +145,11 @@ fn resolve_env() -> Option<(MpdAddress, Option<MpdPassword>)> {
 #[rustfmt::skip]
 #[allow(clippy::unwrap_used, clippy::too_many_arguments, clippy::needless_pass_by_value)]
 mod tests {
-    use std::sync::{LazyLock, Mutex};
-
     use rmpc_shared::env::ENV;
     use test_case::test_case;
     use crate::address::resolve;
 
     use super::{MpdAddress, MpdPassword};
-
-    static TEST_LOCK: LazyLock<Mutex<()>> = LazyLock::new(|| Mutex::new(()));
 
     //               CLI Arg              Cli Pass           Config addr     Config pw            MPD_HOST          MPD_PORT                    Expected                          Description
     #[test_case(Some("127.0.0.1:6600"),           None, "127.0.0.1:7600", None,              Some("192.168.0.1"), Some("6601"), MpdAddress::IpAndPort("127.0.0.1:6600".to_string()),                       None ; "prefer CLI over all")]
@@ -190,7 +186,7 @@ mod tests {
         expected_addr: MpdAddress,
         expected_pw: Option<MpdPassword>
     ) {
-        let _guard = TEST_LOCK.lock().unwrap();
+        let _lock = ENV.lock();
 
         ENV.clear();
         ENV.set("HOME".to_string(), "/home/u123".to_string());

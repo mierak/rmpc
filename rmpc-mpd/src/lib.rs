@@ -8,7 +8,6 @@ pub mod mpd_client;
 pub mod proto_client;
 pub mod queue_position;
 pub mod single_or_range;
-pub mod version;
 
 #[cfg(test)]
 mod tests {

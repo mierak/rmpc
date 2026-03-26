@@ -5,6 +5,6 @@
         ]
     },
     "workspace.library": [
-        "./types"
+        "../types"
     ]
 }

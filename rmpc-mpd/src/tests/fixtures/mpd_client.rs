@@ -4,6 +4,7 @@ use std::{
     time::Duration,
 };
 
+use rmpc_shared::version::Version;
 use rstest::fixture;
 
 use crate::{
@@ -31,7 +32,6 @@ use crate::{
     proto_client::SocketClient,
     queue_position::QueuePosition,
     single_or_range::SingleOrRange,
-    version::Version,
 };
 
 #[fixture]
@@ -107,7 +107,7 @@ impl TestMpdClient {
 
 type MpdResult<T> = Result<T, MpdError>;
 impl MpdClient for TestMpdClient {
-    fn version(&mut self) -> crate::version::Version {
+    fn version(&mut self) -> Version {
         todo!("Not yet implemented")
     }
 
@@ -707,7 +707,7 @@ impl SocketClient for TestMpdClient {
         Ok(())
     }
 
-    fn version(&self) -> crate::version::Version {
+    fn version(&self) -> Version {
         Version::new(0, 0, 0)
     }
 }

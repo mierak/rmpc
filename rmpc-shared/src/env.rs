@@ -6,11 +6,15 @@ use std::{
 pub struct Env {
     #[cfg(feature = "test-impl")]
     vars: std::sync::Arc<std::sync::Mutex<std::collections::HashMap<String, String>>>,
+    #[cfg(feature = "test-impl")]
+    lock: std::sync::Mutex<()>,
 }
 
 pub static ENV: LazyLock<Env> = LazyLock::new(|| Env {
     #[cfg(feature = "test-impl")]
     vars: std::sync::Arc::new(std::sync::Mutex::new(std::collections::HashMap::default())),
+    #[cfg(feature = "test-impl")]
+    lock: std::sync::Mutex::new(()),
 });
 
 #[cfg(not(feature = "test-impl"))]
@@ -60,5 +64,9 @@ impl Env {
 
     pub fn remove(&self, key: impl AsRef<str>) {
         self.vars.lock().unwrap().remove(key.as_ref());
+    }
+
+    pub fn lock(&'_ self) -> std::sync::MutexGuard<'_, ()> {
+        self.lock.lock().unwrap()
     }
 }

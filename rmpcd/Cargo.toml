@@ -26,7 +26,14 @@ derive_more = { workspace = true }
 bitflags = { workspace = true }
 ctrlc = { workspace = true }
 which = { workspace = true }
+sha2 = { workspace = true }
 # console-subscriber = { workspace = true }
+
+[build-dependencies]
+walkdir = { workspace = true }
+
+[dev-dependencies]
+rmpc-shared = { path = "../rmpc-shared", features = ["test-impl"] }
 
 [lints]
 workspace = true

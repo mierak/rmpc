@@ -1,8 +1,9 @@
 use std::{fmt::Display, str::FromStr};
 
-use super::errors::MpdError;
+use serde::{Deserialize, Serialize};
+use thiserror::Error;
 
-#[derive(Eq, PartialEq, Debug, Clone, Copy)]
+#[derive(Eq, PartialEq, Debug, Clone, Copy, Serialize, Deserialize)]
 pub struct Version {
     pub major: u8,
     pub minor: u8,
@@ -21,20 +22,29 @@ impl Display for Version {
     }
 }
 
+#[derive(Error, Debug)]
+pub enum VersionParseError {
+    #[error("Invalid format, {0}")]
+    InvalidFormat(String),
+    #[error("Failed to parse version number, {0}")]
+    Parse(#[from] std::num::ParseIntError),
+}
+
 impl FromStr for Version {
-    type Err = MpdError;
+    type Err = VersionParseError;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         let mut parts = s.trim().split('.');
-        let major = parts
-            .next()
-            .ok_or(MpdError::Parse(format!("Cannot parse major version from '{s}'")))?;
-        let minor = parts
-            .next()
-            .ok_or(MpdError::Parse(format!("Cannot parse minor version from '{s}'")))?;
-        let patch = parts
-            .next()
-            .ok_or(MpdError::Parse(format!("Cannot parse patch version from '{s}'")))?;
+        let major = parts.next().ok_or(VersionParseError::InvalidFormat(format!(
+            "Cannot parse major version from '{s}'"
+        )))?;
+        let minor = parts.next().ok_or(VersionParseError::InvalidFormat(format!(
+            "Cannot parse minor version from '{s}'"
+        )))?;
+        let patch = parts.next().ok_or(VersionParseError::InvalidFormat(format!(
+            "Cannot parse patch version from '{s}'"
+        )))?;
+
         Ok(Self { major: major.parse()?, minor: minor.parse()?, patch: patch.parse()? })
     }
 }
