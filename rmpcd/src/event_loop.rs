@@ -163,9 +163,7 @@ pub async fn init(
                         }
                         ev => {
                             trace!(?ev, "Event currently not supported");
-                            // TODO receiving event without calling client::run will block the event
-                            // loop forever
-                            client.run(|_| Ok(())).await.ok();
+                            client.skip_to_idle().await;
                         }
                     }
 
