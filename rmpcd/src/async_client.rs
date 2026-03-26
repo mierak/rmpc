@@ -30,6 +30,7 @@ type CmdFn = Box<dyn FnOnce(&mut MpdClient) -> Result<(), MpdError> + Send + 'st
 enum Msg {
     Run { f: CmdFn, done: oneshot::Sender<Result<(), MpdError>> },
     Shutdown { done: oneshot::Sender<()> },
+    SkipToIdle,
 }
 
 #[derive(Debug)]
@@ -71,6 +72,7 @@ fn handle_msg(msg: Msg, client: &mut MpdClient, shutting_down: &mut bool) {
             let r = f(client);
             let _ = done.send(r);
         }
+        Msg::SkipToIdle => {}
         Msg::Shutdown { done } => {
             *shutting_down = true;
             let _ = done.send(());
@@ -245,6 +247,11 @@ impl AsyncClient {
                 MpdError::Generic(format!("Timed out waiting for typed response: {err}"))
             })?
             .map_err(|err| MpdError::Generic(format!("Failed to receive typed response: {err}")))?
+    }
+
+    pub async fn skip_to_idle(&self) {
+        notify_interrupter(&self.shared);
+        let _ = self.tx.send(Msg::SkipToIdle).await;
     }
 
     pub async fn shutdown(&self) {
