@@ -7,7 +7,8 @@ use std::{
 
 use crossbeam::channel::{Receiver, Sender, unbounded};
 use ratatui::{Terminal, backend::TestBackend};
-use rmpc_mpd::{commands::Status, version::Version};
+use rmpc_mpd::commands::Status;
+use rmpc_shared::version::Version;
 use rstest::fixture;
 
 use crate::{

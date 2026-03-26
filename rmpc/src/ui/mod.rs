@@ -23,8 +23,8 @@ use rmpc_mpd::{
     errors::{ErrorCode, MpdError, MpdFailureResponse},
     mpd_client::{MpdClient, MpdCommand, ValueChange},
     proto_client::ProtoClient,
-    version::Version,
 };
+use rmpc_shared::version::Version;
 use tab_screen::TabScreen;
 
 use self::{modals::Modal, panes::Pane};

@@ -15,8 +15,8 @@ use rmpc_mpd::{
     proto_client::ProtoClient,
     queue_position::QueuePosition,
     single_or_range::SingleOrRange,
-    version::Version,
 };
+use rmpc_shared::version::Version;
 
 use crate::{
     config::{

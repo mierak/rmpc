@@ -13,6 +13,7 @@ use anyhow::Result;
 use itertools::Itertools;
 use log::debug;
 use rand::seq::SliceRandom;
+use rmpc_shared::version::Version;
 
 use crate::{
     address::{MpdAddress, MpdPassword},
@@ -49,7 +50,6 @@ use crate::{
     proto_client::{ProtoClient, SocketClient},
     queue_position::QueuePosition,
     single_or_range::SingleOrRange,
-    version::Version,
 };
 
 type MpdResult<T> = Result<T, MpdError>;

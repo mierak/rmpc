@@ -73,6 +73,10 @@ async fn main() -> Result<()> {
     let lua = lua::create(&cfg_dir, &mpd, Some(&plugins))?;
     let lua_config = lua::eval_config(&lua, &cfg_dir).await?;
 
+    if let Err(err) = lua::type_def_eject::eject() {
+        error!(err = ?err, "Failed to eject Lua type definitions");
+    }
+
     let mut plugin_store = PluginStore::new();
     for plugin in plugins.read().await.iter() {
         info!(path = ?plugin.read().await.path, "Loading plugin");

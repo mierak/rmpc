@@ -4,12 +4,9 @@ use std::{
 };
 
 use anyhow::Result;
-use rmpc_shared::string_ext::StringExt;
+use rmpc_shared::{string_ext::StringExt, version::Version};
 
-use super::{
-    errors::{MpdError, MpdFailureResponse},
-    version::Version,
-};
+use super::errors::{MpdError, MpdFailureResponse};
 use crate::{
     errors::ErrorCode,
     from_mpd::{FromMpd, split_line},
@@ -278,11 +275,12 @@ impl<T: SocketClient> ProtoClient for T {
 mod tests {
     use std::io::{BufReader, Cursor};
 
+    use rmpc_shared::version::Version;
+
     use super::SocketClient;
     use crate::{
         errors::MpdError,
         from_mpd::{FromMpd, LineHandled},
-        version::Version,
     };
 
     #[derive(Default, Debug, PartialEq, Eq)]

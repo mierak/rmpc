@@ -13,8 +13,8 @@ use rmpc_mpd::{
     client::Client,
     commands::{Song, State, Status},
     mpd_client::MpdClient,
-    version::Version,
 };
+use rmpc_shared::version::Version;
 
 use crate::{
     AppEvent,

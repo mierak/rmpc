@@ -14,8 +14,8 @@ use rmpc_mpd::{
     filter::{Filter, FilterKind},
     mpd_client::{MpdClient, MpdCommand},
     proto_client::ProtoClient,
-    version::Version,
 };
+use rmpc_shared::version::Version;
 
 use super::Pane;
 use crate::{

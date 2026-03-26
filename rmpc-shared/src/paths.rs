@@ -24,12 +24,23 @@ pub fn config_dir() -> Option<PathBuf> {
         .or_else(|| home_dir().map(|home| home.join(".config")))
 }
 
+pub fn data_dir() -> Option<PathBuf> {
+    ENV.var_os("XDG_DATA_HOME")
+        .map(PathBuf::from)
+        .filter(|p| p.is_absolute())
+        .or_else(|| home_dir().map(|home| home.join(".local").join("share")))
+}
+
 pub fn rmpc_config_dir() -> Option<PathBuf> {
     config_dir().map(|config_dir| config_dir.join("rmpc"))
 }
 
 pub fn rmpcd_config_dir() -> Option<PathBuf> {
     config_dir().map(|config_dir| config_dir.join("rmpcd"))
+}
+
+pub fn rmpcd_data_dir() -> Option<PathBuf> {
+    data_dir().map(|data_dir| data_dir.join("rmpcd"))
 }
 
 pub fn config_paths(cli_arg_config_path: Option<&Path>) -> Vec<PathBuf> {
@@ -151,16 +162,11 @@ pub mod utils {
     #[cfg(feature = "test-impl")]
     #[allow(clippy::unwrap_used)]
     mod tests {
-        use std::{
-            path::PathBuf,
-            sync::{LazyLock, Mutex},
-        };
+        use std::path::PathBuf;
 
         use test_case::test_case;
 
         use super::{tilde_expand, *};
-
-        static TEST_LOCK: LazyLock<Mutex<()>> = LazyLock::new(|| Mutex::new(()));
 
         #[test_case("~", "/home/some_user")]
         #[test_case("~enene", "~enene")]
@@ -169,7 +175,7 @@ pub mod utils {
         #[test_case("no/~/no", "no/~/no")]
         #[test_case("basic/path", "basic/path")]
         fn home_dir_present(input: &str, expected: &str) {
-            let _guard = TEST_LOCK.lock().unwrap();
+            let _lock = ENV.lock();
 
             ENV.clear();
             ENV.set("HOME".to_string(), "/home/some_user".to_string());
@@ -183,7 +189,7 @@ pub mod utils {
         #[test_case("no/~/no", "no/~/no")]
         #[test_case("basic/path", "basic/path")]
         fn home_dir_not_present(input: &str, expected: &str) {
-            let _guard = TEST_LOCK.lock().unwrap();
+            let _lock = ENV.lock();
 
             ENV.clear();
             ENV.remove("HOME");
@@ -197,7 +203,7 @@ pub mod utils {
         #[test_case("no/~/no", "no/~/no")]
         #[test_case("basic/path", "basic/path")]
         fn home_dir_present_path(input: &str, expected: &str) {
-            let _guard = TEST_LOCK.lock().unwrap();
+            let _lock = ENV.lock();
 
             ENV.clear();
             ENV.set("HOME".to_string(), "/home/some_user".to_string());
@@ -213,7 +219,7 @@ pub mod utils {
         #[test_case("no/~/no", "no/~/no")]
         #[test_case("basic/path", "basic/path")]
         fn home_dir_not_present_path(input: &str, expected: &str) {
-            let _guard = TEST_LOCK.lock().unwrap();
+            let _lock = ENV.lock();
 
             ENV.clear();
             ENV.remove("HOME");
@@ -234,7 +240,7 @@ pub mod utils {
         // This is different from how shells do it, but I can't think of a use case for
         // it in paths #[test_case("no$HOME$VALUE", "no/home/some_userpath")]
         fn env_var_expansion(input: &str, expected: &str) {
-            let _guard = TEST_LOCK.lock().unwrap();
+            let _lock = ENV.lock();
 
             ENV.clear();
             ENV.set("HOME".to_string(), "/home/some_user".to_string());
@@ -251,7 +257,7 @@ pub mod utils {
         #[test_case("/$NOT_SET", "/$NOT_SET")]
         #[test_case("/basic/path", "/basic/path")]
         fn env_var_expansion_path(input: &str, expected: &str) {
-            let _guard = TEST_LOCK.lock().unwrap();
+            let _lock = ENV.lock();
 
             ENV.clear();
             ENV.set("HOME".to_string(), "/home/some_user".to_string());

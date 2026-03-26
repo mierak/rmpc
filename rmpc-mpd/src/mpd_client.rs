@@ -1,6 +1,7 @@
 use std::str::FromStr;
 
 use anyhow::Result;
+use rmpc_shared::version::Version;
 use strum::AsRefStr;
 
 use super::{
@@ -25,7 +26,6 @@ use super::{
     },
     errors::MpdError,
     proto_client::{ProtoClient, SocketClient},
-    version::Version,
 };
 use crate::{
     commands::{list_all::ListAll, messages::Messages},

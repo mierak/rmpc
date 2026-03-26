@@ -11,6 +11,7 @@ use crate::{
 
 pub mod lualib;
 pub mod plugin;
+pub mod type_def_eject;
 
 pub fn create(
     cfg_dir: &Path,

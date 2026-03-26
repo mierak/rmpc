@@ -3331,7 +3331,9 @@ version = "0.11.0"
 dependencies = [
  "anyhow",
  "log",
+ "serde",
  "test-case",
+ "thiserror 2.0.18",
 ]
 
 [[package]]
@@ -3350,10 +3352,12 @@ dependencies = [
  "serde",
  "serde_json",
  "serde_with",
+ "sha2",
  "tokio",
  "tokio-util",
  "tracing",
  "tracing-subscriber",
+ "walkdir",
  "which",
  "zbus",
 ]
