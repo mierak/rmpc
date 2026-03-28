@@ -125,6 +125,7 @@ async fn main() -> Result<()> {
         status: status.clone(),
         queue,
         album_art: None,
+        last_written_album_art_song_uri: None,
     }));
 
     let enable_mpris = lua_config.get::<Option<bool>>("mpris")?.unwrap_or(false);
