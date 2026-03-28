@@ -23,15 +23,15 @@ impl SongExt for Song {
 
 impl Ctx {
     pub(super) async fn current_song_metadata<'a>(
-        &self,
+        &mut self,
     ) -> zbus::fdo::Result<HashMap<&'static str, Value<'a>>> {
         if let Some(song) = &self.current_song {
             let mut res = HashMap::new();
             Self::song_to_metadata(song, &mut res);
-            tracing::debug!(art = self.album_art.is_some(), "Writing cover art to temp file");
-            if let Some(buf) = &self.album_art {
-                // TODO this cannot be here, this writes every time the metadata are queried and
-                // it should probably utilize a cache to not write the same file all the time
+            if let Some(buf) = &self.album_art
+                && self.last_written_album_art_song_uri.as_ref().is_none_or(|uri| uri != &song.file)
+            {
+                tracing::debug!(art = self.album_art.is_some(), "Writing cover art to temp file");
                 tokio::fs::write(std::env::temp_dir().join("rmpcd-cover-art"), buf).await.map_err(
                     |err| {
                         zbus::fdo::Error::Failed(format!(
@@ -39,6 +39,10 @@ impl Ctx {
                         ))
                     },
                 )?;
+                self.last_written_album_art_song_uri = Some(song.file.clone());
+            }
+
+            if self.last_written_album_art_song_uri.as_ref().is_some_and(|uri| uri == &song.file) {
                 res.insert(
                     "mpris:artUrl",
                     Value::new(format!(

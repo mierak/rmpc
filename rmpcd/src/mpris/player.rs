@@ -129,7 +129,7 @@ impl Player {
 
     #[zbus(property)]
     async fn metadata(&self) -> zbus::fdo::Result<HashMap<&'static str, Value<'_>>> {
-        self.ctx.read().await.current_song_metadata().await
+        self.ctx.write().await.current_song_metadata().await
     }
 
     #[zbus(property)]
