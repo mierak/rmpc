@@ -8,7 +8,8 @@ use rmpc_mpd::{
 use rmpc_shared::paths::rmpcd_config_dir;
 use tokio::sync::RwLock;
 use tracing::{error, info, level_filters::LevelFilter};
-use tracing_subscriber::EnvFilter;
+use tracing_appender::non_blocking;
+use tracing_subscriber::{EnvFilter, Registry, layer::SubscriberExt, util::SubscriberInitExt};
 
 use crate::{
     async_client::AsyncClient,
@@ -28,18 +29,33 @@ mod mpris;
 async fn main() -> Result<()> {
     let start = std::time::Instant::now();
 
-    tracing_subscriber::fmt()
-        .with_line_number(true)
-        .with_target(false)
-        .with_file(true)
-        .with_writer(std::io::stderr)
-        .with_ansi(true)
-        .with_env_filter(
-            EnvFilter::builder()
-                .with_default_directive(LevelFilter::INFO.into())
-                .from_env_lossy()
-                .add_directive("rmpcd=debug".parse()?),
+    let file_appender = tracing_appender::rolling::hourly("/tmp", "rmpcd.log");
+    let (non_blocking_file, _file_guard) = non_blocking(file_appender);
+    let (non_blocking_stderr, _stderr_guard) = non_blocking(std::io::stderr());
+
+    let env_filter = EnvFilter::builder()
+        .with_default_directive(LevelFilter::INFO.into())
+        .from_env_lossy()
+        .add_directive("rmpcd=debug".parse()?);
+
+    Registry::default()
+        .with(
+            tracing_subscriber::fmt::Layer::new()
+                .with_line_number(true)
+                .with_target(false)
+                .with_file(true)
+                .with_ansi(true)
+                .with_writer(non_blocking_stderr),
         )
+        .with(
+            tracing_subscriber::fmt::Layer::new()
+                .with_line_number(true)
+                .with_target(false)
+                .with_file(true)
+                .with_ansi(false)
+                .with_writer(non_blocking_file),
+        )
+        .with(env_filter)
         .init();
 
     let (shutdown_tx, shutdown_rx) = tokio::sync::broadcast::channel::<()>(1);
