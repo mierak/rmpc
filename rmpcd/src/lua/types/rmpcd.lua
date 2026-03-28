@@ -21,3 +21,9 @@
 ---@type RmpcdGlobal
 ---@diagnostic disable-next-line: lowercase-global
 rmpcd = rmpcd
+
+---@class Config
+---@field address string Point to your mpd server, e.g. "localhost:6600".
+---@field password string | nil Password for your mpd server, if any.
+---@field mpris boolean | nil
+---@field subscribed_channels string[] | nil

@@ -5,7 +5,7 @@ use rmpc_shared::{paths::rmpcd_data_dir, version::Version};
 use serde::{Deserialize, Serialize};
 use serde_with::{DisplayFromStr, serde_as};
 use sha2::{Digest, Sha256};
-use tracing::{info, trace};
+use tracing::{debug, trace};
 
 include!(concat!(env!("OUT_DIR"), "/lua_type_defs.rs"));
 
@@ -26,11 +26,11 @@ fn hash_type_defs() -> String {
     format!("{:x}", hasher.finalize())
 }
 
-pub fn eject() -> Result<()> {
+pub fn eject() -> Result<PathBuf> {
     eject_inner(&RealFs)
 }
 
-pub fn eject_inner(fs: &impl FileSystem) -> Result<()> {
+pub fn eject_inner(fs: &impl FileSystem) -> Result<PathBuf> {
     let Some(mut data_dir) = rmpcd_data_dir() else {
         bail!("Could not determine data directory");
     };
@@ -55,15 +55,15 @@ pub fn eject_inner(fs: &impl FileSystem) -> Result<()> {
         })?;
 
         if manifest.rmpcd_version > crate_version {
-            info!(
+            debug!(
                 "Lua type definitions manifest is from newer rmpcd version ({}), skipping eject",
                 manifest.rmpcd_version
             );
-            return Ok(());
+            return Ok(data_dir);
         }
 
         if manifest.hash != hash {
-            info!("Lua type definitions have changed, updating...");
+            debug!("Lua type definitions have changed, updating...");
             for file in manifest.files {
                 let path = data_dir.join(&file);
                 trace!(path = ?path.display(), "Removing old lua type definition file");
@@ -78,12 +78,12 @@ pub fn eject_inner(fs: &impl FileSystem) -> Result<()> {
             eject_type_defs(fs, crate_version, hash, &data_dir)
                 .context("Failed to eject lua type definitions")?;
 
-            return Ok(());
+            return Ok(data_dir);
         }
 
-        info!("Lua type definitions are up to date, skipping eject");
+        debug!("Lua type definitions are up to date, skipping eject");
     } else {
-        info!(
+        debug!(
             "Lua type definitions not found, ejecting type definitions to {}",
             data_dir.display()
         );
@@ -91,7 +91,7 @@ pub fn eject_inner(fs: &impl FileSystem) -> Result<()> {
             .context("Failed to eject lua type definitions")?;
     }
 
-    Ok(())
+    Ok(data_dir)
 }
 
 fn eject_type_defs(
@@ -102,7 +102,7 @@ fn eject_type_defs(
 ) -> Result<()> {
     let mut manifest = Manifest { rmpcd_version: crate_version, hash, files: Vec::new() };
 
-    info!("Ejecting Lua type definitions to {}", data_dir.display());
+    debug!("Ejecting Lua type definitions to {}", data_dir.display());
 
     for (dir, filename, content) in TYPE_DEFS {
         let mut path = data_dir.to_owned();

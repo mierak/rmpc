@@ -1,14 +1,17 @@
 use std::sync::Arc;
 
 use anyhow::{Result, bail};
+use clap::{Parser, Subcommand};
 use rmpc_mpd::{
     commands::{IdleEvent, Status},
     mpd_client::MpdClient,
 };
 use rmpc_shared::paths::rmpcd_config_dir;
+use serde::Serialize;
+use serde_json::json;
 use tokio::sync::RwLock;
-use tracing::{error, info, level_filters::LevelFilter};
-use tracing_appender::non_blocking;
+use tracing::{error, info, level_filters::LevelFilter, warn};
+use tracing_appender::non_blocking::WorkerGuard;
 use tracing_subscriber::{EnvFilter, Registry, layer::SubscriberExt, util::SubscriberInitExt};
 
 use crate::{
@@ -25,18 +28,30 @@ mod lua;
 mod mpd_ext;
 mod mpris;
 
-#[tokio::main]
-async fn main() -> Result<()> {
-    let start = std::time::Instant::now();
+#[derive(Parser, Debug)]
+#[command(version, about)]
+struct Args {
+    #[command(subcommand)]
+    command: Option<Command>,
+}
 
+#[derive(Subcommand, Clone, Debug, PartialEq)]
+#[clap(rename_all = "lower")]
+enum Command {
+    /// Sets up a new config directory with example init.lua and .luarc.json
+    /// config file for `LuaLS`
+    Init,
+}
+
+fn init_logging(level: &str) -> Result<(WorkerGuard, WorkerGuard)> {
     let file_appender = tracing_appender::rolling::hourly("/tmp", "rmpcd.log");
-    let (non_blocking_file, _file_guard) = non_blocking(file_appender);
-    let (non_blocking_stderr, _stderr_guard) = non_blocking(std::io::stderr());
+    let (non_blocking_file, file_guard) = tracing_appender::non_blocking(file_appender);
+    let (non_blocking_stderr, stderr_guard) = tracing_appender::non_blocking(std::io::stderr());
 
     let env_filter = EnvFilter::builder()
         .with_default_directive(LevelFilter::INFO.into())
         .from_env_lossy()
-        .add_directive("rmpcd=debug".parse()?);
+        .add_directive(format!("rmpcd={level}").parse()?);
 
     Registry::default()
         .with(
@@ -57,6 +72,68 @@ async fn main() -> Result<()> {
         )
         .with(env_filter)
         .init();
+
+    Ok((file_guard, stderr_guard))
+}
+
+#[tokio::main]
+async fn main() -> Result<()> {
+    let args = Args::parse();
+    match args.command {
+        Some(Command::Init) => run_init()?,
+        None => run().await?,
+    }
+
+    Ok(())
+}
+
+fn run_init() -> Result<()> {
+    let _log_guards = init_logging("info")?;
+
+    let Some(cfg_dir) = rmpcd_config_dir() else {
+        error!("Could not determine config directory");
+        std::process::exit(1);
+    };
+
+    if cfg_dir.exists() {
+        warn!("Config directory already exists at '{}', exiting...", cfg_dir.display());
+        std::process::exit(1);
+    }
+
+    std::fs::create_dir_all(&cfg_dir)?;
+
+    let init_lua_path = cfg_dir.join("init.lua");
+    let default_config = include_str!("../../assets/rmpcd/example_init.lua");
+    std::fs::write(&init_lua_path, default_config)?;
+
+    info!("Created default config at '{}'", init_lua_path.display());
+
+    match lua::type_def_eject::eject() {
+        Ok(path) => {
+            let value = &json!({
+                "workspace.library": [path.display().to_string()]
+            });
+            let buf = Vec::new();
+            let formatter = serde_json::ser::PrettyFormatter::with_indent(b"    ");
+            let mut ser = serde_json::Serializer::with_formatter(buf, formatter);
+            value.serialize(&mut ser)?;
+            let luarc = String::from_utf8(ser.into_inner())?;
+
+            std::fs::write(cfg_dir.join(".luarc.json"), luarc)?;
+
+            info!("Created Lua API type definitions at '{}'", path.display());
+        }
+        Err(err) => {
+            error!("Failed to eject Lua type definitions. {err:?}");
+        }
+    }
+
+    Ok(())
+}
+
+async fn run() -> Result<()> {
+    let start = std::time::Instant::now();
+    let _log_guards = init_logging("debug")?;
 
     let (shutdown_tx, shutdown_rx) = tokio::sync::broadcast::channel::<()>(1);
     ctrlc::set_handler(move || {
