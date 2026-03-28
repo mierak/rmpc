@@ -2,7 +2,7 @@ use std::collections::HashMap;
 
 use mlua::{ExternalResult, Lua, LuaSerdeExt, Table, Value};
 use serde::{Deserialize, Serialize};
-use tracing::error;
+use tracing::{error, trace};
 
 pub fn create(lua: &Lua) -> mlua::Result<Table> {
     let tbl = lua.create_table()?;
@@ -51,6 +51,7 @@ async fn do_call(lua: Lua, url: &str, opts: Option<RequestOpts>) -> mlua::Result
 
     let result = lua.create_table()?;
 
+    trace!(?client, "Sending HTTP request");
     let response = match client.send().await.and_then(|r| r.error_for_status()) {
         Ok(resp) => resp,
         Err(e) => {

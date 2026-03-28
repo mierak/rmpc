@@ -29,14 +29,28 @@ local function download(self, song)
         return
     end
 
+    if song.artist == nil or song.title == nil or song.album == nil then
+        log.warn("Song metadata missing artist or title, cannot fetch lyrics for " .. song.file)
+        process.spawn({
+            "rmpc",
+            "remote",
+            "status",
+            "--level",
+            "warn",
+            "Cannot download lyrics for " .. song.file .. " due to incomplete metadata",
+        })
+        return
+    end
+
     local result = http.get(lrclib_url .. "/api/get", {
         headers = {
-            ["Lrclib-Client"] = "rmpcd-0.1.0",
+            ["User-Agent"] = "rmpcd v0.1.0 (https://github.com/mierak/rmpc)",
         },
         params = {
             artist_name = song.artist:first(),
             track_name = song.title:first(),
             album_name = song.album:first(),
+            duration = string.format("%.0f", song.duration / 1000),
         },
     })
 
