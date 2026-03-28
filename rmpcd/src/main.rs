@@ -44,7 +44,11 @@ enum Command {
 }
 
 fn init_logging(level: &str) -> Result<(WorkerGuard, WorkerGuard)> {
-    let file_appender = tracing_appender::rolling::hourly("/tmp", "rmpcd.log");
+    let uid = rustix::process::geteuid();
+    let file_appender = tracing_appender::rolling::never(
+        std::env::temp_dir(),
+        format!("rmpcd_{}.log", uid.as_raw()),
+    );
     let (non_blocking_file, file_guard) = tracing_appender::non_blocking(file_appender);
     let (non_blocking_stderr, stderr_guard) = tracing_appender::non_blocking(std::io::stderr());
 
