@@ -154,7 +154,8 @@ pub fn is_passthrough_enabled() -> anyhow::Result<bool> {
     let cmd = cmd.args(["show", "-Ap", "allow-passthrough"]);
     let stdout = cmd.output()?.stdout;
 
-    Ok(String::from_utf8_lossy(&stdout).trim_end().ends_with("on"))
+    let val = String::from_utf8_lossy(&stdout).trim_end().to_lowercase();
+    Ok(val.ends_with("on") || val.ends_with("all"))
 }
 
 pub fn enable_passthrough() -> anyhow::Result<()> {
