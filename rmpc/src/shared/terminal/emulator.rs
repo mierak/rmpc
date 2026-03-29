@@ -59,6 +59,7 @@ impl Emulator {
             "WezTerm" => Some(Emulator::WezTerm),
             "vscode" => Some(Emulator::VSCode),
             "Tabby" => Some(Emulator::Tabby),
+            "iTerm.app" => Some(Emulator::Iterm2),
             _ => None,
         };
 
