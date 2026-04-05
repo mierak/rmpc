@@ -30,17 +30,17 @@ M.song_change = function(_self, _old_song, new_song)
         return
     end
 
-    local sticker, err = mpd.get_song_sticker(new_song.file, "playcount")
+    local sticker, err = mpd.get_song_sticker(new_song.file, "playCount")
     if err then
         log.error("Error retrieving playcount sticker for " .. new_song.file)
         return
     end
 
     if sticker == nil then
-        mpd.set_song_sticker(new_song.file, "playcount", "1")
+        mpd.set_song_sticker(new_song.file, "playCount", "1")
     else
         local count = tonumber(sticker) or 0
-        mpd.set_song_sticker(new_song.file, "playcount", tostring(count + 1))
+        mpd.set_song_sticker(new_song.file, "playCount", tostring(count + 1))
     end
 end
 
