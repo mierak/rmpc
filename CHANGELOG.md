@@ -39,6 +39,7 @@ keybinds
 - modals ignoring `text_color`
 - Fixed potential panic in sorting when mixixng numerical and non numerical values for some song properties
 - password and address override parameter not working for rmpc's CLI
+- Config hot reload ignoring disable flag
 
 
 ## [0.11.0] - 2026-02-01

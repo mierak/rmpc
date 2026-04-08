@@ -438,10 +438,11 @@ fn main() -> Result<()> {
                     .context("Failed to initialize socket listener")?;
 
             let _config_watcher_guard = if let Some(config_path) = config_path {
-                ctx.config.enable_config_hot_reload.then_some(
+                ctx.config.enable_config_hot_reload.then(|| {
+                    log::debug!("Enabling config hot reload for '{}'", config_path.display());
                     core::config_watcher::init(config_path, theme_path, event_tx.clone())
-                        .inspect_err(|e| log::warn!("Failed to initialize config watcher: {e}")),
-                )
+                        .inspect_err(|e| log::warn!("Failed to initialize config watcher: {e}"))
+                })
             } else {
                 log::warn!("No config file was detected, not watching config for changes");
                 None
