@@ -256,7 +256,8 @@ impl Modal for KeybindsModal {
         desc_area.width = desc_area.width.saturating_sub(2); // account for the column spacing
 
         let keybinds = &ctx.config.keybinds;
-        let header_style = ctx.config.theme.highlighted_item_style;
+        let header_style =
+            ctx.config.as_text_style().patch(ctx.config.theme.highlighted_item_style);
 
         let global = keybinds.global.sort_by_action().collect_vec();
         let navigation = keybinds.navigation.sort_by_action().collect_vec();

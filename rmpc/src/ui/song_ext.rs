@@ -423,7 +423,7 @@ impl SongExt for Song {
         strategy: TagResolutionStrategy,
         ctx: &'stickers Ctx,
     ) -> Option<Line<'song>> {
-        let style = format.style.unwrap_or_default();
+        let style = ctx.config.as_text_style().patch(format.style.unwrap_or_default());
         match &format.kind {
             PropertyKindOrText::Text(value) => Some(Line::styled(value.clone(), style)),
             PropertyKindOrText::Sticker(key) => ctx
