@@ -434,6 +434,7 @@ impl TryFrom<UiConfigFile> for UiConfig {
 
     #[allow(clippy::similar_names)]
     fn try_from(value: UiConfigFile) -> Result<Self, Self::Error> {
+        let fg_color = StringColor(value.text_color.clone()).to_color()?;
         let bg_color = StringColor(value.background_color).to_color()?;
         let header_bg_color = StringColor(value.header_background_color).to_color()?.or(bg_color);
         let fallback_border_fg = Color::White;
@@ -452,7 +453,7 @@ impl TryFrom<UiConfigFile> for UiConfig {
                 .to_color()?
                 .or(bg_color),
             modal_backdrop: value.modal_backdrop,
-            text_color: StringColor(value.text_color).to_color()?,
+            text_color: fg_color,
             header_background_color: header_bg_color,
             borders_style: value.borders_style.to_config_or(Some(fallback_border_fg), None)?,
             highlight_border_style: value

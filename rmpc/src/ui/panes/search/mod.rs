@@ -95,8 +95,8 @@ impl SearchPane {
             .search_button(config.search.search_button)
             .text_style(config.as_text_style())
             .separator_style(config.theme.borders_style)
-            .current_item_style(config.theme.current_item_style)
-            .highlight_item_style(config.theme.highlighted_item_style)
+            .current_item_style(config.as_text_style().patch(config.theme.current_item_style))
+            .highlight_item_style(config.as_text_style().patch(config.theme.highlighted_item_style))
             .stickers_supported(ctx.stickers_supported.into())
             .strip_diacritics_supported(ctx.mpd_version >= Version::new(0, 25, 0))
             .custom_query(config.search.custom_query)
@@ -165,6 +165,7 @@ impl SearchPane {
         let current = List::new(
             self.songs_dir.to_list_items(ctx.config.theme.browser_song_format.0.as_slice(), ctx),
         )
+        .style(config.as_text_style())
         .highlight_style(config.theme.current_item_style);
         let directory = &mut self.songs_dir;
 
