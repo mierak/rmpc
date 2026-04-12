@@ -21,6 +21,7 @@ keybinds if they contained either `{` or `}`. You will now need to escape these 
 - `Sort` queue keybind
 - `AlbumArtist` added to song properties.
 - Added `queue_disable_current_item_style_timeout_ms`
+- `album_sort_by` now sorts by `Date` first and `Name` second if `Date` is configured
 
 ### Changed
 

@@ -114,7 +114,12 @@ impl TagBrowserPane {
                     Ordering::Equal => date_a.cmp(date_b),
                     ordering => ordering,
                 },
-                AlbumSortMode::Date => date_a.cmp(date_b),
+                AlbumSortMode::Date => {
+                    date_a.cmp(date_b).then_with(|| match album_a.cmp(album_b) {
+                        Ordering::Equal => date_a.cmp(date_b),
+                        ordering => ordering,
+                    })
+                }
             })
             .map(|((album, date), mut songs)| {
                 songs.sort_by(|a, b| {
@@ -485,6 +490,38 @@ mod tests {
             &Path::from(["artist", "(2021) album_a"]),
         ]);
         assert_eq!(pane_albums(&pane), vec!["(2019) album_b", "(2020) album_a", "(2021) album_a"]);
+    }
+
+    #[rstest]
+    fn albums_split_date_sort_date_and_then_sort_name(mut ctx: Ctx, mut config: Config) {
+        config.artists.album_display_mode = AlbumDisplayMode::SplitByDate;
+        config.artists.album_sort_by = AlbumSortMode::Date;
+        ctx.config = std::sync::Arc::new(config);
+        let mut pane = TagBrowserPane::new(Tag::Artist, PaneType::Artists, None, &ctx);
+        let artist = String::from("artist");
+        let songs = vec![
+            song("album_c", "2020"),
+            song("album_b", "2020"),
+            song("album_d", "2020"),
+            song("album_a", "2020"),
+        ];
+
+        pane.process_songs(artist.clone(), songs, &ctx);
+
+        assert_eq!(pane.stack.contained_paths().sorted().collect_vec(), vec![
+            &Path::from([]),
+            &Path::from("artist"),
+            &Path::from(["artist", "(2020) album_a"]),
+            &Path::from(["artist", "(2020) album_b"]),
+            &Path::from(["artist", "(2020) album_c"]),
+            &Path::from(["artist", "(2020) album_d"]),
+        ]);
+        assert_eq!(pane_albums(&pane), vec![
+            "(2020) album_a",
+            "(2020) album_b",
+            "(2020) album_c",
+            "(2020) album_d",
+        ]);
     }
 
     #[rstest]
