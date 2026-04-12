@@ -165,30 +165,34 @@ fn main() -> Result<()> {
                 option_env!("VERGEN_GIT_DESCRIBE").map(|g| format!(" git {g}")).unwrap_or_default()
             );
 
-            let (config_file, config, config_path) =
-                read_config_for_debuginfo(args.config.as_deref(), args.address, args.password)
-                    .map_or_else(
-                        |err| {
-                            // use stdout here in case a user pipes the debug info to a
-                            // file/clipboard so its copied to the github issue as well
-                            if let ConfigReadError::ConfigNotFound = err {
-                                // Do not print error when config was not found, this is fine for
-                                // debuginfo
-                                println!("\nWarning:");
-                                println!("No config file was found. Using default values.");
-                            } else {
-                                println!("\nError: Failed to read config");
-                                println!("Caused by:");
-                                println!("  {err}");
-                                println!("\nUsing the default values");
-                            }
+            let (config_file, config, config_path) = read_config_for_debuginfo(
+                args.config.as_deref(),
+                args.theme.as_deref(),
+                args.address,
+                args.password,
+            )
+            .map_or_else(
+                |err| {
+                    // use stdout here in case a user pipes the debug info to a
+                    // file/clipboard so its copied to the github issue as well
+                    if let ConfigReadError::ConfigNotFound = err {
+                        // Do not print error when config was not found, this is fine for
+                        // debuginfo
+                        println!("\nWarning:");
+                        println!("No config file was found. Using default values.");
+                    } else {
+                        println!("\nError: Failed to read config");
+                        println!("Caused by:");
+                        println!("  {err}");
+                        println!("\nUsing the default values");
+                    }
 
-                            (ConfigFile::default(), Config::default(), None)
-                        },
-                        |(config_file, config, config_path)| {
-                            (config_file, config, Some(config_path))
-                        },
-                    );
+                    (ConfigFile::default(), Config::default(), None)
+                },
+                |(config_file, config, config_path, _theme_path)| {
+                    (config_file, config, Some(config_path))
+                },
+            );
 
             let mut mpd_host = ENV.var("MPD_HOST").unwrap_or_else(|_| "unset".to_string());
             if let Some(at_idx) = mpd_host.find('@') {

@@ -11,7 +11,7 @@ use crate::config::{
     ConfigFile,
     cli::Args,
     cli_config::{CliConfig, CliConfigFile},
-    theme::{UiConfig, UiConfigFile},
+    theme::UiConfigFile,
 };
 
 #[derive(Error, Debug)]
@@ -53,9 +53,10 @@ pub fn read_cli_config(
 
 pub fn read_config_for_debuginfo(
     cli_arg_config_path: Option<&Path>,
+    cli_arg_theme_path: Option<&Path>,
     cli_arg_address: Option<String>,
     cli_arg_password: Option<String>,
-) -> Result<(ConfigFile, Config, PathBuf), ConfigReadError> {
+) -> Result<(ConfigFile, Config, PathBuf, Option<PathBuf>), ConfigReadError> {
     let config_paths = config_paths(cli_arg_config_path);
     if config_paths.is_empty() {
         return Err(ConfigReadError::NoConfigPaths);
@@ -67,10 +68,29 @@ pub fn read_config_for_debuginfo(
 
     let config = read_config_file(&chosen_config_path)?;
 
+    let (chosen_theme_path, theme) = match &config.theme {
+        Some(theme_name) => {
+            let theme_paths = theme_paths(cli_arg_theme_path, &chosen_config_path, theme_name);
+            let chosen_theme_path = find_first_existing_path(theme_paths);
+
+            if let Some(theme_path) = chosen_theme_path {
+                let theme = read_theme_file(&theme_path)?;
+                (Some(theme_path), theme)
+            } else {
+                return Err(ConfigReadError::ThemeNotFound);
+            }
+        }
+        // No theme set in the config file, this is OK, use the default theme
+        None => (None, UiConfigFile::default()),
+    };
+
+    let theme = theme.try_into().map_err(ConfigReadError::Conversion)?;
+
     Ok((
         config.clone(),
-        config.into_config(UiConfig::default(), cli_arg_address, cli_arg_password, false)?,
+        config.into_config(theme, cli_arg_address, cli_arg_password, false)?,
         chosen_config_path,
+        chosen_theme_path,
     ))
 }
 
