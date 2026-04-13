@@ -86,7 +86,7 @@ impl DirStackItem for DirOrSong {
             DirOrSong::Dir { name, playlist: is_playlist, .. } => {
                 let config = &ctx.config;
                 let marker_style = if matches_filter {
-                    config.theme.symbols.marker_current_style
+                    config.theme.symbols.marker_highlighted_style
                 } else {
                     config.theme.symbols.marker_style
                 }
@@ -102,7 +102,7 @@ impl DirStackItem for DirOrSong {
                         Span::styled(
                             config.theme.symbols.playlist.clone(),
                             if matches_filter {
-                                config.theme.symbols.playlist_current_style
+                                config.theme.symbols.playlist_highlighted_style
                             } else {
                                 config.theme.symbols.playlist_style
                             }
@@ -112,7 +112,7 @@ impl DirStackItem for DirOrSong {
                         Span::styled(
                             config.theme.symbols.dir.clone(),
                             if matches_filter {
-                                config.theme.symbols.dir_current_style
+                                config.theme.symbols.dir_highlighted_style
                             } else {
                                 config.theme.symbols.dir_style
                             }
@@ -178,7 +178,7 @@ impl DirStackItem for Song {
     ) -> ListItem<'a> {
         let config = &ctx.config;
         let marker_style = if matches_filter {
-            config.theme.symbols.marker_current_style
+            config.theme.symbols.marker_highlighted_style
         } else {
             config.theme.symbols.marker_style
         }
@@ -194,7 +194,7 @@ impl DirStackItem for Song {
             Span::styled(
                 config.theme.symbols.song.clone(),
                 if matches_filter {
-                    config.theme.symbols.song_current_style
+                    config.theme.symbols.song_highlighted_style
                 } else {
                     config.theme.symbols.song_style
                 }
@@ -312,7 +312,7 @@ impl DirStackItem for String {
     ) -> ListItem<'a> {
         let config = &ctx.config;
         let marker_style = if matches_filter {
-            config.theme.symbols.marker_current_style
+            config.theme.symbols.marker_highlighted_style
         } else {
             config.theme.symbols.marker_style
         }

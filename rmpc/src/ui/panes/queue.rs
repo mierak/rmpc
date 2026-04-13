@@ -409,7 +409,7 @@ impl Pane for QueuePane {
 
                     if is_marked && i == 0 {
                         let marker_style = if is_current {
-                            config.theme.symbols.marker_current_style
+                            config.theme.symbols.marker_highlighted_style
                         } else {
                             config.theme.symbols.marker_style
                         }
