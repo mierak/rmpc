@@ -85,11 +85,14 @@ impl DirStackItem for DirOrSong {
         match self {
             DirOrSong::Dir { name, playlist: is_playlist, .. } => {
                 let config = &ctx.config;
+                let marker_style = if matches_filter {
+                    config.theme.symbols.marker_current_style
+                } else {
+                    config.theme.symbols.marker_style
+                }
+                .unwrap_or(config.theme.highlighted_item_style);
                 let marker_span = if is_marked {
-                    Span::styled(
-                        config.theme.symbols.marker.clone(),
-                        config.theme.highlighted_item_style,
-                    )
+                    Span::styled(config.theme.symbols.marker.clone(), marker_style)
                 } else {
                     Span::from(" ".repeat(config.theme.symbols.marker.chars().count()))
                 };
@@ -98,12 +101,22 @@ impl DirStackItem for DirOrSong {
                     if *is_playlist {
                         Span::styled(
                             config.theme.symbols.playlist.clone(),
-                            config.theme.symbols.playlist_style.unwrap_or_default(),
+                            if matches_filter {
+                                config.theme.symbols.playlist_current_style
+                            } else {
+                                config.theme.symbols.playlist_style
+                            }
+                            .unwrap_or_default(),
                         )
                     } else {
                         Span::styled(
                             config.theme.symbols.dir.clone(),
-                            config.theme.symbols.dir_style.unwrap_or_default(),
+                            if matches_filter {
+                                config.theme.symbols.dir_current_style
+                            } else {
+                                config.theme.symbols.dir_style
+                            }
+                            .unwrap_or_default(),
                         )
                     },
                     Span::from(" "),
@@ -164,8 +177,14 @@ impl DirStackItem for Song {
         additional_content: Option<String>,
     ) -> ListItem<'a> {
         let config = &ctx.config;
+        let marker_style = if matches_filter {
+            config.theme.symbols.marker_current_style
+        } else {
+            config.theme.symbols.marker_style
+        }
+        .unwrap_or(config.theme.highlighted_item_style);
         let marker_span = if is_marked {
-            Span::styled(config.theme.symbols.marker.clone(), config.theme.highlighted_item_style)
+            Span::styled(config.theme.symbols.marker.clone(), marker_style)
         } else {
             Span::from(" ".repeat(config.theme.symbols.marker.chars().count()))
         };
@@ -174,7 +193,12 @@ impl DirStackItem for Song {
             marker_span,
             Span::styled(
                 config.theme.symbols.song.clone(),
-                config.theme.symbols.song_style.unwrap_or_default(),
+                if matches_filter {
+                    config.theme.symbols.song_current_style
+                } else {
+                    config.theme.symbols.song_style
+                }
+                .unwrap_or_default(),
             ),
             Span::from(" "),
         ]
@@ -287,8 +311,14 @@ impl DirStackItem for String {
         _additional_content: Option<String>,
     ) -> ListItem<'a> {
         let config = &ctx.config;
+        let marker_style = if matches_filter {
+            config.theme.symbols.marker_current_style
+        } else {
+            config.theme.symbols.marker_style
+        }
+        .unwrap_or(config.theme.highlighted_item_style);
         let marker_span = if is_marked {
-            Span::styled(config.theme.symbols.marker.clone(), config.theme.highlighted_item_style)
+            Span::styled(config.theme.symbols.marker.clone(), marker_style)
         } else {
             Span::from(" ".repeat(config.theme.symbols.marker.chars().count()))
         };

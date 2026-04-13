@@ -183,6 +183,11 @@ impl Default for UiConfigFile {
                 song_style: None,
                 dir_style: None,
                 playlist_style: None,
+                marker_style: None,
+                song_current_style: None,
+                dir_current_style: None,
+                playlist_current_style: None,
+                marker_current_style: None,
             },
             song_table_format: QueueTableColumnsFile::default(),
             song_table_album_separator: AlbumSeparator::default(),
@@ -241,6 +246,11 @@ pub struct SymbolsFile {
     pub(super) song_style: Option<StyleFile>,
     pub(super) dir_style: Option<StyleFile>,
     pub(super) playlist_style: Option<StyleFile>,
+    pub(super) marker_style: Option<StyleFile>,
+    pub(super) song_current_style: Option<StyleFile>,
+    pub(super) dir_current_style: Option<StyleFile>,
+    pub(super) playlist_current_style: Option<StyleFile>,
+    pub(super) marker_current_style: Option<StyleFile>,
 }
 
 #[derive(Debug, Default, Clone)]
@@ -253,6 +263,11 @@ pub struct SymbolsConfig {
     pub song_style: Option<Style>,
     pub dir_style: Option<Style>,
     pub playlist_style: Option<Style>,
+    pub marker_style: Option<Style>,
+    pub song_current_style: Option<Style>,
+    pub dir_current_style: Option<Style>,
+    pub playlist_current_style: Option<Style>,
+    pub marker_current_style: Option<Style>,
 }
 
 impl From<SymbolsFile> for SymbolsConfig {
@@ -275,6 +290,31 @@ impl From<SymbolsFile> for SymbolsConfig {
                 .unwrap_or_default(),
             playlist_style: value
                 .playlist_style
+                .map(|s| s.to_config_or(None, None))
+                .transpose()
+                .unwrap_or_default(),
+            marker_style: value
+                .marker_style
+                .map(|s| s.to_config_or(None, None))
+                .transpose()
+                .unwrap_or_default(),
+            song_current_style: value
+                .song_current_style
+                .map(|s| s.to_config_or(None, None))
+                .transpose()
+                .unwrap_or_default(),
+            dir_current_style: value
+                .dir_current_style
+                .map(|s| s.to_config_or(None, None))
+                .transpose()
+                .unwrap_or_default(),
+            playlist_current_style: value
+                .playlist_current_style
+                .map(|s| s.to_config_or(None, None))
+                .transpose()
+                .unwrap_or_default(),
+            marker_current_style: value
+                .marker_current_style
                 .map(|s| s.to_config_or(None, None))
                 .transpose()
                 .unwrap_or_default(),

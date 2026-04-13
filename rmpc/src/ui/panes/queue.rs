@@ -408,10 +408,15 @@ impl Pane for QueuePane {
                     .alignment(formats[i].alignment.into());
 
                     if is_marked && i == 0 {
-                        let marker_span = Span::styled(
-                            &config.theme.symbols.marker,
-                            config.theme.highlighted_item_style,
-                        );
+                        let marker_style = if is_current {
+                            config.theme.symbols.marker_current_style
+                        } else {
+                            config.theme.symbols.marker_style
+                        }
+                        .unwrap_or(config.theme.highlighted_item_style);
+
+                        let marker_span = Span::styled(&config.theme.symbols.marker, marker_style);
+
                         line.spans.splice(..0, std::iter::once(marker_span));
                     }
 
