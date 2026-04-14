@@ -30,6 +30,10 @@
         dir_highlighted_style: None,
         playlist_highlighted_style: None,
         marker_highlighted_style: None,
+        song_current_style: None,
+        dir_current_style: None,
+        playlist_current_style: None,
+        marker_current_style: None,
     ),
     level_styles: (
         info: (fg: "blue", bg: "black"),

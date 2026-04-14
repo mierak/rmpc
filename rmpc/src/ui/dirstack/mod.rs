@@ -2,6 +2,7 @@ use std::borrow::Cow;
 
 use itertools::Itertools;
 use ratatui::{
+    style::Style,
     text::{Line, Span},
     widgets::{ListItem, ListState, TableState},
 };
@@ -35,13 +36,58 @@ pub trait DirStackItem {
         &self,
         ctx: &Ctx,
         is_marked: bool,
+        is_current: bool,
         matches_filter: bool,
         additional_content: Option<String>,
     ) -> ListItem<'a>;
     fn to_list_item_simple<'a>(&self, ctx: &Ctx) -> ListItem<'a> {
-        self.to_list_item(ctx, false, false, None)
+        self.to_list_item(ctx, false, false, false, None)
     }
     fn format(&self, format: &[Property<SongProperty>], sep: &str, ctx: &Ctx) -> String;
+}
+
+pub fn marker_style(ctx: &Ctx, is_current: bool, matches_filter: bool) -> Style {
+    if is_current {
+        ctx.config.theme.symbols.marker_current_style
+    } else if matches_filter {
+        ctx.config.theme.symbols.marker_highlighted_style
+    } else {
+        ctx.config.theme.symbols.marker_style
+    }
+    .unwrap_or(ctx.config.theme.highlighted_item_style)
+}
+
+fn dir_style(ctx: &Ctx, is_current: bool, matches_filter: bool) -> Style {
+    if is_current {
+        ctx.config.theme.symbols.dir_current_style
+    } else if matches_filter {
+        ctx.config.theme.symbols.dir_highlighted_style
+    } else {
+        ctx.config.theme.symbols.dir_style
+    }
+    .unwrap_or_default()
+}
+
+fn playlist_style(ctx: &Ctx, is_current: bool, matches_filter: bool) -> Style {
+    if is_current {
+        ctx.config.theme.symbols.playlist_current_style
+    } else if matches_filter {
+        ctx.config.theme.symbols.playlist_highlighted_style
+    } else {
+        ctx.config.theme.symbols.playlist_style
+    }
+    .unwrap_or_default()
+}
+
+fn song_style(ctx: &Ctx, is_current: bool, matches_filter: bool) -> Style {
+    if is_current {
+        ctx.config.theme.symbols.song_current_style
+    } else if matches_filter {
+        ctx.config.theme.symbols.song_highlighted_style
+    } else {
+        ctx.config.theme.symbols.song_style
+    }
+    .unwrap_or_default()
 }
 
 impl DirStackItem for DirOrSong {
@@ -79,18 +125,17 @@ impl DirStackItem for DirOrSong {
         &self,
         ctx: &Ctx,
         is_marked: bool,
+        is_current: bool,
         matches_filter: bool,
         additional_content: Option<String>,
     ) -> ListItem<'a> {
         match self {
             DirOrSong::Dir { name, playlist: is_playlist, .. } => {
                 let config = &ctx.config;
-                let marker_style = if matches_filter {
-                    config.theme.symbols.marker_highlighted_style
-                } else {
-                    config.theme.symbols.marker_style
-                }
-                .unwrap_or(config.theme.highlighted_item_style);
+                let marker_style = marker_style(ctx, is_current, matches_filter);
+                let dir_style = dir_style(ctx, is_current, matches_filter);
+                let playlist_style = playlist_style(ctx, is_current, matches_filter);
+
                 let marker_span = if is_marked {
                     Span::styled(config.theme.symbols.marker.clone(), marker_style)
                 } else {
@@ -99,25 +144,9 @@ impl DirStackItem for DirOrSong {
                 let mut value = Line::from(vec![
                     marker_span,
                     if *is_playlist {
-                        Span::styled(
-                            config.theme.symbols.playlist.clone(),
-                            if matches_filter {
-                                config.theme.symbols.playlist_highlighted_style
-                            } else {
-                                config.theme.symbols.playlist_style
-                            }
-                            .unwrap_or_default(),
-                        )
+                        Span::styled(config.theme.symbols.playlist.clone(), playlist_style)
                     } else {
-                        Span::styled(
-                            config.theme.symbols.dir.clone(),
-                            if matches_filter {
-                                config.theme.symbols.dir_highlighted_style
-                            } else {
-                                config.theme.symbols.dir_style
-                            }
-                            .unwrap_or_default(),
-                        )
+                        Span::styled(config.theme.symbols.dir.clone(), dir_style)
                     },
                     Span::from(" "),
                     Span::from(if name.is_empty() {
@@ -130,14 +159,17 @@ impl DirStackItem for DirOrSong {
                 if let Some(content) = additional_content {
                     value.push_span(Span::raw(content));
                 }
-                if matches_filter {
+
+                if is_current {
+                    ListItem::from(value).style(config.theme.current_item_style)
+                } else if matches_filter {
                     ListItem::from(value).style(config.theme.highlighted_item_style)
                 } else {
                     ListItem::from(value)
                 }
             }
             DirOrSong::Song(s) => {
-                s.to_list_item(ctx, is_marked, matches_filter, additional_content)
+                s.to_list_item(ctx, is_marked, is_current, matches_filter, additional_content)
             }
         }
     }
@@ -173,16 +205,14 @@ impl DirStackItem for Song {
         &self,
         ctx: &Ctx,
         is_marked: bool,
+        is_current: bool,
         matches_filter: bool,
         additional_content: Option<String>,
     ) -> ListItem<'a> {
         let config = &ctx.config;
-        let marker_style = if matches_filter {
-            config.theme.symbols.marker_highlighted_style
-        } else {
-            config.theme.symbols.marker_style
-        }
-        .unwrap_or(config.theme.highlighted_item_style);
+        let marker_style = marker_style(ctx, is_current, matches_filter);
+        let song_style = song_style(ctx, is_current, matches_filter);
+
         let marker_span = if is_marked {
             Span::styled(config.theme.symbols.marker.clone(), marker_style)
         } else {
@@ -191,15 +221,7 @@ impl DirStackItem for Song {
 
         let spans = [
             marker_span,
-            Span::styled(
-                config.theme.symbols.song.clone(),
-                if matches_filter {
-                    config.theme.symbols.song_highlighted_style
-                } else {
-                    config.theme.symbols.song_style
-                }
-                .unwrap_or_default(),
-            ),
+            Span::styled(config.theme.symbols.song.clone(), song_style),
             Span::from(" "),
         ]
         .into_iter()
@@ -219,7 +241,10 @@ impl DirStackItem for Song {
         if let Some(content) = additional_content {
             value.push_span(Span::raw(content));
         }
-        if matches_filter {
+
+        if is_current {
+            ListItem::from(value).style(config.theme.current_item_style)
+        } else if matches_filter {
             ListItem::from(value).style(config.theme.highlighted_item_style)
         } else {
             ListItem::from(value)
@@ -307,6 +332,7 @@ impl DirStackItem for String {
         &self,
         ctx: &Ctx,
         is_marked: bool,
+        _is_current: bool,
         matches_filter: bool,
         _additional_content: Option<String>,
     ) -> ListItem<'a> {

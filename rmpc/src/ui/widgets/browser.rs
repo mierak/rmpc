@@ -122,7 +122,7 @@ where
             let prev_state = &mut previous.state;
             prev_state.set_content_and_viewport_len(items.len(), previous_area.height.into());
 
-            let mut previous = List::new(items).style(config.as_text_style());
+            let previous = List::new(items).style(config.as_text_style());
             let mut block = if config.theme.draw_borders {
                 Block::default()
                     .borders(Borders::RIGHT)
@@ -135,8 +135,6 @@ where
             if let Some(title) = title {
                 block = block.title(title);
             }
-
-            previous = previous.highlight_style(config.theme.current_item_style);
 
             let inner_block = block.inner(previous_area);
             self.areas[BrowserArea::Previous] = inner_block;
@@ -177,9 +175,7 @@ where
                 }
                 b.padding(Padding::new(0, column_right_padding, 0, 0))
             };
-            let current = List::new(current)
-                .highlight_style(config.theme.current_item_style)
-                .style(config.as_text_style());
+            let current = List::new(current).style(config.as_text_style());
 
             let inner_block = block.inner(current_area);
             ratatui::widgets::StatefulWidget::render(

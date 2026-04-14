@@ -24,7 +24,8 @@ All notable changes to this project will be documented in this file.
 - Added `queue_disable_current_item_style_timeout_ms`
 - `album_sort_by` now sorts by `Date` first and `Name` second if `Date` is configured
 - Added additional styling properties for symbols: `marker_style`, `marker_current_style`,
-  `song_current_style`, `dir_current_style`, `playlist_current_style`
+  `song_current_style`, `dir_current_style`, `playlist_current_style`,`marker_highlighted_style`,
+  `song_highlighted_style`, `dir_highlighted_style` and `playlist_highlighted_style`
 
 ### Changed
 

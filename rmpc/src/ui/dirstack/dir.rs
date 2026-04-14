@@ -121,7 +121,7 @@ where
         ctx: &Ctx,
     ) -> Vec<ListItem<'a>> {
         let mut already_matched: u32 = 0;
-        let current_item_idx = self.selected_with_idx().map(|(idx, _)| idx);
+        let current_item_idx = self.selected_idx();
 
         let start = match range.start_bound() {
             Bound::Included(&start) => start,
@@ -156,7 +156,13 @@ where
                 } else {
                     None
                 };
-                item.to_list_item(ctx, self.marked().contains(&i), matches, content)
+                item.to_list_item(
+                    ctx,
+                    self.marked().contains(&i),
+                    current_item_idx.is_some_and(|idx| idx == i),
+                    matches,
+                    content,
+                )
             })
             .collect()
     }
@@ -183,6 +189,10 @@ where
         } else {
             None
         }
+    }
+
+    pub fn selected_idx(&self) -> Option<usize> {
+        self.state.get_selected()
     }
 
     pub fn marked_items(&self) -> impl Iterator<Item = &T> {
