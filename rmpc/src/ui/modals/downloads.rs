@@ -349,6 +349,7 @@ impl DirStackItem for DownloadId {
         &self,
         _ctx: &Ctx,
         _is_marked: bool,
+        _is_current: bool,
         _matches_filter: bool,
         _additional_content: Option<String>,
     ) -> ListItem<'a> {

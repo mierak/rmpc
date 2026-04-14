@@ -2,7 +2,6 @@ use itertools::Itertools;
 use ratatui::{
     buffer::Buffer,
     layout::{Constraint, Rect},
-    style::Style,
     widgets::{Row, StatefulWidget, Table, TableState},
 };
 
@@ -18,7 +17,6 @@ where
 {
     items: &'song [T],
     column_widths: Vec<Constraint>,
-    row_highlight_style: Style,
     map_fn: Option<F>,
 }
 
@@ -27,12 +25,7 @@ where
     F: Fn(usize, &'song T) -> Row<'a>,
 {
     pub fn new(items: &'song [T]) -> Self {
-        Self {
-            items,
-            column_widths: Vec::new(),
-            row_highlight_style: Style::default(),
-            map_fn: None,
-        }
+        Self { items, column_widths: Vec::new(), map_fn: None }
     }
 
     pub fn map_fn(mut self, f: F) -> Self {
@@ -46,11 +39,6 @@ where
         W::Item: Into<Constraint>,
     {
         self.column_widths = widths.into_iter().map(Into::into).collect_vec();
-        self
-    }
-
-    pub fn row_highlight_style(mut self, style: Style) -> Self {
-        self.row_highlight_style = style;
         self
     }
 }
@@ -86,8 +74,7 @@ where
             .take(viewport_len)
             .enumerate()
             .map(|(idx, item)| map_fn(idx + original_offset, item));
-        let table = Table::new(actual_rows, self.column_widths)
-            .row_highlight_style(self.row_highlight_style);
+        let table = Table::new(actual_rows, self.column_widths);
 
         StatefulWidget::render(table, area, buf, state.as_render_state_ref());
 

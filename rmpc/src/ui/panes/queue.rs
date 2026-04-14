@@ -62,7 +62,7 @@ use crate::{
     },
     ui::{
         UiEvent,
-        dirstack::{Dir, DirStackItem},
+        dirstack::{self, Dir, DirStackItem},
         input::InputResultEvent,
         modals::{
             confirm_modal::{Action, ConfirmModal},
@@ -363,18 +363,22 @@ impl Pane for QueuePane {
         let current_song_id = ctx.find_current_song_in_queue().map(|(_, song)| song.id);
         let marked = std::mem::take(self.queue.marked_mut());
         let filter = ctx.input.value(self.queue.filter_buffer_id);
+        let selected_idx = self.queue.selected_idx();
 
         let table = VirtualizedTable::new(&self.queue.items)
             .column_widths(self.column_widths.clone())
-            .row_highlight_style(if self.highlight_enabled {
-                config.theme.current_item_style
-            } else {
-                Style::default()
-            })
             .map_fn(|idx, song| {
-                let is_current = current_song_id.is_some_and(|v| v == song.id);
+                let is_currently_playing_song = current_song_id.is_some_and(|v| v == song.id);
+                let is_under_cursor = selected_idx.is_some_and(|i| i == idx);
 
                 let is_marked = marked.contains(&idx);
+                let matches_filter = is_currently_playing_song
+                    || if self.queue.filter_active {
+                        song.matches_formats(self.column_formats.as_slice(), &filter, ctx)
+                    } else {
+                        Default::default()
+                    };
+
                 let columns = (0..formats.len()).map(|i| {
                     let mut max_len: usize = widths[i].width.into();
                     // We have to subtract marker symbol length from max len in order to make space
@@ -408,13 +412,8 @@ impl Pane for QueuePane {
                     .alignment(formats[i].alignment.into());
 
                     if is_marked && i == 0 {
-                        let marker_style = if is_current {
-                            config.theme.symbols.marker_highlighted_style
-                        } else {
-                            config.theme.symbols.marker_style
-                        }
-                        .unwrap_or(config.theme.highlighted_item_style);
-
+                        let marker_style =
+                            dirstack::marker_style(ctx, is_under_cursor, matches_filter);
                         let marker_span = Span::styled(&config.theme.symbols.marker, marker_style);
 
                         line.spans.splice(..0, std::iter::once(marker_span));
@@ -423,16 +422,12 @@ impl Pane for QueuePane {
                     line
                 });
 
-                let is_matching_search = is_current
-                    || if self.queue.filter_active {
-                        song.matches_formats(self.column_formats.as_slice(), &filter, ctx)
-                    } else {
-                        Default::default()
-                    };
-
                 let mut row = QueueRow::default();
-                if is_matching_search {
+                if matches_filter {
                     row.cell_style = Some(config.theme.highlighted_item_style);
+                }
+                if is_under_cursor {
+                    row.cursor_style = Some(config.theme.current_item_style);
                 }
 
                 let sep = ctx.config.theme.song_table_album_separator;
@@ -1371,21 +1366,28 @@ impl QueuePane {
 #[derive(Default)]
 struct QueueRow {
     cell_style: Option<Style>,
+    cursor_style: Option<Style>,
     underlined: bool,
 }
 
 impl QueueRow {
     fn into_row<'a>(self, cells: impl Iterator<Item = Line<'a>>) -> Row<'a> {
-        let mut row = if let Some(style) = self.cell_style {
-            Row::new(cells.map(|column| column.patch_style(style))).style(style)
-        } else {
-            Row::new(cells)
-        };
+        let row = Row::new(cells);
 
-        if self.underlined {
-            row = row.style(self.cell_style.unwrap_or_default().underlined());
+        let mut row_style = Style::default();
+
+        if let Some(style) = self.cell_style {
+            row_style = row_style.patch(style);
         }
 
-        row
+        if let Some(cursor) = self.cursor_style {
+            row_style = row_style.patch(cursor);
+        }
+
+        if self.underlined {
+            row_style = row_style.underlined();
+        }
+
+        row.style(row_style)
     }
 }
