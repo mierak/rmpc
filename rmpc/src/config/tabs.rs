@@ -1,7 +1,7 @@
 #![allow(deprecated)] // TODO remove after cleanup
 use std::collections::HashMap;
 
-use anyhow::{Result, ensure};
+use anyhow::{Context, Result, bail, ensure};
 use derive_more::{Deref, Display, Into};
 use itertools::Itertools;
 use ratatui::{
@@ -69,6 +69,38 @@ impl std::hash::Hash for TabName {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub struct BrowserTagConfigFile {
+    pub tag: String,
+    #[serde(default)]
+    pub split_by_tag: Option<Vec<String>>,
+    #[serde(default)]
+    pub sort_by: Option<Vec<String>>,
+    #[serde(default)]
+    pub separator: Option<String>,
+}
+
+#[derive(Debug, Clone, Hash, Eq, PartialEq)]
+pub struct BrowserTagConfig {
+    pub tag: String,
+    pub split_by_tag: Option<Vec<String>>,
+    pub sort_by: Option<Vec<String>>,
+    pub separator: Option<String>,
+}
+
+impl TryFrom<BrowserTagConfigFile> for BrowserTagConfig {
+    type Error = anyhow::Error;
+
+    fn try_from(value: BrowserTagConfigFile) -> std::result::Result<Self, Self::Error> {
+        Ok(Self {
+            tag: value.tag,
+            split_by_tag: value.split_by_tag,
+            sort_by: value.sort_by,
+            separator: value.separator,
+        })
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 #[allow(clippy::large_enum_variant)]
 pub enum PaneTypeFile {
     Queue,
@@ -101,8 +133,10 @@ pub enum PaneTypeFile {
         scroll_speed: u16,
     },
     Browser {
-        root_tag: String,
+        root_tag: Option<String>,
         separator: Option<String>,
+        #[serde(default)]
+        levels: Vec<BrowserTagConfigFile>,
     },
     Cava,
     Empty(),
@@ -138,8 +172,7 @@ pub enum PaneType {
         scroll_speed: u16,
     },
     Browser {
-        root_tag: String,
-        separator: Option<String>,
+        levels: Vec<BrowserTagConfig>,
     },
     Cava,
     Empty,
@@ -223,8 +256,39 @@ impl TryFrom<PaneTypeFile> for PaneType {
                     scroll_speed,
                 }
             }
-            PaneTypeFile::Browser { root_tag: tag, separator } => {
-                PaneType::Browser { root_tag: tag, separator }
+            PaneTypeFile::Browser { root_tag, separator, levels } => {
+                if let Some(root_tag) = root_tag {
+                    PaneType::Browser {
+                        levels: vec![
+                            BrowserTagConfig {
+                                tag: root_tag,
+                                split_by_tag: None,
+                                sort_by: None,
+                                separator,
+                            },
+                            BrowserTagConfig {
+                                tag: "album".to_string(),
+                                split_by_tag: Some(vec!["date".to_string()]),
+                                sort_by: None,
+                                separator: None,
+                            },
+                        ],
+                    }
+                } else {
+                    if levels.is_empty() {
+                        bail!("At least one level is required for browser panes");
+                    }
+
+                    if levels[0].split_by_tag.is_some() || levels[0].sort_by.is_some() {
+                        bail!(
+                            "split_by_tag and sort_by are not allowed for the first level of browser panes"
+                        );
+                    }
+
+                    PaneType::Browser {
+                        levels: levels.into_iter().map(TryInto::try_into).try_collect()?,
+                    }
+                }
             }
             PaneTypeFile::Cava => PaneType::Cava,
             PaneTypeFile::Empty() => PaneType::Empty,
@@ -243,8 +307,11 @@ impl TabsFile {
             .into_iter()
             .map(|tab| -> Result<_> {
                 Ok(Tab {
+                    panes: tab
+                        .pane
+                        .convert(library, border_set_library)
+                        .with_context(|| format!("Failed to parse tab: {}", tab.name))?,
                     name: tab.name.into(),
-                    panes: tab.pane.convert(library, border_set_library)?,
                 })
             })
             .try_fold((Vec::new(), HashMap::new()), |(mut names, mut tabs), tab| -> Result<_> {

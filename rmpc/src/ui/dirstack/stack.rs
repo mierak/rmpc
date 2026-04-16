@@ -46,6 +46,10 @@ where
         self.dirs.get(path)
     }
 
+    pub fn get_ensure(&mut self, path: Path) -> &mut Dir<T, S> {
+        self.dirs.entry(path).or_default()
+    }
+
     pub fn contained_paths(&self) -> impl Iterator<Item = &Path> {
         self.dirs.keys()
     }
