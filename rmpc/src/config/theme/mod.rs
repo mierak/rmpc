@@ -437,9 +437,11 @@ impl TryFrom<UiConfigFile> for UiConfig {
         let fg_color = StringColor(value.text_color.clone()).to_color()?;
         let bg_color = StringColor(value.background_color).to_color()?;
         let header_bg_color = StringColor(value.header_background_color).to_color()?.or(bg_color);
-        let fallback_border_fg = Color::White;
+        let border = value.borders_style.to_config_or(Some(Color::White), None)?;
         let border_set_lib: BorderSetLib = value.border_symbol_sets.try_into()?;
         let components = convert_components(value.components, &border_set_lib)?;
+        let current_style = value.current_item_style.to_config_or(None, None)?;
+        let highlighted_style = value.highlighted_item_style.to_config_or(None, None)?;
 
         Ok(Self {
             layout: value.layout.convert(&components, &border_set_lib)?,
@@ -455,12 +457,15 @@ impl TryFrom<UiConfigFile> for UiConfig {
             modal_backdrop: value.modal_backdrop,
             text_color: fg_color,
             header_background_color: header_bg_color,
-            borders_style: value.borders_style.to_config_or(Some(fallback_border_fg), None)?,
+            borders_style: border,
             highlight_border_style: value
                 .highlight_border_style
-                .to_config_or(Some(Color::Blue), None)?,
+                .to_config_or(border.fg, border.bg)?,
             symbols: value.symbols.into(),
-            scrollbar: value.scrollbar.map(|sc| sc.into_config(fallback_border_fg)).transpose()?,
+            scrollbar: value
+                .scrollbar
+                .map(|sc| sc.into_config(border.fg.unwrap_or(Color::White)))
+                .transpose()?,
             progress_bar: value.progress_bar.into_config()?,
             song_table_format: TryInto::<QueueTableColumns>::try_into(value.song_table_format)?.0,
             song_table_album_separator: value.song_table_album_separator,
@@ -479,11 +484,14 @@ impl TryFrom<UiConfigFile> for UiConfig {
                 active_style: value
                     .tab_bar
                     .active_style
-                    .to_config_or(Some(Color::Black), Some(Color::Blue))?,
-                inactive_style: value.tab_bar.inactive_style.to_config_or(None, header_bg_color)?,
+                    .to_config_or(current_style.fg.or(fg_color), current_style.bg)?,
+                inactive_style: value
+                    .tab_bar
+                    .inactive_style
+                    .to_config_or(fg_color, header_bg_color)?,
             },
-            highlighted_item_style: value.highlighted_item_style.to_config_or(None, None)?,
-            current_item_style: value.current_item_style.to_config_or(None, None)?,
+            highlighted_item_style: highlighted_style,
+            current_item_style: current_style,
             default_album_art: value
                 .default_album_art_path
                 .map_or(Ok(DEFAULT_ART as &'static [u8]), |path| -> Result<_> {
