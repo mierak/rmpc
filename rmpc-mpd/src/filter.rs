@@ -15,6 +15,7 @@ pub enum Tag {
     Title,
     File,
     Genre,
+    #[strum(serialize = "{0}")]
     Custom(String),
 }
 

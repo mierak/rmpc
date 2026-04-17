@@ -26,9 +26,13 @@ All notable changes to this project will be documented in this file.
 - Added additional styling properties for symbols: `marker_style`, `marker_current_style`,
   `song_current_style`, `dir_current_style`, `playlist_current_style`,`marker_highlighted_style`,
   `song_highlighted_style`, `dir_highlighted_style` and `playlist_highlighted_style`
+- More felixbility to `Browser` panes. They can now be configured to any arbitrary levels of nesting
+  instead of hardcoded `["root_tag", "album"]`
 
 ### Changed
 
+- **Breaking** `config.artists` is now ignored in the `Browser` panes. Use the configuration in the
+  `Browser` pane directly to replicate the old behavior.
 - Improved error message when invalid `default_album_art_path` path is provided
 - Environment variables are now resolved when parsing paths in the config file or theme
 
