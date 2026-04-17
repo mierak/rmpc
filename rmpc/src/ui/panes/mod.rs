@@ -156,7 +156,7 @@ impl<'panes> PaneContainer<'panes> {
             albums: TagBrowserPane::new(
                 vec![BrowserTagConfig {
                     tag: "album".to_string(),
-                    split_by_tag: None,
+                    group_by: None,
                     sort_by: None,
                     separator: None,
                 }],
@@ -167,13 +167,13 @@ impl<'panes> PaneContainer<'panes> {
                 vec![
                     BrowserTagConfig {
                         tag: "artist".to_string(),
-                        split_by_tag: None,
+                        group_by: None,
                         sort_by: None,
                         separator: None,
                     },
                     BrowserTagConfig {
                         tag: "album".to_string(),
-                        split_by_tag: match display_mode {
+                        group_by: match display_mode {
                             AlbumDisplayMode::SplitByDate => Some(date_tags.clone()),
                             AlbumDisplayMode::NameOnly => None,
                         },
@@ -191,13 +191,13 @@ impl<'panes> PaneContainer<'panes> {
                 vec![
                     BrowserTagConfig {
                         tag: "albumartist".to_string(),
-                        split_by_tag: None,
+                        group_by: None,
                         sort_by: None,
                         separator: None,
                     },
                     BrowserTagConfig {
                         tag: "album".to_string(),
-                        split_by_tag: match display_mode {
+                        group_by: match display_mode {
                             AlbumDisplayMode::SplitByDate => Some(date_tags.clone()),
                             AlbumDisplayMode::NameOnly => None,
                         },

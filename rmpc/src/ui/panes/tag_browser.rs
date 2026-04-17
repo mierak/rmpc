@@ -88,11 +88,11 @@ impl TagBrowserPane {
             tags.iter().find_map(|tag| song.metadata.get(tag).map(|v| v.last().to_string()))
         };
 
-        let split_tags = tag.split_by_tag.as_deref().unwrap_or(&[]);
+        let group_tags = tag.group_by.as_deref().unwrap_or(&[]);
 
         let mut groups: Vec<(String, Option<String>, Option<String>, Vec<Song>)> = songs
             .into_iter()
-            .into_group_map_by(|s| (tag_of(s), first_tag_of(s, split_tags)))
+            .into_group_map_by(|s| (tag_of(s), first_tag_of(s, group_tags)))
             .into_iter()
             .flat_map(|((name, split_tag), mut songs)| {
                 songs.sort_by(|a, b| {
@@ -132,7 +132,7 @@ impl TagBrowserPane {
         groups
             .into_iter()
             .map(|(name, split_tag, _, songs)| {
-                let display_name = match &tag.split_by_tag {
+                let display_name = match &tag.group_by {
                     Some(tags) => format!(
                         "({}) {name}",
                         split_tag.unwrap_or_else(|| format!("<no {}>", tags.join(sep)))
@@ -430,7 +430,7 @@ mod tests {
     fn tag(tag: impl Into<String>) -> BrowserTagConfig {
         BrowserTagConfig {
             tag: tag.into(),
-            split_by_tag: Some(vec!["date".to_string()]),
+            group_by: Some(vec!["date".to_string()]),
             sort_by: Some(vec!["date".to_string()]),
             separator: None,
         }
@@ -441,7 +441,7 @@ mod tests {
 
         BrowserTagConfig {
             tag: "album".to_string(),
-            split_by_tag: date_tags,
+            group_by: date_tags,
             sort_by: sort_tag.map(|tag| vec![tag.to_string()]),
             separator: None,
         }
@@ -771,7 +771,7 @@ mod tests {
             ctx.config = std::sync::Arc::new(config);
             let disc_tag = BrowserTagConfig {
                 tag: "disc".to_string(),
-                split_by_tag: None,
+                group_by: None,
                 sort_by: None,
                 separator: None,
             };
@@ -814,7 +814,7 @@ mod tests {
             let mut pane = TagBrowserPane::new(
                 vec![tag("artist"), BrowserTagConfig {
                     tag: "album".to_string(),
-                    split_by_tag: None,
+                    group_by: None,
                     sort_by: None,
                     separator: Some("/".to_string()),
                 }],
@@ -839,7 +839,7 @@ mod tests {
             let mut pane = TagBrowserPane::new(
                 vec![tag("artist"), BrowserTagConfig {
                     tag: "album".to_string(),
-                    split_by_tag: None,
+                    group_by: None,
                     sort_by: None,
                     separator: Some("/".to_string()),
                 }],
@@ -867,7 +867,7 @@ mod tests {
             let mut pane = TagBrowserPane::new(
                 vec![tag("artist"), BrowserTagConfig {
                     tag: "album".to_string(),
-                    split_by_tag: None,
+                    group_by: None,
                     sort_by: None,
                     separator: Some("/".to_string()),
                 }],
