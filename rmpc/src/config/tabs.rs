@@ -72,7 +72,7 @@ impl std::hash::Hash for TabName {
 pub struct BrowserTagConfigFile {
     pub tag: String,
     #[serde(default)]
-    pub split_by_tag: Option<Vec<String>>,
+    pub group_by: Option<Vec<String>>,
     #[serde(default)]
     pub sort_by: Option<Vec<String>>,
     #[serde(default)]
@@ -82,7 +82,7 @@ pub struct BrowserTagConfigFile {
 #[derive(Debug, Clone, Hash, Eq, PartialEq)]
 pub struct BrowserTagConfig {
     pub tag: String,
-    pub split_by_tag: Option<Vec<String>>,
+    pub group_by: Option<Vec<String>>,
     pub sort_by: Option<Vec<String>>,
     pub separator: Option<String>,
 }
@@ -93,7 +93,7 @@ impl TryFrom<BrowserTagConfigFile> for BrowserTagConfig {
     fn try_from(value: BrowserTagConfigFile) -> std::result::Result<Self, Self::Error> {
         Ok(Self {
             tag: value.tag,
-            split_by_tag: value.split_by_tag,
+            group_by: value.group_by,
             sort_by: value.sort_by,
             separator: value.separator,
         })
@@ -262,13 +262,13 @@ impl TryFrom<PaneTypeFile> for PaneType {
                         levels: vec![
                             BrowserTagConfig {
                                 tag: root_tag,
-                                split_by_tag: None,
+                                group_by: None,
                                 sort_by: None,
                                 separator,
                             },
                             BrowserTagConfig {
                                 tag: "album".to_string(),
-                                split_by_tag: Some(vec!["date".to_string()]),
+                                group_by: Some(vec!["date".to_string()]),
                                 sort_by: None,
                                 separator: None,
                             },
@@ -279,7 +279,7 @@ impl TryFrom<PaneTypeFile> for PaneType {
                         bail!("At least one level is required for browser panes");
                     }
 
-                    if levels[0].split_by_tag.is_some() || levels[0].sort_by.is_some() {
+                    if levels[0].group_by.is_some() || levels[0].sort_by.is_some() {
                         bail!(
                             "split_by_tag and sort_by are not allowed for the first level of browser panes"
                         );
