@@ -476,15 +476,13 @@ impl Pane for CavaPane {
                     self.run(ctx)?;
                 }
             }
-            UiEvent::Displayed if is_visible => {
-                if is_visible && !self.is_modal_open && matches!(ctx.status.state, State::Play) {
-                    self.run(ctx)?;
-                }
+            UiEvent::Displayed
+                if is_visible && !self.is_modal_open && matches!(ctx.status.state, State::Play) =>
+            {
+                self.run(ctx)?;
             }
-            UiEvent::Hidden if is_visible => {
-                if !self.is_modal_open {
-                    self.pause_and_clear(ctx)?;
-                }
+            UiEvent::Hidden if is_visible && !self.is_modal_open => {
+                self.pause_and_clear(ctx)?;
             }
             UiEvent::ModalOpened if is_visible => {
                 if !self.is_modal_open {

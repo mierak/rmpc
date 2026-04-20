@@ -180,7 +180,7 @@ impl AlbumArtFacade {
             return Ok(());
         }
 
-        log::debug!(data:?, area:? = self.last_size; "Received encoded data",);
+        log::debug!(data:?, area:? = self.last_size; "Received encoded data");
 
         let w = TERMINAL.writer();
         let mut w = w.lock();

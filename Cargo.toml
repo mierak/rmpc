@@ -97,6 +97,7 @@ cast_sign_loss = "allow"
 must_use_candidate = "allow"
 missing_errors_doc = "allow"
 return_self_not_must_use = "allow"
+duration_suboptimal_units = "allow"
 
 [workspace.lints.rust]
 unused_macros = "allow"

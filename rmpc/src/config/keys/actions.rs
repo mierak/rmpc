@@ -1327,10 +1327,8 @@ impl TryFrom<CommonActionFile> for CommonAction {
                             }
                         }
                     }
-                    RateKind::Value(v) => {
-                        if *v < min_rating || *v > max_rating {
-                            bail!("Rating must be between {min_rating} and {max_rating}");
-                        }
+                    RateKind::Value(v) if (*v < min_rating || *v > max_rating) => {
+                        bail!("Rating must be between {min_rating} and {max_rating}");
                     }
                     _ => {}
                 }

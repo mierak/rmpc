@@ -245,8 +245,8 @@ impl Config {
         tabs: &HashMap<TabName, Tab>,
         layout: &SizedPaneOrSplit,
     ) -> Vec<PaneType> {
-        tabs.iter()
-            .flat_map(|(_, tab)| tab.panes.panes_iter().map(|pane| pane.pane.clone()))
+        tabs.values()
+            .flat_map(|tab| tab.panes.panes_iter().map(|pane| pane.pane.clone()))
             .chain(layout.panes_iter().map(|pane| pane.pane.clone()))
             .unique()
             .collect_vec()

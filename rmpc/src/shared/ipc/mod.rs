@@ -126,7 +126,7 @@ impl RemoteCmd {
                     return ExitCode::from(1);
                 }
                 Ok(_) => {
-                    eprintln!("Remote command '{self}' requires a PID to be specified",);
+                    eprintln!("Remote command '{self}' requires a PID to be specified");
                     return ExitCode::from(1);
                 }
                 Err(err) => {
