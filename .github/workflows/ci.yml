@@ -71,6 +71,7 @@ jobs:
 
       - name: Install Rust components
         run: |
+          rustup update
           rustup toolchain install nightly --profile minimal
           rustup component add rustfmt --toolchain nightly
           rustup component add clippy

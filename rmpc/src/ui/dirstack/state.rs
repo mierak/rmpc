@@ -211,10 +211,7 @@ impl<T: ScrollingState> DirState<T> {
     pub fn prev_half_viewport(&mut self, scrolloff: usize) {
         if self.content_len.is_some() {
             if let Some(viewport) = self.viewport_len {
-                self.select(
-                    self.get_selected().map(|i| i.saturating_sub(viewport / 2).max(0)),
-                    scrolloff,
-                );
+                self.select(self.get_selected().map(|i| i.saturating_sub(viewport / 2)), scrolloff);
             } else {
                 self.select(None, scrolloff);
             }
@@ -242,10 +239,7 @@ impl<T: ScrollingState> DirState<T> {
     pub fn prev_viewport(&mut self, scrolloff: usize) {
         if self.content_len.is_some() {
             if let Some(viewport) = self.viewport_len {
-                self.select(
-                    self.get_selected().map(|i| i.saturating_sub(viewport).max(0)),
-                    scrolloff,
-                );
+                self.select(self.get_selected().map(|i| i.saturating_sub(viewport)), scrolloff);
             } else {
                 self.select(None, scrolloff);
             }
@@ -310,7 +304,7 @@ impl<T: ScrollingState> DirState<T> {
 
     pub fn select(&mut self, idx: Option<usize>, scrolloff: usize) {
         let content_len = self.content_len.unwrap_or_default();
-        let idx = idx.map(|idx| idx.max(0).min(content_len.saturating_sub(1)));
+        let idx = idx.map(|idx| idx.min(content_len.saturating_sub(1)));
         self.inner.select_scrolling(idx);
         self.apply_scrolloff(scrolloff);
 

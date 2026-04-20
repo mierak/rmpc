@@ -192,11 +192,12 @@ impl Modal for MenuModal<'_> {
                 CommonAction::Close => {
                     self.hide(ctx)?;
                 }
-                CommonAction::Confirm => {
-                    if self.sections[self.current_section_idx].confirm(ctx)? {
-                        self.hide(ctx)?;
-                    }
+                CommonAction::Confirm
+                    if self.sections[self.current_section_idx].confirm(ctx)? =>
+                {
+                    self.hide(ctx)?;
                 }
+                CommonAction::Confirm => {}
                 CommonAction::NextResult => {
                     self.next_result(ctx);
                     ctx.render()?;

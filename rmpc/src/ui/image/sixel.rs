@@ -120,7 +120,7 @@ impl Backend for Sixel {
                 let Rgba(current_pixel) = image.get_pixel(x, y);
                 let color = quantized.index_of(current_pixel);
 
-                if last_color.is_some_and(|c| c == color) || last_color.is_none() {
+                if last_color.is_none_or(|c| c == color) {
                     repeat.add_assign(1);
                     last_color = Some(color);
                     continue;

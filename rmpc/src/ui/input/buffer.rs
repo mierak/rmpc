@@ -269,7 +269,7 @@ impl InputBuffer {
             }
             Some(InputEvent::BackWord) => {
                 let prev = self.prev_word_boundary();
-                self.cursor = prev.max(0);
+                self.cursor = prev;
                 InputResultEvent::NoChange
             }
             Some(InputEvent::ForwardWord) => {

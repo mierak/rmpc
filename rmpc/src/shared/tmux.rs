@@ -85,7 +85,7 @@ impl TmuxHooks {
             "-a",
             "-g",
             &format!("client-session-changed[{pid}]"),
-            &format!("run-shell '{current_exe} remote --pid {pid} tmux client-session-changed'",),
+            &format!("run-shell '{current_exe} remote --pid {pid} tmux client-session-changed'"),
         ]);
         log::debug!(cmd:?; "installing hook");
         let stdout = cmd.output()?.stdout;

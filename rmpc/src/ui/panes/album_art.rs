@@ -90,10 +90,8 @@ impl Pane for AlbumArtPane {
                 }
                 self.before_show(ctx)?;
             }
-            UiEvent::Displayed if is_visible => {
-                if is_visible && !self.is_modal_open {
-                    self.album_art.show_current(ctx)?;
-                }
+            UiEvent::Displayed if is_visible && !self.is_modal_open => {
+                self.album_art.show_current(ctx)?;
             }
             UiEvent::ModalOpened if is_visible => {
                 if !self.is_modal_open {
@@ -111,10 +109,8 @@ impl Pane for AlbumArtPane {
                 }
                 self.album_art.show_current(ctx)?;
             }
-            UiEvent::ConfigChanged => {
-                if is_visible && !self.is_modal_open {
-                    self.album_art.show_current(ctx)?;
-                }
+            UiEvent::ConfigChanged if is_visible && !self.is_modal_open => {
+                self.album_art.show_current(ctx)?;
             }
             UiEvent::Exit => {
                 self.album_art.cleanup()?;

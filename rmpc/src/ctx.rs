@@ -211,7 +211,7 @@ impl Ctx {
             if let Ok(val) = any.downcast::<T>() {
                 return Ok(*val);
             }
-            bail!("Received unknown type answer for sync query request",);
+            bail!("Received unknown type answer for sync query request");
         }
 
         bail!("Received unknown MpdQueryResult for sync query request");

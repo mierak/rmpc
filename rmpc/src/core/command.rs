@@ -161,12 +161,11 @@ impl Command {
             Command::Prev { rewind_to_start, keep_state } => Ok(Box::new(move |client| {
                 let status = client.get_status()?;
                 match rewind_to_start {
-                    Some(value) => {
-                        if status.elapsed.as_secs() >= value {
-                            client.seek_current(ValueChange::Set(0))?;
-                        } else {
-                            client.prev_keep_state(keep_state, status.state)?;
-                        }
+                    Some(value) if status.elapsed.as_secs() >= value => {
+                        client.seek_current(ValueChange::Set(0))?;
+                    }
+                    Some(_value) => {
+                        client.prev_keep_state(keep_state, status.state)?;
                     }
                     None => {
                         client.prev_keep_state(keep_state, status.state)?;

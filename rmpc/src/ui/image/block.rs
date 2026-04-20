@@ -151,6 +151,7 @@ fn average_region_pixel(
         }
     }
 
+    #[allow(clippy::manual_checked_ops, reason = "Div used multiple times")]
     if count == 0 {
         image::Rgba([0, 0, 0, 255])
     } else {

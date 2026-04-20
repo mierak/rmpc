@@ -170,8 +170,8 @@ impl<'panes> PaneContainer<'panes> {
         ctx.config
             .tabs
             .tabs
-            .iter()
-            .flat_map(|(_name, tab)| tab.panes.panes_iter())
+            .values()
+            .flat_map(|tab| tab.panes.panes_iter())
             .chain(ctx.config.theme.layout.panes_iter())
             .filter_map(|pane| match &pane.pane {
                 PaneType::Browser { root_tag, separator } => Some((

@@ -202,7 +202,7 @@ impl BrowserPane<DirOrSong> for DirectoriesPane {
                             match client.lsinfo(Some(&next_path.to_string())) {
                                 Ok(val) => val,
                                 Err(err) => {
-                                    log::error!(error:? = err; "Failed to get lsinfo for dir",);
+                                    log::error!(error:? = err; "Failed to get lsinfo for dir");
                                     return Ok(MpdQueryResult::DirOrSong {
                                         data: Vec::new(),
                                         path: None,

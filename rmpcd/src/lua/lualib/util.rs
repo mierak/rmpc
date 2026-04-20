@@ -36,7 +36,7 @@ pub fn dump(v: &Value, indent: usize, seen: &mut HashSet<usize>) -> String {
         Value::Integer(i) => i.to_string(),
         Value::Number(n) => n.to_string(),
         Value::String(s) => {
-            format!("{:?}", s.to_str().map(|v| v.to_string()).unwrap_or("<non-utf8>".to_string()))
+            format!("{:?}", s.to_str().map_or("<non-utf8>".to_string(), |v| v.to_string()))
         }
         Value::Table(t) => dump_table(t, indent, seen),
         Value::Function(_) => "<function>".into(),
