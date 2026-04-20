@@ -8,6 +8,7 @@ use ratatui::{
 
 use super::Pane;
 use crate::{
+    config::theme::properties::Alignment,
     ctx::Ctx,
     shared::{
         ext::duration::DurationExt,
@@ -39,6 +40,14 @@ impl LyricsPane {
 
         self.current_lyrics = Some(lrc);
         Ok(())
+    }
+}
+
+fn align_text(text: Text, alignment: Alignment) -> Text {
+    match alignment {
+        Alignment::Left => text.left_aligned(),
+        Alignment::Right => text.right_aligned(),
+        Alignment::Center => text.centered(),
     }
 }
 
@@ -92,8 +101,8 @@ impl Pane for LyricsPane {
             let Some(area) = areas.get(current_area) else {
                 break;
             };
-            let text = Text::from(l).centered().style(middle_style);
-            frame.render_widget(text, *area);
+            let text = Text::from(l).style(middle_style);
+            frame.render_widget(align_text(text, ctx.config.theme.lyrics.alignment), *area);
             current_area += 1;
         }
 
@@ -116,9 +125,9 @@ impl Pane for LyricsPane {
                 let Some(area) = areas.get(before_area_cursor - 1) else {
                     break;
                 };
-                let text = Text::from(l.as_ref()).centered().style(default_style);
+                let text = Text::from(l.as_ref()).style(default_style);
 
-                frame.render_widget(text, *area);
+                frame.render_widget(align_text(text, ctx.config.theme.lyrics.alignment), *area);
                 before_area_cursor -= 1;
             }
         }
@@ -142,8 +151,8 @@ impl Pane for LyricsPane {
                 let Some(area) = areas.get(after_area_cursor + 1) else {
                     break;
                 };
-                let text = Text::from(l).centered().style(default_style);
-                frame.render_widget(text, *area);
+                let text = Text::from(l).style(default_style);
+                frame.render_widget(align_text(text, ctx.config.theme.lyrics.alignment), *area);
                 after_area_cursor += 1;
             }
         }
