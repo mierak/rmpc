@@ -47,7 +47,8 @@ keybinds
 - password and address override parameter not working for rmpc's CLI
 - Config hot reload ignoring disable flag
 - `debuginfo` command no longer shows incorrect errors about missing components
-
+- also consider `all` when verifying tmux passthrough
+- add `iTerm.app` into emulator env variable detection
 
 ## [0.11.0] - 2026-02-01
 
