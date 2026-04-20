@@ -426,7 +426,7 @@ impl Pane for QueuePane {
                 if matches_filter {
                     row.cell_style = Some(config.theme.highlighted_item_style);
                 }
-                if is_under_cursor {
+                if is_under_cursor && self.highlight_enabled {
                     row.cursor_style = Some(config.theme.current_item_style);
                 }
 
