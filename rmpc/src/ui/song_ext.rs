@@ -227,7 +227,7 @@ impl SongExt for Song {
                     start_of_line_spacer.clone(),
                     Span::styled("Duration", key_style),
                     separator.clone(),
-                    Span::from(ctx.config.duration_format.format(duration.as_secs())),
+                    Span::from(ctx.config.duration_format.format(duration)),
                 ])
                 .into(),
             );

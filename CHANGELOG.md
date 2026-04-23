@@ -27,6 +27,7 @@ All notable changes to this project will be documented in this file.
   `song_current_style`, `dir_current_style`, `playlist_current_style`,`marker_highlighted_style`,
   `song_highlighted_style`, `dir_highlighted_style` and `playlist_highlighted_style`
 - Added alignment config to lyrics
+- Song info modal now respects `duration_format`
 
 ### Changed
 

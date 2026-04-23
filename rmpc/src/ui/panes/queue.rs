@@ -66,7 +66,7 @@ use crate::{
         input::InputResultEvent,
         modals::{
             confirm_modal::{Action, ConfirmModal},
-            info_list_modal::InfoListModal,
+            info_list_modal::{InfoListModal, SongCtx},
             input_modal::InputModal,
             menu::{
                 add_to_playlist_or_show_modal,
@@ -200,7 +200,7 @@ impl QueuePane {
                         modal!(
                             ctx,
                             InfoListModal::builder()
-                                .items(&song)
+                                .items(SongCtx(&song, ctx))
                                 .title("Song info")
                                 .column_widths(&[30, 70])
                                 .build()
@@ -1178,7 +1178,7 @@ impl Pane for QueuePane {
                         modal!(
                             ctx,
                             InfoListModal::builder()
-                                .items(selected_song)
+                                .items(SongCtx(selected_song, ctx))
                                 .title("Song info")
                                 .column_widths(&[30, 70])
                                 .build()

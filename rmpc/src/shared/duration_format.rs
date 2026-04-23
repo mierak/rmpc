@@ -1,3 +1,5 @@
+use std::time::Duration;
+
 use anyhow::Result;
 use serde::{Deserialize, Serialize};
 
@@ -123,10 +125,11 @@ impl DurationFormat {
         Ok(Self { parts })
     }
 
-    pub fn format(&self, total_seconds: u64) -> String {
+    pub fn format(&self, duration: &Duration) -> String {
         use std::fmt::Write;
 
         let mut result = String::with_capacity(16);
+        let total_seconds = duration.as_secs();
         let days = total_seconds / 86400;
         let hours = (total_seconds / 3600) % 24;
         let minutes = (total_seconds / 60) % 60;
@@ -177,36 +180,36 @@ mod tests {
     #[test]
     fn test_custom_format_tokens() {
         let classic = DurationFormat::parse("%M:%S").unwrap();
-        assert_eq!(classic.format(45), "00:45");
-        assert_eq!(classic.format(85), "01:25");
+        assert_eq!(classic.format(&Duration::from_secs(45)), "00:45");
+        assert_eq!(classic.format(&Duration::from_secs(85)), "01:25");
 
         let mixed = DurationFormat::parse("%h hours, %M mins").unwrap();
-        assert_eq!(mixed.format(3665), "1 hours, 01 mins");
+        assert_eq!(mixed.format(&Duration::from_secs(3665)), "1 hours, 01 mins");
 
         let unpadded = DurationFormat::parse("%m:%s").unwrap();
-        assert_eq!(unpadded.format(85), "1:25");
+        assert_eq!(unpadded.format(&Duration::from_secs(85)), "1:25");
     }
 
     #[test]
     fn test_total_seconds_token() {
         let total = DurationFormat::parse("%t seconds").unwrap();
-        assert_eq!(total.format(90), "90 seconds");
-        assert_eq!(total.format(3600), "3600 seconds");
+        assert_eq!(total.format(&Duration::from_secs(90)), "90 seconds");
+        assert_eq!(total.format(&Duration::from_secs(3600)), "3600 seconds");
     }
 
     #[test]
     fn test_literal_percent() {
         let fmt = DurationFormat::parse("Usage: 100%%").unwrap();
-        assert_eq!(fmt.format(60), "Usage: 100%");
+        assert_eq!(fmt.format(&Duration::from_secs(60)), "Usage: 100%");
 
         let fmt2 = DurationFormat::parse("%M%%").unwrap();
-        assert_eq!(fmt2.format(60), "01%");
+        assert_eq!(fmt2.format(&Duration::from_secs(60)), "01%");
     }
 
     #[test]
     fn test_zero_duration() {
         let fmt2 = DurationFormat::parse("%M:%S").unwrap();
-        assert_eq!(fmt2.format(0), "00:00");
+        assert_eq!(fmt2.format(&Duration::from_secs(0)), "00:00");
     }
 
     #[test]
