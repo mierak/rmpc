@@ -55,7 +55,7 @@ use crate::{
     ui::{
         image::facade::EncodeData,
         input::{InputEvent, InputResultEvent},
-        modals::{downloads::DownloadsModal, menu::create_rating_modal},
+        modals::{downloads::DownloadsModal, info_list_modal::SongCtx, menu::create_rating_modal},
     },
 };
 
@@ -696,7 +696,7 @@ impl<'ui> Ui<'ui> {
                         modal!(
                             ctx,
                             InfoListModal::builder()
-                                .items(current_song)
+                                .items(SongCtx(current_song, ctx))
                                 .title("Song info")
                                 .column_widths(&[30, 70])
                                 .build()

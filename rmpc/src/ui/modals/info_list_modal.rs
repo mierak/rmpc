@@ -276,8 +276,9 @@ impl From<Vec<Song>> for KeyValues {
     }
 }
 
-impl From<&Song> for KeyValues {
-    fn from(song: &Song) -> Self {
+pub struct SongCtx<'a>(pub &'a Song, pub &'a Ctx);
+impl From<SongCtx<'_>> for KeyValues {
+    fn from(SongCtx(song, ctx): SongCtx) -> Self {
         let mut result = Vec::new();
         result.push(KeyValue { key: "File".to_owned(), value: song.file.clone() });
         let file_name = song.file_name().unwrap_or_default();
@@ -309,7 +310,11 @@ impl From<&Song> for KeyValues {
             );
         }
 
-        let duration = song.duration.as_ref().map(|d| d.as_secs().to_string()).unwrap_or_default();
+        let duration = song
+            .duration
+            .as_ref()
+            .map(|d| ctx.config.duration_format.format(d))
+            .unwrap_or_default();
         if !duration.is_empty() {
             result.push(KeyValue { key: "Duration".to_owned(), value: duration });
         }
