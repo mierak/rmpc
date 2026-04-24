@@ -29,6 +29,7 @@ All notable changes to this project will be documented in this file.
 - Added alignment config to lyrics
 - Song info modal now respects `duration_format`
 - Add `-v`/`--version` args to cli
+- `SelectAlbum` queue keybind
 
 ### Changed
 
