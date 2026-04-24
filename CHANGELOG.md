@@ -28,6 +28,7 @@ All notable changes to this project will be documented in this file.
   `song_highlighted_style`, `dir_highlighted_style` and `playlist_highlighted_style`
 - Added alignment config to lyrics
 - Song info modal now respects `duration_format`
+- Add `-v`/`--version` args to cli
 
 ### Changed
 
