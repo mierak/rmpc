@@ -30,6 +30,10 @@ pub struct Args {
 
     #[command(flatten)]
     pub partition: Partition,
+
+    #[arg(short, long)]
+    /// Print rmpc version and exit
+    pub version: bool,
 }
 
 #[derive(Debug, clap::Args)]
@@ -122,7 +126,7 @@ pub enum Command {
         /// Command to send to MPD
         command: String,
     },
-    /// Prints the rmpc version
+    /// Print rmpc version and exit
     Version,
     /// Prints the list of songs in the current queue
     Queue,

@@ -291,11 +291,7 @@ fn main() -> Result<()> {
             println!("{}", CAVA.display());
         }
         Some(Command::Version) => {
-            println!(
-                "rmpc {}{}",
-                env!("CARGO_PKG_VERSION"),
-                option_env!("VERGEN_GIT_DESCRIBE").map(|g| format!(" git {g}")).unwrap_or_default()
-            );
+            print_version();
         }
         Some(Command::Remote { command, pid }) => {
             let pid = pid.or_else(|| {
@@ -338,6 +334,11 @@ fn main() -> Result<()> {
             result(&mut client)?;
         }
         None => {
+            if args.version {
+                print_version();
+                return Ok(());
+            }
+
             let (worker_tx, worker_rx) = unbounded::<WorkRequest>();
             let (client_tx, client_rx) = unbounded::<ClientRequest>();
             let (event_tx, event_rx) = unbounded::<AppEvent>();
@@ -467,4 +468,12 @@ fn main() -> Result<()> {
     }
 
     Ok(())
+}
+
+fn print_version() {
+    println!(
+        "rmpc {}{}",
+        env!("CARGO_PKG_VERSION"),
+        option_env!("VERGEN_GIT_DESCRIBE").map(|g| format!(" git {g}")).unwrap_or_default()
+    );
 }
