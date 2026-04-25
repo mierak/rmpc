@@ -1194,7 +1194,7 @@ impl Config {
         self.theme.highlight_border_style
     }
 
-    fn as_text_style(&self) -> ratatui::style::Style {
+    pub(crate) fn as_text_style(&self) -> ratatui::style::Style {
         self.theme.text_color.map(|color| Style::default().fg(color)).unwrap_or_default()
     }
 
