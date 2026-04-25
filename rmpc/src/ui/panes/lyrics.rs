@@ -2,7 +2,6 @@ use anyhow::Result;
 use ratatui::{
     Frame,
     layout::{Constraint, Layout, Rect},
-    style::Style,
     text::Text,
 };
 
@@ -71,10 +70,10 @@ impl Pane for LyricsPane {
         let areas = Layout::vertical((0..rows).map(|_| Constraint::Length(1))).split(area);
         let middle_row = rows.saturating_sub(1) / 2;
 
-        let default_style = Style::default().fg(ctx.config.theme.text_color.unwrap_or_default());
+        let default_style = ctx.config.as_text_style();
 
         let middle_style = if first_line_reached {
-            ctx.config.theme.highlighted_item_style
+            ctx.config.as_text_style().patch(ctx.config.theme.highlighted_item_style)
         } else {
             default_style
         };

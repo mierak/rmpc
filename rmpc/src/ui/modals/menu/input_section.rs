@@ -4,7 +4,6 @@ use anyhow::Result;
 use ratatui::{
     buffer::Buffer,
     layout::{Position, Rect},
-    style::Style,
     widgets::Widget,
 };
 
@@ -122,17 +121,15 @@ impl Section for InputSection<'_> {
             .borderless(true)
             .label(self.label.as_ref())
             .label_style(if self.is_current && !ctx.input.is_active(self.buffer_id) {
-                ctx.config.theme.current_item_style
+                ctx.config.as_text_style().patch(ctx.config.theme.current_item_style)
             } else if let Some(f) = filter
                 && self.label.to_lowercase().contains(f)
             {
-                ctx.config.theme.highlighted_item_style
+                ctx.config.as_text_style().patch(ctx.config.theme.highlighted_item_style)
             } else {
-                ctx.config.theme.text_color.map_or(Style::default(), |c| Style::default().fg(c))
+                ctx.config.as_text_style()
             })
-            .input_style(
-                ctx.config.theme.text_color.map_or(Style::default(), |c| Style::default().fg(c)),
-            )
+            .input_style(ctx.config.as_text_style())
             .build();
 
         input.render(area, buf);

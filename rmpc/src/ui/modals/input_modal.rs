@@ -146,9 +146,10 @@ impl<'a, C: FnOnce(&Ctx, &str) -> Result<()> + 'a> Modal for InputModal<'a, C> {
             .build();
 
         self.button_group.set_active_style(if ctx.input.is_active(self.input_buffer_id) {
+            // !!TODO - Should this have config??
             Style::default().reversed()
         } else {
-            ctx.config.theme.current_item_style
+            ctx.config.as_text_style().patch(ctx.config.theme.current_item_style)
         });
 
         self.input_area = body_area;

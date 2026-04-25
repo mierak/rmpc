@@ -47,47 +47,48 @@ pub trait DirStackItem {
 }
 
 pub fn marker_style(ctx: &Ctx, is_current: bool, matches_filter: bool) -> Style {
+    let style =
+        ctx.config.theme.symbols.marker_style.unwrap_or(ctx.config.theme.highlighted_item_style);
     if is_current {
-        ctx.config.theme.symbols.marker_current_style
+        return style.patch(ctx.config.theme.symbols.marker_current_style.unwrap_or_default());
     } else if matches_filter {
-        ctx.config.theme.symbols.marker_highlighted_style
-    } else {
-        ctx.config.theme.symbols.marker_style
+        return style.patch(ctx.config.theme.symbols.marker_highlighted_style.unwrap_or_default());
     }
-    .unwrap_or(ctx.config.theme.highlighted_item_style)
+    return style;
 }
 
 fn dir_style(ctx: &Ctx, is_current: bool, matches_filter: bool) -> Style {
+    let style =
+        ctx.config.theme.symbols.dir_style.unwrap_or(ctx.config.theme.highlighted_item_style);
     if is_current {
-        ctx.config.theme.symbols.dir_current_style
+        return style.patch(ctx.config.theme.symbols.dir_current_style.unwrap_or_default());
     } else if matches_filter {
-        ctx.config.theme.symbols.dir_highlighted_style
-    } else {
-        ctx.config.theme.symbols.dir_style
+        return style.patch(ctx.config.theme.symbols.dir_highlighted_style.unwrap_or_default());
     }
-    .unwrap_or_default()
+    return style;
 }
 
 fn playlist_style(ctx: &Ctx, is_current: bool, matches_filter: bool) -> Style {
+    let style =
+        ctx.config.theme.symbols.playlist_style.unwrap_or(ctx.config.theme.highlighted_item_style);
     if is_current {
-        ctx.config.theme.symbols.playlist_current_style
+        return style.patch(ctx.config.theme.symbols.playlist_current_style.unwrap_or_default());
     } else if matches_filter {
-        ctx.config.theme.symbols.playlist_highlighted_style
-    } else {
-        ctx.config.theme.symbols.playlist_style
+        return style
+            .patch(ctx.config.theme.symbols.playlist_highlighted_style.unwrap_or_default());
     }
-    .unwrap_or_default()
+    return style;
 }
 
 fn song_style(ctx: &Ctx, is_current: bool, matches_filter: bool) -> Style {
+    let style =
+        ctx.config.theme.symbols.song_style.unwrap_or(ctx.config.theme.highlighted_item_style);
     if is_current {
-        ctx.config.theme.symbols.song_current_style
+        return style.patch(ctx.config.theme.symbols.song_current_style.unwrap_or_default());
     } else if matches_filter {
-        ctx.config.theme.symbols.song_highlighted_style
-    } else {
-        ctx.config.theme.symbols.song_style
+        return style.patch(ctx.config.theme.symbols.song_highlighted_style.unwrap_or_default());
     }
-    .unwrap_or_default()
+    return style;
 }
 
 impl DirStackItem for DirOrSong {
