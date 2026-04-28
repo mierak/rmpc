@@ -127,7 +127,7 @@
             "D":          DeleteAll,
             "<CR>":       Play,
             "C":          JumpToCurrent,
-            "L":          SelectAlbum,
+            "L":          SelectAlbum(),
             "X":          Shuffle,
         },
     ),

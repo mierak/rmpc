@@ -352,7 +352,7 @@ pub enum QueueActionsFile {
     Sort {
         kind: SortFile,
     },
-    SelectAlbum,
+    SelectAlbum(),
 }
 
 #[derive(Debug, Display, Clone, EnumDiscriminants, PartialEq, Eq)]
@@ -381,7 +381,7 @@ impl TryFrom<QueueActionsFile> for QueueActions {
             QueueActionsFile::AddToPlaylist => Ok(QueueActions::Unused),
             QueueActionsFile::ShowInfo => Ok(QueueActions::Unused),
             QueueActionsFile::JumpToCurrent => Ok(QueueActions::JumpToCurrent),
-            QueueActionsFile::SelectAlbum => Ok(QueueActions::SelectAlbum),
+            QueueActionsFile::SelectAlbum() => Ok(QueueActions::SelectAlbum),
             QueueActionsFile::Shuffle => Ok(QueueActions::Shuffle),
             QueueActionsFile::SortByColumn(idx) => {
                 let idx = idx.checked_sub(1);
