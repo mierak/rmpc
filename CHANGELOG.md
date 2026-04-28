@@ -52,6 +52,7 @@ keybinds
 - `debuginfo` command no longer shows incorrect errors about missing components
 - also consider `all` when verifying tmux passthrough
 - add `iTerm.app` into emulator env variable detection
+- `current_item_style` and `highlighted_item_style` merge on top of `text_color` in modals and search
 
 ## [0.11.0] - 2026-02-01
 
