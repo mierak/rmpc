@@ -847,6 +847,20 @@ impl Pane for QueuePane {
                         status_info!("No song is currently playing");
                     }
                 }
+
+                QueueActions::SelectAlbum => {
+                    if let Some(selected_idx) = self.queue.selected_idx() {
+                        let mut album_ranges = self.queue.items.as_slice().to_album_ranges();
+
+                        if let Some(range) = album_ranges.find(|r| r.contains(&selected_idx)) {
+                            for idx in range {
+                                self.queue.state.toggle_mark(idx);
+                            }
+                            ctx.render()?;
+                        }
+                    }
+                }
+
                 QueueActions::Shuffle if !self.queue.marked().is_empty() => {
                     for range in self.queue.marked().ranges().rev() {
                         ctx.command(move |client| {
