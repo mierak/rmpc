@@ -35,6 +35,7 @@ All notable changes to this project will be documented in this file.
 
 - Improved error message when invalid `default_album_art_path` path is provided
 - Environment variables are now resolved when parsing paths in the config file or theme
+- Apply `text_color` to more elements
 
 ### Fixed
 

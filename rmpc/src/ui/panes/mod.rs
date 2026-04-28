@@ -422,7 +422,7 @@ impl Property<PropertyKind> {
         tag_separator: &str,
         strategy: TagResolutionStrategy,
     ) -> Option<Either<Span<'s>, Vec<Span<'s>>>> {
-        let style = self.style.unwrap_or_default();
+        let style = ctx.config.as_text_style().patch(self.style.unwrap_or_default());
         let status = &ctx.status;
         match &self.kind {
             PropertyKindOrText::Text(value) => Some(Either::Left(Span::styled(value, style))),
@@ -464,7 +464,7 @@ impl Property<PropertyKind> {
                         State::Stop => stopped_style,
                         State::Pause => paused_style,
                     }
-                    .unwrap_or(style),
+                    .map_or(style, |s| style.patch(s))
                 ))),
                 StatusProperty::Duration => {
                     Some(Either::Left(Span::styled(status.duration.to_string(), style)))
@@ -481,13 +481,15 @@ impl Property<PropertyKind> {
                 StatusProperty::Repeat { on_label, off_label, on_style, off_style } => {
                     Some(Either::Left(Span::styled(
                         if status.repeat { on_label } else { off_label },
-                        if status.repeat { on_style } else { off_style }.unwrap_or(style),
+                        if status.repeat { on_style } else { off_style }
+                            .map_or(style, |s| style.patch(s))
                     )))
                 }
                 StatusProperty::Random { on_label, off_label, on_style, off_style } => {
                     Some(Either::Left(Span::styled(
                         if status.random { on_label } else { off_label },
-                        if status.random { on_style } else { off_style }.unwrap_or(style),
+                        if status.random { on_style } else { off_style }
+                            .map_or(style, |s| style.patch(s))
                     )))
                 }
                 StatusProperty::Consume {
@@ -508,7 +510,7 @@ impl Property<PropertyKind> {
                         OnOffOneshot::Off => off_style,
                         OnOffOneshot::Oneshot => oneshot_style,
                     }
-                    .unwrap_or(style),
+                    .map_or(style, |s| style.patch(s))
                 ))),
                 StatusProperty::Single {
                     on_label,
@@ -528,7 +530,7 @@ impl Property<PropertyKind> {
                         OnOffOneshot::Off => off_style,
                         OnOffOneshot::Oneshot => oneshot_style,
                     }
-                    .unwrap_or(style),
+                    .map_or(style, |s| style.patch(s))
                 ))),
                 StatusProperty::Bitrate => status.bitrate.as_ref().map_or_else(
                     || self.default_as_span(song, ctx, tag_separator, strategy),
@@ -599,22 +601,32 @@ impl Property<PropertyKind> {
                     Some(Either::Left(Span::styled(Volume::get_str(*status.volume.value()), style)))
                 }
                 WidgetProperty::States { active_style, separator_style } => {
-                    let separator = Span::styled(" / ", *separator_style);
+                    let separator = Span::styled(" / ", style.patch(*separator_style));
                     Some(Either::Right(vec![
-                        Span::styled("Repeat", if status.repeat { *active_style } else { style }),
+                        Span::styled(
+                            "Repeat",
+                            if status.repeat { style.patch(*active_style) } else { style },
+                        ),
                         separator.clone(),
-                        Span::styled("Random", if status.random { *active_style } else { style }),
+                        Span::styled(
+                            "Random",
+                            if status.random { style.patch(*active_style) } else { style },
+                        ),
                         separator.clone(),
                         match status.consume {
-                            OnOffOneshot::On => Span::styled("Consume", *active_style),
+                            OnOffOneshot::On => Span::styled("Consume", style.patch(*active_style)),
                             OnOffOneshot::Off => Span::styled("Consume", style),
-                            OnOffOneshot::Oneshot => Span::styled("Oneshot(C)", *active_style),
+                            OnOffOneshot::Oneshot => {
+                                Span::styled("Oneshot(C)", style.patch(*active_style))
+                            }
                         },
                         separator,
                         match status.single {
-                            OnOffOneshot::On => Span::styled("Single", *active_style),
+                            OnOffOneshot::On => Span::styled("Single", style.patch(*active_style)),
                             OnOffOneshot::Off => Span::styled("Single", style),
-                            OnOffOneshot::Oneshot => Span::styled("Oneshot(S)", *active_style),
+                            OnOffOneshot::Oneshot => {
+                                Span::styled("Oneshot(S)", style.patch(*active_style))
+                            }
                         },
                     ]))
                 }

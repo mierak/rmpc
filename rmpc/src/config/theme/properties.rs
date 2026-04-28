@@ -3,7 +3,7 @@ use std::collections::BTreeMap;
 use anyhow::Result;
 use bon::Builder;
 use itertools::Itertools;
-use ratatui::style::{Color, Style};
+use ratatui::style::Style;
 use serde::{Deserialize, Serialize};
 use serde_with::skip_serializing_none;
 use strum::Display;
@@ -562,9 +562,8 @@ impl TryFrom<PropertyFile<PropertyKindFile>> for Property<PropertyKind> {
                             active_style,
                             separator_style,
                         }) => PropertyKind::Widget(WidgetProperty::States {
-                            active_style: active_style.to_config_or(Some(Color::White), None)?,
-                            separator_style: separator_style
-                                .to_config_or(Some(Color::White), None)?,
+                            active_style: active_style.to_config_or(None, None)?,
+                            separator_style: separator_style.to_config_or(None, None)?,
                         }),
                         PropertyKindFile::Widget(WidgetPropertyFile::ScanStatus) => {
                             PropertyKind::Widget(WidgetProperty::ScanStatus)

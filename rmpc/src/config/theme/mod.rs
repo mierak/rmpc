@@ -439,6 +439,7 @@ impl TryFrom<UiConfigFile> for UiConfig {
         let fallback_border_fg = Color::White;
         let border_set_lib: BorderSetLib = value.border_symbol_sets.try_into()?;
         let components = convert_components(value.components, &border_set_lib)?;
+        let text_color = StringColor(value.text_color).to_color()?;
 
         Ok(Self {
             layout: value.layout.convert(&components, &border_set_lib)?,
@@ -452,7 +453,7 @@ impl TryFrom<UiConfigFile> for UiConfig {
                 .to_color()?
                 .or(bg_color),
             modal_backdrop: value.modal_backdrop,
-            text_color: StringColor(value.text_color).to_color()?,
+            text_color,
             header_background_color: header_bg_color,
             borders_style: value.borders_style.to_config_or(Some(fallback_border_fg), None)?,
             highlight_border_style: value
@@ -478,11 +479,14 @@ impl TryFrom<UiConfigFile> for UiConfig {
                 active_style: value
                     .tab_bar
                     .active_style
-                    .to_config_or(Some(Color::Black), Some(Color::Blue))?,
-                inactive_style: value.tab_bar.inactive_style.to_config_or(None, header_bg_color)?,
+                    .to_config_or(text_color, Some(Color::Blue))?,
+                inactive_style: value
+                    .tab_bar
+                    .inactive_style
+                    .to_config_or(text_color, header_bg_color)?,
             },
-            highlighted_item_style: value.highlighted_item_style.to_config_or(None, None)?,
-            current_item_style: value.current_item_style.to_config_or(None, None)?,
+            highlighted_item_style: value.highlighted_item_style.to_config_or(text_color, None)?,
+            current_item_style: value.current_item_style.to_config_or(text_color, None)?,
             default_album_art: value
                 .default_album_art_path
                 .map_or(Ok(DEFAULT_ART as &'static [u8]), |path| -> Result<_> {
@@ -492,10 +496,10 @@ impl TryFrom<UiConfigFile> for UiConfig {
                 })
                 .context("Failed to read 'default_album_art_path'")?,
             browser_song_format: TryInto::<SongFormat>::try_into(value.browser_song_format)?,
-            preview_label_style: value.preview_label_style.to_config_or(None, None)?,
+            preview_label_style: value.preview_label_style.to_config_or(text_color, None)?,
             preview_metadata_group_style: value
                 .preview_metadata_group_style
-                .to_config_or(None, None)?,
+                .to_config_or(text_color, None)?,
             level_styles: value.level_styles.try_into()?,
             lyrics: value.lyrics.into(),
             border_symbol_sets: border_set_lib,
