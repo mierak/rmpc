@@ -131,6 +131,7 @@ pub trait MpdCommand {
     fn send_delete_id(&mut self, id: u32) -> MpdResult<()>;
     fn send_delete_from_queue(&mut self, songs: SingleOrRange) -> MpdResult<()>;
     fn send_playlist_info(&mut self) -> MpdResult<()>;
+    fn send_playlist_id(&mut self, id: u32) -> MpdResult<()>;
     fn send_find(&mut self, filter: &[Filter<'_>]) -> MpdResult<()>;
     fn send_search(&mut self, filter: &[Filter<'_>]) -> MpdResult<()>;
     fn send_move_in_queue(&mut self, from: SingleOrRange, to: QueuePosition) -> MpdResult<()>;
@@ -273,6 +274,7 @@ pub trait MpdClient: Sized {
     fn delete_id(&mut self, id: u32) -> MpdResult<()>;
     fn delete_from_queue(&mut self, songs: SingleOrRange) -> MpdResult<()>;
     fn playlist_info(&mut self) -> MpdResult<Option<Vec<Song>>>;
+    fn playlist_id(&mut self, id: u32) -> MpdResult<Option<Song>>;
     fn find(&mut self, filter: &[Filter<'_>]) -> MpdResult<Vec<Song>>;
     fn search(&mut self, filter: &[Filter<'_>], ignore_diacritics: bool) -> MpdResult<Vec<Song>>;
     fn move_in_queue(&mut self, from: SingleOrRange, to: QueuePosition) -> MpdResult<()>;
@@ -570,6 +572,10 @@ impl<T: SocketClient> MpdCommand for T {
 
     fn send_playlist_info(&mut self) -> MpdResult<()> {
         self.execute("playlistinfo")
+    }
+
+    fn send_playlist_id(&mut self, id: u32) -> MpdResult<()> {
+        self.execute(&format!("playlistid {id}"))
     }
 
     fn send_find(&mut self, filter: &[Filter<'_>]) -> MpdResult<()> {

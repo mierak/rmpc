@@ -2,7 +2,10 @@ use std::sync::Arc;
 
 use anyhow::Result;
 use mlua::{IntoLuaMulti, Lua, LuaSerdeExt, Table, Value};
-use rmpc_mpd::mpd_client::MpdClient;
+use rmpc_mpd::{
+    filter::{Filter, Tag},
+    mpd_client::MpdClient,
+};
 
 use crate::{async_client::AsyncClient, lua::lualib::mpd::types::Status};
 
@@ -60,9 +63,54 @@ pub fn create(lua: &Lua, client: &Arc<AsyncClient>) -> Result<Table> {
         }
     })?;
 
+    let c = Arc::clone(client);
+    let get_song = lua.create_async_function(move |lua, uri: String| {
+        let client = Arc::clone(&c);
+        async move {
+            match client.run(move |c| c.find_one(&[Filter::new(Tag::File, uri.as_str())])).await {
+                Ok(song) => lua.to_value(&song).into_lua_multi(&lua),
+                Err(err) => {
+                    tracing::error!(err = ?err, "Failed to get song by uri");
+                    (Value::Nil, Some(err.to_string())).into_lua_multi(&lua)
+                }
+            }
+        }
+    })?;
+
+    let c = Arc::clone(client);
+    let get_song_by_id = lua.create_async_function(move |lua, id: u32| {
+        let client = Arc::clone(&c);
+        async move {
+            match client.run(move |c| c.playlist_id(id)).await {
+                Ok(song) => lua.to_value(&song).into_lua_multi(&lua),
+                Err(err) => {
+                    tracing::error!(err = ?err, "Failed to get song by id");
+                    (Value::Nil, Some(err.to_string())).into_lua_multi(&lua)
+                }
+            }
+        }
+    })?;
+
+    let c = Arc::clone(client);
+    let get_current_song = lua.create_async_function(move |lua, ()| {
+        let client = Arc::clone(&c);
+        async move {
+            match client.run(move |c| c.get_current_song()).await {
+                Ok(song) => lua.to_value(&song).into_lua_multi(&lua),
+                Err(err) => {
+                    tracing::error!(err = ?err, "Failed to get current song");
+                    (Value::Nil, Some(err.to_string())).into_lua_multi(&lua)
+                }
+            }
+        }
+    })?;
+
     mpd.raw_set("get_status", get_status)?;
     mpd.raw_set("album_art", album_art)?;
     mpd.raw_set("read_picture", read_picture)?;
+    mpd.raw_set("get_song", get_song)?;
+    mpd.raw_set("get_song_by_id", get_song_by_id)?;
+    mpd.raw_set("get_current_song", get_current_song)?;
 
     Ok(mpd)
 }
