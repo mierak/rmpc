@@ -27,6 +27,9 @@
 ---@field channels fun(): (string[]|nil, string|nil)
 ---@field send_message fun(channel: string, message: string): (boolean, string|nil)
 ---@field read_messages fun(): (table<string, string[]>|nil, string|nil)
+---@field get_song fun(uri: string): (Song|nil, nil|string)
+---@field get_song_by_id fun(id: number): (Song|nil, nil|string)
+---@field get_current_song fun(): (Song|nil, nil|string)
 
 ---@alias ValueChange string e.g. "+5", "-10", "50"
 

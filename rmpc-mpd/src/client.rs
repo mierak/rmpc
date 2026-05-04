@@ -516,6 +516,10 @@ impl MpdClient for Client<'_> {
         self.send_playlist_info().and_then(|()| self.read_opt_response())
     }
 
+    fn playlist_id(&mut self, id: u32) -> MpdResult<Option<Song>> {
+        self.send_playlist_id(id).and_then(|()| self.read_opt_response())
+    }
+
     /// Search the database for songs matching FILTER
     fn find(&mut self, filter: &[Filter<'_>]) -> MpdResult<Vec<Song>> {
         self.send_find(filter).and_then(|()| self.read_response())
