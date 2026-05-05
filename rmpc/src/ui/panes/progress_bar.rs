@@ -86,7 +86,7 @@ impl Pane for ProgressBarPane {
                         f32::from(event.x.saturating_sub(self.area.x)) / f32::from(self.area.width),
                     )
                     .as_secs();
-                ctx.command(move |client| {
+                ctx.command(move |_, client| {
                     client.seek_current(ValueChange::Set(u32::try_from(second_to_seek_to)?))?;
                     Ok(())
                 });

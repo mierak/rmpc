@@ -45,21 +45,21 @@ impl Pane for HeaderPane {
 
         match event.kind {
             MouseEventKind::LeftClick => {
-                ctx.command(move |client| {
+                ctx.command(move |_, client| {
                     client.pause_toggle()?;
                     Ok(())
                 });
             }
             MouseEventKind::ScrollUp => {
                 let volume_step = ctx.config.volume_step.into();
-                ctx.command(move |client| {
+                ctx.command(move |_, client| {
                     client.volume(ValueChange::Increase(volume_step))?;
                     Ok(())
                 });
             }
             MouseEventKind::ScrollDown => {
                 let volume_step = ctx.config.volume_step.into();
-                ctx.command(move |client| {
+                ctx.command(move |_, client| {
                     client.volume(ValueChange::Decrease(volume_step))?;
                     Ok(())
                 });

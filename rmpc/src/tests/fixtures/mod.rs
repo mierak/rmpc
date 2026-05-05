@@ -88,6 +88,7 @@ pub fn ctx(
         input: InputManager::default(),
         key_resolver,
         cached_queue_time_total: Duration::default(),
+        current_song: None,
     }
 }
 

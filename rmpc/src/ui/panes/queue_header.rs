@@ -86,7 +86,7 @@ impl QueueHeaderPane {
 
             let swaps = Self::calculate_swaps(evald.as_slice(), ctx)?;
 
-            ctx.command(move |client| {
+            ctx.command(move |_, client| {
                 client.send_start_cmd_list()?;
                 for swap in swaps {
                     client.send_swap_position(swap.0, swap.1)?;

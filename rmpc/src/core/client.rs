@@ -229,7 +229,7 @@ fn client_task(
                                     continue;
                                 }
 
-                                match handle_client_request(&mut client, request) {
+                                match handle_client_request(&mut client, event_tx, request) {
                                     Ok(result) => {
                                         health!(
                                             event_tx.send(AppEvent::WorkDone(Ok(result))),
@@ -355,7 +355,11 @@ fn check_connection(
     }
 }
 
-fn handle_client_request(client: &mut Client<'_>, request: ClientRequest) -> Result<WorkDone> {
+fn handle_client_request(
+    client: &mut Client<'_>,
+    event_tx: &Sender<AppEvent>,
+    request: ClientRequest,
+) -> Result<WorkDone> {
     match request {
         ClientRequest::Query(query) => Ok(WorkDone::MpdCommandFinished {
             id: query.id,
@@ -363,7 +367,7 @@ fn handle_client_request(client: &mut Client<'_>, request: ClientRequest) -> Res
             data: (query.callback)(client)?,
         }),
         ClientRequest::Command(command) => {
-            (command.callback)(client)?;
+            (command.callback)(event_tx, client)?;
             Ok(WorkDone::None)
         }
         ClientRequest::QuerySync(query) => {

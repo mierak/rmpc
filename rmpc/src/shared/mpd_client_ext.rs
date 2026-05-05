@@ -7,7 +7,7 @@ use std::{
 use anyhow::Context;
 use itertools::Itertools;
 use rmpc_mpd::{
-    commands::{IdleEvent, State, Status, outputs::Outputs, stickers::Stickers},
+    commands::{IdleEvent, Song, State, Status, outputs::Outputs, stickers::Stickers},
     errors::{ErrorCode, MpdError, MpdFailureResponse},
     filter::{Filter, FilterKind, Tag},
     mpd_client::{AlbumArtOrder, MpdClient, MpdCommand},
@@ -48,7 +48,7 @@ pub trait MpdClientExt {
             }
         };
 
-        ctx.command(move |client| {
+        ctx.command(move |_, client| {
             client.enqueue_multiple(items, autoplay_idx, position, replace)?;
             Ok(())
         });
@@ -96,6 +96,7 @@ pub trait MpdClientExt {
         path: &str,
         order: AlbumArtOrder,
     ) -> Result<Option<Vec<u8>>, MpdError>;
+    fn get_status_and_current_song(&mut self) -> Result<(Status, Option<Song>), MpdError>;
 }
 
 #[derive(Debug, Clone)]
@@ -605,6 +606,19 @@ impl<T: MpdClient + MpdCommand + ProtoClient> MpdClientExt for T {
                 Ok(None)
             }
         }
+    }
+
+    fn get_status_and_current_song(&mut self) -> Result<(Status, Option<Song>), MpdError> {
+        self.send_start_cmd_list_ok()?;
+        self.send_get_status()?;
+        self.send_get_current_song()?;
+        self.send_execute_cmd_list()?;
+
+        let status = self.read_response()?;
+        let current_song = self.read_opt_response()?;
+        self.read_ok()?;
+
+        Ok((status, current_song))
     }
 }
 

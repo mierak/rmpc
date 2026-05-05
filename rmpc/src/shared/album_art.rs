@@ -12,7 +12,7 @@ pub fn fetch_album_art(ctx: &Ctx) -> Option<()> {
         return None;
     }
 
-    let (_, current_song) = ctx.find_current_song_in_queue()?;
+    let current_song = ctx.current_song()?;
 
     if let Some(loader) = &ctx.config.album_art.custom_loader {
         ctx.work_sender

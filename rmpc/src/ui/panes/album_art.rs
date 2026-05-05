@@ -168,6 +168,7 @@ mod tests {
         config.album_art.method = method;
         ctx.config = std::sync::Arc::new(config);
         ctx.queue.push(Song { id: selected_song_id, ..Default::default() });
+        ctx.current_song = Some(Song { id: selected_song_id, ..Default::default() });
         ctx.status.songid = Some(selected_song_id);
         ctx.status.state = State::Play;
         let mut screen = AlbumArtPane::new(&ctx);
@@ -209,6 +210,7 @@ mod tests {
         config.album_art.method = method;
         ctx.config = std::sync::Arc::new(config);
         ctx.queue.push(Song { id: selected_song_id, ..Default::default() });
+        ctx.current_song = Some(Song { id: selected_song_id, ..Default::default() });
         ctx.status.songid = Some(selected_song_id);
         ctx.status.state = State::Play;
         let mut screen = AlbumArtPane::new(&ctx);

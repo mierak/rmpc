@@ -328,7 +328,7 @@ where
                     if let Some(item) = self.stack().current().selected() {
                         let (items, _) = self.enqueue(std::iter::once(item));
                         if !items.is_empty() {
-                            ctx.command(move |client| {
+                            ctx.command(move |_, client| {
                                 client.enqueue_multiple(items, None, None, false)?;
                                 Ok(())
                             });
@@ -546,7 +546,7 @@ where
                                 confirm_label: Some("Delete"),
                                 cancel_label: None,
                                 on_confirm: Box::new(move |ctx| {
-                                    ctx.command(move |client| {
+                                    ctx.command(move |_, client| {
                                         client.delete_multiple(items)?;
                                         Ok(())
                                     });
@@ -586,7 +586,7 @@ where
                 let (enqueue, hovered_idx) = self.enqueue_items(options.all);
                 if !enqueue.is_empty() {
                     let queue_len = ctx.queue.len();
-                    let current_song_idx = ctx.find_current_song_in_queue().map(|(i, _)| i);
+                    let current_song_idx = ctx.current_song_index();
 
                     Client::resolve_and_enqueue(
                         ctx,
@@ -619,7 +619,7 @@ where
                 max_rating: _,
             } => {
                 let items = self.enqueue(self.items(false).map(|(_, i)| i)).0;
-                ctx.command(move |client| {
+                ctx.command(move |_, client| {
                     client.set_sticker_multiple(RATING_STICKER, value.to_string(), items)?;
                     Ok(())
                 });
@@ -631,7 +631,7 @@ where
                 max_rating: _,
             } => {
                 let items = self.enqueue(self.items(false).map(|(_, i)| i)).0;
-                ctx.command(move |client| {
+                ctx.command(move |_, client| {
                     client.delete_sticker_multiple(RATING_STICKER, items)?;
                     Ok(())
                 });
@@ -658,21 +658,21 @@ where
             }
             CommonAction::Rate { kind: RateKind::Like(), current: false, .. } => {
                 let items = self.enqueue(self.items(false).map(|(_, i)| i)).0;
-                ctx.command(move |client| {
+                ctx.command(move |_, client| {
                     client.set_sticker_multiple(LIKE_STICKER, "2".to_string(), items)?;
                     Ok(())
                 });
             }
             CommonAction::Rate { kind: RateKind::Neutral(), current: false, .. } => {
                 let items = self.enqueue(self.items(false).map(|(_, i)| i)).0;
-                ctx.command(move |client| {
+                ctx.command(move |_, client| {
                     client.set_sticker_multiple(LIKE_STICKER, "1".to_string(), items)?;
                     Ok(())
                 });
             }
             CommonAction::Rate { kind: RateKind::Dislike(), current: false, .. } => {
                 let items = self.enqueue(self.items(false).map(|(_, i)| i)).0;
-                ctx.command(move |client| {
+                ctx.command(move |_, client| {
                     client.set_sticker_multiple(LIKE_STICKER, "0".to_string(), items)?;
                     Ok(())
                 });
@@ -789,7 +789,7 @@ where
                 if !current_items.is_empty() {
                     let cloned_items = current_items.clone();
                     section.add_item("Add to queue", move |ctx| {
-                        ctx.command(move |client| {
+                        ctx.command(move |_, client| {
                             client.enqueue_multiple(cloned_items, None, None, false)?;
                             Ok(())
                         });
@@ -797,7 +797,7 @@ where
                     });
                     let cloned_items = current_items.clone();
                     section.add_item("Replace queue", move |ctx| {
-                        ctx.command(move |client| {
+                        ctx.command(move |_, client| {
                             client.enqueue_multiple(cloned_items, None, None, true)?;
                             Ok(())
                         });
@@ -817,7 +817,7 @@ where
                             .initial_value(initial_playlist_name.unwrap_or_default())
                             .on_confirm(move |ctx, value| {
                                 let value = value.to_owned();
-                                ctx.command(move |client| {
+                                ctx.command(move |_, client| {
                                     let items: Vec<_> = songs_in_items_clone
                                         .into_iter()
                                         .map(|cb| -> Result<_> { cb(client) })
@@ -859,7 +859,7 @@ where
                             .confirm_label("Add")
                             .title("Select a playlist")
                             .on_confirm(move |ctx, selected, _idx| {
-                                ctx.command(move |client| {
+                                ctx.command(move |_, client| {
                                     client.add_to_playlist_multiple(
                                         &selected,
                                         items.into_iter().map(|s| s.file).collect_vec(),

@@ -34,7 +34,7 @@ impl<'content> PropertyPane<'content> {
 
 impl Pane for PropertyPane<'_> {
     fn render(&mut self, frame: &mut Frame, area: Rect, ctx: &Ctx) -> Result<()> {
-        let song = ctx.find_current_song_in_queue().map(|(_, song)| song);
+        let song = ctx.current_song();
 
         let line = Line::from(self.content.iter().fold(Vec::new(), |mut acc, val| {
             match val.as_span(

@@ -30,7 +30,7 @@ impl Widget for Header<'_> {
         let row_count = config.theme.header.rows.len();
 
         let layouts = Layout::vertical((0..row_count).map(|_| Constraint::Length(1))).split(area);
-        let song = self.ctx.find_current_song_in_queue().map(|(_, song)| song);
+        let song = self.ctx.current_song();
         for row in 0..row_count {
             let [left, center, right] = *Layout::horizontal([
                 Constraint::Percentage(config.theme.header_column_widths[0]),
