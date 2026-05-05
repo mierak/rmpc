@@ -630,13 +630,14 @@ fn main_task<B: Backend + std::io::Write>(
                                 song_changed = true;
                                 ctx.song_played = Some(Duration::ZERO);
                             }
+
+                            ctx.set_current_song(new_current_song);
                             if song_changed
                                 && let Err(err) = ui.on_event(UiEvent::SongChanged, &mut ctx)
                             {
                                 status_error!(error:? = err; "UI failed to handle idle event, error: '{}'", err.to_status());
                             }
 
-                            ctx.set_current_song(new_current_song);
                             ctx.last_status_update = Instant::now();
                             render_wanted = true;
                         }
