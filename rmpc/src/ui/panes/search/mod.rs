@@ -427,7 +427,7 @@ impl SearchPane {
                 CommonAction::AddOptions { kind: AddKind::Action(opts) } if opts.all => {
                     let (_, enqueue) = self.enqueue(opts.all);
                     if !enqueue.is_empty() {
-                        let current_song_idx = ctx.find_current_song_in_queue().map(|(i, _)| i);
+                        let current_song_idx = ctx.current_song_index();
                         Client::resolve_and_enqueue(
                             ctx,
                             enqueue,
@@ -585,7 +585,7 @@ impl SearchPane {
                         vec![Enqueue::File { path: item.file.clone() }]
                     });
                     if !items.is_empty() {
-                        ctx.command(move |client| {
+                        ctx.command(move |_, client| {
                             client.enqueue_multiple(items, None, None, false)?;
                             Ok(())
                         });
@@ -681,7 +681,7 @@ impl SearchPane {
                 CommonAction::Close => {}
                 CommonAction::Confirm if self.songs_dir.marked().is_empty() => {
                     let (hovered_song_idx, items) = self.enqueue(true);
-                    let current_song_idx = ctx.find_current_song_in_queue().map(|(i, _)| i);
+                    let current_song_idx = ctx.current_song_index();
 
                     if !items.is_empty() {
                         Client::resolve_and_enqueue(
@@ -702,7 +702,7 @@ impl SearchPane {
                     let (hovered_song_idx, enqueue) = self.enqueue(opts.all);
 
                     if !enqueue.is_empty() {
-                        let current_song_idx = ctx.find_current_song_in_queue().map(|(i, _)| i);
+                        let current_song_idx = ctx.current_song_index();
 
                         Client::resolve_and_enqueue(
                             ctx,
@@ -742,7 +742,7 @@ impl SearchPane {
                     max_rating: _,
                 } => {
                     let items = self.enqueue(false).1;
-                    ctx.command(move |client| {
+                    ctx.command(move |_, client| {
                         client.set_sticker_multiple(RATING_STICKER, value.to_string(), items)?;
                         Ok(())
                     });
@@ -754,7 +754,7 @@ impl SearchPane {
                     max_rating: _,
                 } => {
                     let items = self.enqueue(false).1;
-                    ctx.command(move |client| {
+                    ctx.command(move |_, client| {
                         client.delete_sticker_multiple(RATING_STICKER, items)?;
                         Ok(())
                     });
@@ -781,21 +781,21 @@ impl SearchPane {
                 }
                 CommonAction::Rate { kind: RateKind::Like(), current: false, .. } => {
                     let items = self.enqueue(false).1;
-                    ctx.command(move |client| {
+                    ctx.command(move |_, client| {
                         client.set_sticker_multiple(LIKE_STICKER, "2".to_string(), items)?;
                         Ok(())
                     });
                 }
                 CommonAction::Rate { kind: RateKind::Neutral(), current: false, .. } => {
                     let items = self.enqueue(false).1;
-                    ctx.command(move |client| {
+                    ctx.command(move |_, client| {
                         client.set_sticker_multiple(LIKE_STICKER, "1".to_string(), items)?;
                         Ok(())
                     });
                 }
                 CommonAction::Rate { kind: RateKind::Dislike(), current: false, .. } => {
                     let items = self.enqueue(false).1;
-                    ctx.command(move |client| {
+                    ctx.command(move |_, client| {
                         client.set_sticker_multiple(LIKE_STICKER, "0".to_string(), items)?;
                         Ok(())
                     });
@@ -870,14 +870,14 @@ impl SearchPane {
                     if !enqueue.is_empty() {
                         let enqueue_clone = enqueue.clone();
                         section.add_item("Add all to queue", move |ctx| {
-                            ctx.command(move |client| {
+                            ctx.command(move |_, client| {
                                 client.enqueue_multiple(enqueue_clone, None, None, false)?;
                                 Ok(())
                             });
                             Ok(())
                         });
                         section.add_item("Replace queue with all", move |ctx| {
-                            ctx.command(move |client| {
+                            ctx.command(move |_, client| {
                                 client.enqueue_multiple(enqueue, None, None, true)?;
                                 Ok(())
                             });
@@ -895,7 +895,7 @@ impl SearchPane {
                                     .input_label("Playlist name:")
                                     .on_confirm(move |ctx, value| {
                                         let value = value.to_owned();
-                                        ctx.command(move |client| {
+                                        ctx.command(move |_, client| {
                                             client.create_playlist(&value, song_files)?;
                                             Ok(())
                                         });
@@ -923,7 +923,7 @@ impl SearchPane {
                                     .confirm_label("Add")
                                     .title("Select a playlist")
                                     .on_confirm(move |ctx, selected, _idx| {
-                                        ctx.command(move |client| {
+                                        ctx.command(move |_, client| {
                                             client
                                                 .add_to_playlist_multiple(&selected, song_files)?;
                                             Ok(())
@@ -949,7 +949,7 @@ impl SearchPane {
                             .input_label("Playlist name:")
                             .on_confirm(move |ctx, value| {
                                 let value = value.to_owned();
-                                ctx.command(move |client| {
+                                ctx.command(move |_, client| {
                                     client.create_playlist(&value, song_files)?;
                                     Ok(())
                                 });
@@ -972,7 +972,7 @@ impl SearchPane {
                             .confirm_label("Add")
                             .title("Select a playlist")
                             .on_confirm(move |ctx, selected, _idx| {
-                                ctx.command(move |client| {
+                                ctx.command(move |_, client| {
                                     client.add_to_playlist_multiple(&selected, song_files)?;
                                     Ok(())
                                 });
@@ -1188,7 +1188,7 @@ impl Pane for SearchPane {
                     Phase::BrowseResults => {
                         let (_, items) = self.enqueue(false);
                         if !items.is_empty() {
-                            ctx.command(move |client| {
+                            ctx.command(move |_, client| {
                                 client.enqueue_multiple(items, None, None, false)?;
                                 Ok(())
                             });
@@ -1243,7 +1243,7 @@ impl Pane for SearchPane {
                 Phase::BrowseResults => {
                     let (_, items) = self.enqueue(false);
                     if !items.is_empty() {
-                        ctx.command(move |client| {
+                        ctx.command(move |_, client| {
                             client.enqueue_multiple(items, None, None, false)?;
                             Ok(())
                         });
@@ -1265,7 +1265,7 @@ impl Pane for SearchPane {
                             self.songs_dir.select_idx(idx, ctx.config.scrolloff);
                             if let Some(item) = self.songs_dir.selected() {
                                 let item = item.file.clone();
-                                ctx.command(move |client| {
+                                ctx.command(move |_, client| {
                                     client.add(&item, None)?;
                                     status_info!("Added '{item}' to queue");
                                     Ok(())

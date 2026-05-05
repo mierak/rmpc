@@ -52,6 +52,7 @@ keybinds
 - `debuginfo` command no longer shows incorrect errors about missing components
 - also consider `all` when verifying tmux passthrough
 - add `iTerm.app` into emulator env variable detection
+- `PREV_SONG` in `on_song_change` is now correctly tracked with consume on
 
 ## [0.11.0] - 2026-02-01
 

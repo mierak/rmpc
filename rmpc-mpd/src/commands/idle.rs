@@ -3,7 +3,7 @@ use crate::{
     from_mpd::{FromMpd, LineHandled},
 };
 
-#[derive(Debug, Clone, Copy, strum::Display, Eq, Hash, PartialEq)]
+#[derive(Debug, Clone, Copy, strum::Display, Eq, Hash, PartialEq, enum_map::Enum)]
 #[strum(serialize_all = "snake_case")]
 pub enum IdleEvent {
     Player,   /* the player has been started, stopped or seeked or tags of

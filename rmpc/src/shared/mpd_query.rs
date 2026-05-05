@@ -7,13 +7,12 @@ use ratatui::{style::Style, widgets::ListItem};
 use rmpc_mpd::{
     client::Client,
     commands::{Decoder, IdleEvent, Song, Status, Volume},
-    mpd_client::MpdClient,
 };
 
 use super::{events::AppEvent, mpd_client_ext::PartitionedOutput};
 use crate::{
     config::tabs::PaneType,
-    shared::{events::ClientRequest, macros::try_skip},
+    shared::{events::ClientRequest, macros::try_skip, mpd_client_ext::MpdClientExt},
     ui::{dir_or_song::DirOrSong, dirstack::Path},
 };
 
@@ -42,7 +41,7 @@ pub(crate) struct MpdQuerySync {
 #[derive(derive_more::Debug)]
 pub struct MpdCommand {
     #[debug(skip)]
-    pub callback: Box<dyn FnOnce(&mut Client<'_>) -> Result<()> + Send>,
+    pub callback: Box<dyn FnOnce(&Sender<AppEvent>, &mut Client<'_>) -> Result<()> + Send>,
 }
 
 impl MpdQuery {
@@ -87,7 +86,7 @@ pub(crate) enum MpdQueryResult {
     AddToPlaylist { playlists: Vec<String>, song_file: String },
     AddToPlaylistMultiple { playlists: Vec<String>, song_files: Vec<String> },
     AlbumArt(Option<Vec<u8>>),
-    Status { data: Status, source_event: Option<IdleEvent> },
+    Status { status: Status, current_song: Option<Song>, source_event: Option<IdleEvent> },
     Queue(Option<Vec<Song>>),
     Volume(Volume),
     Outputs(Vec<PartitionedOutput>),
@@ -105,10 +104,10 @@ pub fn run_status_update((_, client_tx): &(Sender<AppEvent>, Sender<ClientReques
             id: GLOBAL_STATUS_UPDATE,
             target: None,
             replace_id: Some("status"),
-            callback: Box::new(move |client| Ok(MpdQueryResult::Status {
-                data: client.get_status()?,
-                source_event: None
-            })),
+            callback: Box::new(move |client| {
+                let (status, current_song) = client.get_status_and_current_song()?;
+                Ok(MpdQueryResult::Status { status, current_song, source_event: None })
+            }),
         })),
         "Failed to send status update query"
     );

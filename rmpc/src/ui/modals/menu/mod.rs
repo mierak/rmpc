@@ -265,7 +265,7 @@ pub fn create_rating_modal<'a>(
                 }
 
                 if !value.trim().is_empty() {
-                    ctx.command(move |client| {
+                    ctx.command(move |_, client| {
                         client.set_sticker_multiple(RATING_STICKER, value, clone2)?;
                         Ok(())
                     });
@@ -284,7 +284,7 @@ pub fn create_rating_modal<'a>(
             }
 
             section.action(move |ctx, value| {
-                ctx.command(move |client| {
+                ctx.command(move |_, client| {
                     client.set_sticker_multiple(RATING_STICKER, value, clone)?;
                     Ok(())
                 });
@@ -299,7 +299,7 @@ pub fn create_rating_modal<'a>(
             }
             let clone = items.clone();
             let section = section.item("Like", |ctx| {
-                ctx.command(move |client| {
+                ctx.command(move |_, client| {
                     client.set_sticker_multiple(LIKE_STICKER, "2".to_string(), clone)?;
                     Ok(())
                 });
@@ -307,7 +307,7 @@ pub fn create_rating_modal<'a>(
             });
             let clone = items.clone();
             let section = section.item("Neutral", |ctx| {
-                ctx.command(move |client| {
+                ctx.command(move |_, client| {
                     client.set_sticker_multiple(LIKE_STICKER, "1".to_string(), clone)?;
                     Ok(())
                 });
@@ -315,7 +315,7 @@ pub fn create_rating_modal<'a>(
             });
             let clone = items.clone();
             let section = section.item("Dislike", |ctx| {
-                ctx.command(move |client| {
+                ctx.command(move |_, client| {
                     client.set_sticker_multiple(LIKE_STICKER, "0".to_string(), clone)?;
                     Ok(())
                 });
@@ -326,7 +326,7 @@ pub fn create_rating_modal<'a>(
         .list_section(ctx, |mut section| {
             if custom || !values.is_empty() {
                 section.add_item("Clear rating", |ctx| {
-                    ctx.command(move |client| {
+                    ctx.command(move |_, client| {
                         client.delete_sticker_multiple(RATING_STICKER, clone3)?;
                         Ok(())
                     });
@@ -335,7 +335,7 @@ pub fn create_rating_modal<'a>(
             }
             if like {
                 section.add_item("Clear like state", |ctx| {
-                    ctx.command(move |client| {
+                    ctx.command(move |_, client| {
                         client.delete_sticker_multiple(LIKE_STICKER, items)?;
                         Ok(())
                     });
@@ -356,7 +356,7 @@ pub fn create_add_modal<'a>(
 ) -> MenuModal<'a> {
     MenuModal::new(ctx)
         .list_section(ctx, |section| {
-            let current_song_idx = ctx.find_current_song_in_queue().map(|(i, _)| i);
+            let current_song_idx = ctx.current_song_index();
             let mut section = section;
 
             for (label, options, (enqueue, hovered_idx)) in opts {
@@ -398,7 +398,7 @@ pub fn create_save_modal<'a>(
             let song_paths = song_paths.clone();
             sect.add_action(|ctx, value| {
                 if !value.is_empty() {
-                    ctx.command(move |client| {
+                    ctx.command(move |_, client| {
                         client.create_playlist(&value, song_paths)?;
                         Ok(())
                     });
@@ -451,7 +451,7 @@ pub fn add_to_playlist_or_show_modal(
         DuplicateStrategy::None if !duplicate_songs.is_empty() => {}
         DuplicateStrategy::NonDuplicate if !duplicate_songs.is_empty() => {
             // add only non duplicate songs
-            ctx.command(move |client| {
+            ctx.command(move |_, client| {
                 client.add_to_playlist_multiple(&playlist_name, non_duplicate_songs)?;
                 Ok(())
             });
@@ -472,7 +472,7 @@ pub fn add_to_playlist_or_show_modal(
         | DuplicateStrategy::NonDuplicate
         | DuplicateStrategy::Ask => {
             // add all songs
-            ctx.command(move |client| {
+            ctx.command(move |_, client| {
                 client.add_to_playlist_multiple(&playlist_name, all_songs)?;
                 Ok(())
             });
@@ -516,7 +516,7 @@ fn create_duplicate_songs_modal<'a>(
                 (
                     "Add anyway",
                     Box::new(|ctx| {
-                        ctx.command(move |client| {
+                        ctx.command(move |_, client| {
                             client.add_to_playlist_multiple(&playlist_name2, all_songs)?;
                             Ok(())
                         });
@@ -526,7 +526,7 @@ fn create_duplicate_songs_modal<'a>(
                 (
                     "Add non duplicates",
                     Box::new(|ctx| {
-                        ctx.command(move |client| {
+                        ctx.command(move |_, client| {
                             client.add_to_playlist_multiple(&playlist_name, non_duplicate_songs)?;
                             Ok(())
                         });
@@ -610,7 +610,7 @@ pub fn delete_from_playlist_or_show_confirmation(
         format!("Remove {songs_to_remove} song(s) from playlist \"{playlist_name}\"?");
 
     let delete_songs = move |ctx: &Ctx| {
-        ctx.command(move |client| {
+        ctx.command(move |_, client| {
             client.send_start_cmd_list()?;
             for (idx, _path) in songs_to_remove_in_playlist.iter().rev() {
                 client.send_delete_from_playlist(&playlist_name, &SingleOrRange::single(*idx))?;

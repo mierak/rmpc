@@ -331,7 +331,8 @@ fn main() -> Result<()> {
                 args.partition.autocreate,
             )?;
             client.set_read_timeout(None)?;
-            result(&mut client)?;
+            let (sender, _receiver) = crossbeam::channel::unbounded();
+            result(&sender, &mut client)?;
         }
         None => {
             if args.version {

@@ -148,7 +148,7 @@ impl MpdClient for TestMpdClient {
     }
 
     fn noidle(&mut self) -> MpdResult<()> {
-        todo!()
+        todo!("Not yet implemented")
     }
 
     fn get_volume(&mut self) -> MpdResult<Volume> {
@@ -312,6 +312,10 @@ impl MpdClient for TestMpdClient {
 
     fn playlist_info(&mut self) -> MpdResult<Option<Vec<Song>>> {
         Ok(Some(self.queue.iter().map(|idx| self.songs[*idx].clone()).collect()))
+    }
+
+    fn playlist_id(&mut self, _id: u32) -> MpdResult<Option<Song>> {
+        todo!("Not yet implemented")
     }
 
     /// `FilterKind` not implemented, everything is treated as Contains

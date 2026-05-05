@@ -270,7 +270,7 @@ impl<'ui> Ui<'ui> {
                 GlobalAction::Partition { name: Some(name), autocreate } => {
                     let name = name.clone();
                     let autocreate = *autocreate;
-                    ctx.command(move |client| {
+                    ctx.command(move |_, client| {
                         match client.switch_to_partition(&name) {
                             Ok(()) => {}
                             Err(MpdError::Mpd(MpdFailureResponse {
@@ -297,7 +297,7 @@ impl<'ui> Ui<'ui> {
                                 None
                             } else {
                                 let section = section.item("Switch to default partition", |ctx| {
-                                    ctx.command(move |client| {
+                                    ctx.command(move |_, client| {
                                         client.switch_to_partition("default")?;
                                         Ok(())
                                     });
@@ -310,13 +310,13 @@ impl<'ui> Ui<'ui> {
                         .multi_section(ctx, |section| {
                             let mut section = section
                                 .add_action("Switch", |ctx, label| {
-                                    ctx.command(move |client| {
+                                    ctx.command(move |_, client| {
                                         client.switch_to_partition(&label)?;
                                         Ok(())
                                     });
                                 })
                                 .add_action("Delete", |ctx, label| {
-                                    ctx.command(move |client| {
+                                    ctx.command(move |_, client| {
                                         client.delete_partition(&label)?;
                                         Ok(())
                                     });
@@ -335,7 +335,7 @@ impl<'ui> Ui<'ui> {
                         .input_section(ctx, "New partition:", |section| {
                             let section = section.action(|ctx, value| {
                                 if !value.is_empty() {
-                                    ctx.command(move |client| {
+                                    ctx.command(move |_, client| {
                                         client.send_start_cmd_list()?;
                                         client.send_new_partition(&value)?;
                                         client.send_switch_to_partition(&value)?;
@@ -442,7 +442,7 @@ impl<'ui> Ui<'ui> {
                 GlobalAction::NextTrack if ctx.status.state != State::Stop => {
                     let keep_state = ctx.config.keep_state_on_song_change;
                     let state = ctx.status.state;
-                    ctx.command(move |client| {
+                    ctx.command(move |_, client| {
                         client.next_keep_state(keep_state, state)?;
                         Ok(())
                     });
@@ -452,7 +452,7 @@ impl<'ui> Ui<'ui> {
                     let elapsed_sec = ctx.status.elapsed.as_secs();
                     let keep_state = ctx.config.keep_state_on_song_change;
                     let state = ctx.status.state;
-                    ctx.command(move |client| {
+                    ctx.command(move |_, client| {
                         match rewind_to_start {
                             Some(value) if elapsed_sec >= value => {
                                 client.seek_current(ValueChange::Set(0))?;
@@ -468,28 +468,28 @@ impl<'ui> Ui<'ui> {
                     });
                 }
                 GlobalAction::Stop if matches!(ctx.status.state, State::Play | State::Pause) => {
-                    ctx.command(move |client| {
+                    ctx.command(move |_, client| {
                         client.stop()?;
                         Ok(())
                     });
                 }
                 GlobalAction::ToggleRepeat => {
                     let repeat = !ctx.status.repeat;
-                    ctx.command(move |client| {
+                    ctx.command(move |_, client| {
                         client.repeat(repeat)?;
                         Ok(())
                     });
                 }
                 GlobalAction::ToggleRandom => {
                     let random = !ctx.status.random;
-                    ctx.command(move |client| {
+                    ctx.command(move |_, client| {
                         client.random(random)?;
                         Ok(())
                     });
                 }
                 GlobalAction::ToggleSingle => {
                     let single = ctx.status.single;
-                    ctx.command(move |client| {
+                    ctx.command(move |_, client| {
                         if client.version() < Version::new(0, 21, 0) {
                             client.single(single.cycle_skip_oneshot())?;
                         } else {
@@ -500,7 +500,7 @@ impl<'ui> Ui<'ui> {
                 }
                 GlobalAction::ToggleConsume => {
                     let consume = ctx.status.consume;
-                    ctx.command(move |client| {
+                    ctx.command(move |_, client| {
                         if client.version() < Version::new(0, 24, 0) {
                             client.consume(consume.cycle_skip_oneshot())?;
                         } else {
@@ -511,26 +511,26 @@ impl<'ui> Ui<'ui> {
                 }
                 GlobalAction::ToggleSingleOnOff => {
                     let single = ctx.status.single;
-                    ctx.command(move |client| {
+                    ctx.command(move |_, client| {
                         client.single(single.cycle_skip_oneshot())?;
                         Ok(())
                     });
                 }
                 GlobalAction::ToggleConsumeOnOff => {
                     let consume = ctx.status.consume;
-                    ctx.command(move |client| {
+                    ctx.command(move |_, client| {
                         client.consume(consume.cycle_skip_oneshot())?;
                         Ok(())
                     });
                 }
                 GlobalAction::TogglePause => {
                     if matches!(ctx.status.state, State::Play | State::Pause) {
-                        ctx.command(move |client| {
+                        ctx.command(move |_, client| {
                             client.pause_toggle()?;
                             Ok(())
                         });
                     } else {
-                        ctx.command(move |client| {
+                        ctx.command(move |_, client| {
                             client.play()?;
                             Ok(())
                         });
@@ -538,7 +538,7 @@ impl<'ui> Ui<'ui> {
                 }
                 GlobalAction::Pause => {
                     if matches!(ctx.status.state, State::Play) {
-                        ctx.command(move |client| {
+                        ctx.command(move |_, client| {
                             client.pause()?;
                             Ok(())
                         });
@@ -548,7 +548,7 @@ impl<'ui> Ui<'ui> {
                 }
                 GlobalAction::Unpause => {
                     if matches!(ctx.status.state, State::Pause) {
-                        ctx.command(move |client| {
+                        ctx.command(move |_, client| {
                             client.unpause()?;
                             Ok(())
                         });
@@ -558,14 +558,14 @@ impl<'ui> Ui<'ui> {
                 }
                 GlobalAction::VolumeUp => {
                     let step = ctx.config.volume_step;
-                    ctx.command(move |client| {
+                    ctx.command(move |_, client| {
                         client.volume(ValueChange::Increase(step.into()))?;
                         Ok(())
                     });
                 }
                 GlobalAction::VolumeDown => {
                     let step = ctx.config.volume_step;
-                    ctx.command(move |client| {
+                    ctx.command(move |_, client| {
                         client.volume(ValueChange::Decrease(step.into()))?;
                         Ok(())
                     });
@@ -573,7 +573,7 @@ impl<'ui> Ui<'ui> {
                 GlobalAction::CrossfadeUp => {
                     let current_xfade = ctx.status.xfade.unwrap_or(0);
                     let new_xfade = current_xfade.saturating_add(1);
-                    ctx.command(move |client| {
+                    ctx.command(move |_, client| {
                         client.crossfade(new_xfade)?;
                         Ok(())
                     });
@@ -581,7 +581,7 @@ impl<'ui> Ui<'ui> {
                 GlobalAction::CrossfadeDown => {
                     let current_xfade = ctx.status.xfade.unwrap_or(0);
                     let new_xfade = current_xfade.saturating_sub(1);
-                    ctx.command(move |client| {
+                    ctx.command(move |_, client| {
                         client.crossfade(new_xfade)?;
                         Ok(())
                     });
@@ -589,7 +589,7 @@ impl<'ui> Ui<'ui> {
                 GlobalAction::SeekForward
                     if matches!(ctx.status.state, State::Play | State::Pause) =>
                 {
-                    ctx.command(move |client| {
+                    ctx.command(move |_, client| {
                         client.seek_current(ValueChange::Increase(5))?;
                         Ok(())
                     });
@@ -597,7 +597,7 @@ impl<'ui> Ui<'ui> {
                 GlobalAction::SeekBack
                     if matches!(ctx.status.state, State::Play | State::Pause) =>
                 {
-                    ctx.command(move |client| {
+                    ctx.command(move |_, client| {
                         client.seek_current(ValueChange::Decrease(5))?;
                         Ok(())
                     });
@@ -605,19 +605,19 @@ impl<'ui> Ui<'ui> {
                 GlobalAction::SeekToStart
                     if matches!(ctx.status.state, State::Play | State::Pause) =>
                 {
-                    ctx.command(move |client| {
+                    ctx.command(move |_, client| {
                         client.seek_current(ValueChange::Set(0))?;
                         Ok(())
                     });
                 }
                 GlobalAction::Update => {
-                    ctx.command(move |client| {
+                    ctx.command(move |_, client| {
                         client.update(None)?;
                         Ok(())
                     });
                 }
                 GlobalAction::Rescan => {
-                    ctx.command(move |client| {
+                    ctx.command(move |_, client| {
                         client.rescan(None)?;
                         Ok(())
                     });
@@ -692,7 +692,7 @@ impl<'ui> Ui<'ui> {
                         .query(|client| Ok(MpdQueryResult::Decoders(client.decoders()?.0)));
                 }
                 GlobalAction::ShowCurrentSongInfo => {
-                    if let Some((_, current_song)) = ctx.find_current_song_in_queue() {
+                    if let Some(current_song) = &ctx.current_song() {
                         modal!(
                             ctx,
                             InfoListModal::builder()
@@ -719,7 +719,7 @@ impl<'ui> Ui<'ui> {
             )]
             match action {
                 CommonAction::Rate { kind, current: true, min_rating, max_rating } => {
-                    if let Some((_, song)) = ctx.find_current_song_in_queue() {
+                    if let Some(song) = ctx.current_song() {
                         match kind {
                             RateKind::Modal { values, custom, like } => {
                                 let items = vec![Enqueue::File { path: song.file.clone() }];
@@ -739,35 +739,35 @@ impl<'ui> Ui<'ui> {
                             RateKind::Value(value) => {
                                 let uri = song.file.clone();
                                 let value = value.to_string();
-                                ctx.command(move |client| {
+                                ctx.command(move |_, client| {
                                     client.set_sticker(&uri, RATING_STICKER, &value)?;
                                     Ok(())
                                 });
                             }
                             RateKind::ClearRating() => {
                                 let uri = song.file.clone();
-                                ctx.command(move |client| {
+                                ctx.command(move |_, client| {
                                     client.delete_sticker(&uri, RATING_STICKER)?;
                                     Ok(())
                                 });
                             }
                             RateKind::Like() => {
                                 let uri = song.file.clone();
-                                ctx.command(move |client| {
+                                ctx.command(move |_, client| {
                                     client.set_sticker(&uri, LIKE_STICKER, "2")?;
                                     Ok(())
                                 });
                             }
                             RateKind::Dislike() => {
                                 let uri = song.file.clone();
-                                ctx.command(move |client| {
+                                ctx.command(move |_, client| {
                                     client.set_sticker(&uri, LIKE_STICKER, "0")?;
                                     Ok(())
                                 });
                             }
                             RateKind::Neutral() => {
                                 let uri = song.file.clone();
-                                ctx.command(move |client| {
+                                ctx.command(move |_, client| {
                                     client.set_sticker(&uri, LIKE_STICKER, "1")?;
                                     Ok(())
                                 });

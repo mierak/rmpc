@@ -404,7 +404,7 @@ impl BrowserPane<DirOrSong> for PlaylistsPane {
                             if current_name != new_value {
                                 let current_name = current_name.clone();
                                 let new_value = new_value.to_owned();
-                                ctx.command(move |client| {
+                                ctx.command(move |_, client| {
                                     client.rename_playlist(&current_name, &new_value)?;
                                     status_info!(
                                         "Playlist '{}' renamed to '{}'",

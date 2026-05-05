@@ -1,11 +1,11 @@
 use std::{
-    collections::HashSet,
     path::PathBuf,
     sync::{Arc, LazyLock},
     time::{Duration, Instant},
 };
 
 use crossbeam::channel::{Receiver, RecvTimeoutError};
+use enum_map::{EnumMap, enum_map};
 use ratatui::{Terminal, layout::Rect, prelude::Backend};
 use rmpc_mpd::{
     commands::{IdleEvent, State},
@@ -71,11 +71,13 @@ fn main_task<B: Backend + std::io::Write>(
     let mut last_render = std::time::Instant::now()
         .checked_sub(Duration::from_secs(10))
         .unwrap_or_else(std::time::Instant::now);
-    let mut additional_evs = HashSet::new();
     let mut connected = true;
     ui.before_show(area, &mut ctx).expect("Initial render init to succeed");
     let mut _update_loop_guard = None;
     let mut _update_db_loop_guard = None;
+    let mut events_to_ignore: EnumMap<IdleEvent, usize> = EnumMap::default();
+    let mut reconcile_pending: EnumMap<IdleEvent, bool> = EnumMap::default();
+    let reconcile_id: EnumMap<IdleEvent, Id> = enum_map! { _ => id::new() };
 
     // Tmux hooks have to be initialized after ui, because ueberzugpp replaces all
     // hooks on its init instead of simply appending and might break rmpc's hooks
@@ -91,7 +93,7 @@ fn main_task<B: Backend + std::io::Write>(
     // Execute on_song_change at startup if
     // configured and current song is available.
     if ctx.config.exec_on_song_change_at_start
-        && let Some((_, _song)) = ctx.find_current_song_in_queue()
+        && let Some(_song) = ctx.current_song()
         && let Some(command) = &ctx.config.on_song_change
     {
         let env = create_env(&ctx, std::iter::empty());
@@ -144,6 +146,32 @@ fn main_task<B: Backend + std::io::Write>(
 
         if let Some(event) = event {
             match event {
+                AppEvent::IgnoreIdleEvent(ev) => {
+                    events_to_ignore[ev] += 1;
+                    if reconcile_pending[ev] {
+                        ctx.scheduler.cancel(reconcile_id[ev]);
+                        reconcile_pending[ev] = false;
+                    }
+                }
+                AppEvent::UnIgnoreIdleEvent(ev) => {
+                    events_to_ignore[ev] -= 1;
+                    if events_to_ignore[ev] == 0 {
+                        reconcile_pending[ev] = true;
+                        let timeout = Duration::from_millis(100);
+                        ctx.scheduler.schedule_replace(
+                            reconcile_id[ev],
+                            timeout,
+                            move |(tx, _)| {
+                                tx.send(AppEvent::ReconcileIdleEvent(ev))
+                                    .map_err(|err| anyhow::anyhow!(err))
+                            },
+                        );
+                    }
+                }
+                AppEvent::ReconcileIdleEvent(ev) => {
+                    reconcile_pending[ev] = false;
+                    handle_idle_event(ev, &ctx);
+                }
                 AppEvent::ConfigChanged { config: mut new_config, keep_old_theme } => {
                     // Technical limitation. Keep the old image backend because it was not rechecked
                     // anyway. Sending the escape sequences to determine image support would mess up
@@ -316,11 +344,16 @@ fn main_task<B: Backend + std::io::Write>(
                     }
                 }
                 AppEvent::IdleEvent(event) => {
-                    handle_idle_event(event, &ctx, &mut additional_evs);
-                    for ev in additional_evs.drain().filter_map(|ev| UiEvent::try_from(ev).ok()) {
-                        if let Err(err) = ui.on_event(ev, &mut ctx) {
-                            status_error!(error:? = err, event:?; "UI failed to handle idle event, event: '{:?}', error: '{}'", event, err.to_status());
-                        }
+                    if events_to_ignore[event] > 0 || reconcile_pending[event] {
+                        log::debug!(event:?; "Ignoring idle event due to previous ignore request");
+                        continue;
+                    }
+
+                    handle_idle_event(event, &ctx);
+                    if let Ok(ev) = event.try_into()
+                        && let Err(err) = ui.on_event(ev, &mut ctx)
+                    {
+                        status_error!(error:? = err, event:?; "UI failed to handle idle event, event: '{:?}', error: '{}'", event, err.to_status());
                     }
                     render_wanted = true;
                 }
@@ -372,7 +405,7 @@ fn main_task<B: Backend + std::io::Write>(
                         match ctx.ytdlp_manager.resolve_download(id, result) {
                             Ok((path, position)) => {
                                 let cache_dir = ctx.config.cache_dir.clone();
-                                ctx.command(move |client| {
+                                ctx.command(move |_, client| {
                                     client.add_downloaded_file_to_queue(
                                         path,
                                         cache_dir.as_deref(),
@@ -476,10 +509,13 @@ fn main_task<B: Backend + std::io::Write>(
                         (
                             GLOBAL_STATUS_UPDATE,
                             None,
-                            MpdQueryResult::Status { data: status, source_event },
+                            MpdQueryResult::Status {
+                                status,
+                                current_song: new_current_song,
+                                source_event,
+                            },
                         ) => {
-                            let current_song_id =
-                                ctx.find_current_song_in_queue().map(|(_, song)| song.id);
+                            let current_song_id = ctx.current_song().map(|s| s.id);
                             let previous_state = ctx.status.state;
                             let current_updating_db = ctx.status.updating_db;
                             let current_playlist = ctx.status.lastloadedplaylist.take();
@@ -497,7 +533,7 @@ fn main_task<B: Backend + std::io::Write>(
                                     && &current_playlist == new_playlist
                                 {
                                     let playlist_name = current_playlist.clone();
-                                    ctx.command(move |client| {
+                                    ctx.command(move |_, client| {
                                         client.save_queue_as_playlist(
                                             &playlist_name,
                                             Some(SaveMode::Replace),
@@ -569,16 +605,14 @@ fn main_task<B: Backend + std::io::Write>(
                                 }
                             }
 
-                            if let Some((_, song)) = ctx.find_current_song_in_queue()
+                            if let Some(song) = new_current_song.as_ref()
                                 && Some(song.id) != current_song_id
                             {
                                 if let Some(command) = &ctx.config.on_song_change {
                                     let mut env = create_env(&ctx, std::iter::empty());
 
                                     let prev_song_file = (previous_status.state != State::Stop)
-                                        .then_some(previous_status.song.and_then(|idx| {
-                                            ctx.queue.get(idx).map(|song| song.file.clone())
-                                        }))
+                                        .then(|| ctx.current_song().map(|s| s.file.clone()))
                                         .flatten();
 
                                     if let (Some(prev_song), Some(played)) =
@@ -602,6 +636,7 @@ fn main_task<B: Backend + std::io::Write>(
                                 status_error!(error:? = err; "UI failed to handle idle event, error: '{}'", err.to_status());
                             }
 
+                            ctx.set_current_song(new_current_song);
                             ctx.last_status_update = Instant::now();
                             render_wanted = true;
                         }
@@ -714,7 +749,7 @@ fn main_task<B: Backend + std::io::Write>(
                 }
                 AppEvent::Reconnected => {
                     for ev in [IdleEvent::Player, IdleEvent::Playlist, IdleEvent::Options] {
-                        handle_idle_event(ev, &ctx, &mut additional_evs);
+                        handle_idle_event(ev, &ctx);
                     }
                     if let Err(err) = ui.on_event(UiEvent::Reconnected, &mut ctx) {
                         log::error!(error:? = err, event:?; "UI failed to handle resize event");
@@ -780,7 +815,7 @@ fn main_task<B: Backend + std::io::Write>(
     terminal
 }
 
-fn handle_idle_event(event: IdleEvent, ctx: &Ctx, result_ui_evs: &mut HashSet<IdleEvent>) {
+fn handle_idle_event(event: IdleEvent, ctx: &Ctx) {
     match event {
         IdleEvent::Mixer if ctx.supported_commands.contains("getvol") => {
             ctx.query()
@@ -790,24 +825,30 @@ fn handle_idle_event(event: IdleEvent, ctx: &Ctx, result_ui_evs: &mut HashSet<Id
         }
         IdleEvent::Mixer => {
             ctx.query().id(GLOBAL_STATUS_UPDATE).replace_id("status").query(move |client| {
+                let (status, current_song) = client.get_status_and_current_song()?;
                 Ok(MpdQueryResult::Status {
-                    data: client.get_status()?,
+                    status,
+                    current_song,
                     source_event: Some(IdleEvent::Mixer),
                 })
             });
         }
         IdleEvent::Options => {
             ctx.query().id(GLOBAL_STATUS_UPDATE).replace_id("status").query(move |client| {
+                let (status, current_song) = client.get_status_and_current_song()?;
                 Ok(MpdQueryResult::Status {
-                    data: client.get_status()?,
+                    status,
+                    current_song,
                     source_event: Some(IdleEvent::Options),
                 })
             });
         }
         IdleEvent::Player => {
             ctx.query().id(GLOBAL_STATUS_UPDATE).replace_id("status").query(move |client| {
+                let (status, current_song) = client.get_status_and_current_song()?;
                 Ok(MpdQueryResult::Status {
-                    data: client.get_status()?,
+                    status,
+                    current_song,
                     source_event: Some(IdleEvent::Player),
                 })
             });
@@ -823,8 +864,10 @@ fn handle_idle_event(event: IdleEvent, ctx: &Ctx, result_ui_evs: &mut HashSet<Id
             // during queue update (shuffle, move, ...)
             ctx.query().id(GLOBAL_STATUS_UPDATE).replace_id("status_from_playlist").query(
                 move |client| {
+                    let (status, current_song) = client.get_status_and_current_song()?;
                     Ok(MpdQueryResult::Status {
-                        data: client.get_status()?,
+                        status,
+                        current_song,
                         source_event: Some(IdleEvent::Playlist),
                     })
                 },
@@ -843,16 +886,20 @@ fn handle_idle_event(event: IdleEvent, ctx: &Ctx, result_ui_evs: &mut HashSet<Id
         IdleEvent::StoredPlaylist => {}
         IdleEvent::Database => {
             ctx.query().id(GLOBAL_STATUS_UPDATE).replace_id("status").query(move |client| {
+                let (status, current_song) = client.get_status_and_current_song()?;
                 Ok(MpdQueryResult::Status {
-                    data: client.get_status()?,
+                    status,
+                    current_song,
                     source_event: Some(IdleEvent::Database),
                 })
             });
         }
         IdleEvent::Update => {
             ctx.query().id(GLOBAL_STATUS_UPDATE).replace_id("status").query(move |client| {
+                let (status, current_song) = client.get_status_and_current_song()?;
                 Ok(MpdQueryResult::Status {
-                    data: client.get_status()?,
+                    status,
+                    current_song,
                     source_event: Some(IdleEvent::Update),
                 })
             });
@@ -866,6 +913,4 @@ fn handle_idle_event(event: IdleEvent, ctx: &Ctx, result_ui_evs: &mut HashSet<Id
             log::warn!(event:?; "Received unhandled event");
         }
     }
-
-    result_ui_evs.insert(event);
 }

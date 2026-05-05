@@ -13,7 +13,7 @@ use ratatui::{
 };
 use rmpc_mpd::{
     client::Client,
-    commands::Song,
+    commands::{IdleEvent, Song},
     mpd_client::{MpdClient, MpdCommand},
     proto_client::ProtoClient,
     queue_position::QueuePosition,
@@ -110,7 +110,6 @@ const ADD_TO_PLAYLIST_MULTIPLE: &str = "add_to_playlist_multiple";
 impl QueuePane {
     pub fn new(ctx: &Ctx) -> Self {
         let (column_widths, column_formats) = Self::init(ctx);
-        let highlight_id = id::new();
 
         let mut s = Self {
             queue: Dir::new(ctx.queue.clone()),
@@ -120,7 +119,7 @@ impl QueuePane {
                 _ => Rect::default(),
             },
             should_center_cursor_on_current: ctx.config.center_current_song_on_change,
-            highlight_id,
+            highlight_id: id::new(),
             highlight_enabled: true,
         };
 
@@ -188,7 +187,7 @@ impl QueuePane {
             .list_section(ctx, |mut section| {
                 section.add_item("Play", move |ctx| {
                     if let Some(id) = selected_song_id {
-                        ctx.command(move |client| {
+                        ctx.command(move |_, client| {
                             client.play_id(id)?;
                             Ok(())
                         });
@@ -225,7 +224,7 @@ impl QueuePane {
                             .confirm_label("Add")
                             .title("Select a playlist")
                             .on_confirm(move |ctx, selected, _idx| {
-                                ctx.command(move |client| {
+                                ctx.command(move |_, client| {
                                     client.add_to_playlist_multiple(&selected, items)?;
                                     Ok(())
                                 });
@@ -244,7 +243,7 @@ impl QueuePane {
                             .input_label("Playlist name:")
                             .on_confirm(move |ctx, value| {
                                 let value = value.to_owned();
-                                ctx.command(move |client| {
+                                ctx.command(move |_, client| {
                                     client.save_queue_as_playlist(&value, None)?;
                                     Ok(())
                                 });
@@ -260,7 +259,7 @@ impl QueuePane {
                 let section = section
                     .item("Remove", move |ctx| {
                         if let Some(id) = selected_song_id {
-                            ctx.command(move |client| {
+                            ctx.command(move |_, client| {
                                 client.delete_id(id)?;
                                 Ok(())
                             });
@@ -268,7 +267,7 @@ impl QueuePane {
                         Ok(())
                     })
                     .item("Clear queue", |ctx| {
-                        ctx.command(|client| {
+                        ctx.command(|_, client| {
                             client.clear()?;
                             Ok(())
                         });
@@ -307,7 +306,7 @@ impl QueuePane {
 
         let swaps = QueueHeaderPane::calculate_swaps(evald.as_slice(), ctx)?;
 
-        ctx.command(move |client| {
+        ctx.command(move |_, client| {
             client.send_start_cmd_list()?;
             for swap in swaps {
                 client.send_swap_position(swap.0, swap.1)?;
@@ -360,7 +359,7 @@ impl Pane for QueuePane {
             .to_album_ranges()
             .map(|range| range.end.saturating_sub(1))
             .collect();
-        let current_song_id = ctx.find_current_song_in_queue().map(|(_, song)| song.id);
+        let current_song_id = ctx.current_song().map(|s| s.id);
         let marked = std::mem::take(self.queue.marked_mut());
         let filter = ctx.input.value(self.queue.filter_buffer_id);
         let selected_idx = self.queue.selected_idx();
@@ -506,20 +505,11 @@ impl Pane for QueuePane {
         );
 
         if self.should_center_cursor_on_current {
-            let to_select = ctx
-                .find_current_song_in_queue()
-                .or(self.queue.selected_with_idx())
-                .map(|(idx, _)| idx)
-                .or(Some(0));
+            let to_select = ctx.current_song_index().or(self.queue.selected_idx()).or(Some(0));
             self.queue.select_idx_opt(to_select, usize::MAX);
             self.should_center_cursor_on_current = false;
         } else {
-            let to_select = self
-                .queue
-                .selected_with_idx()
-                .or(ctx.find_current_song_in_queue())
-                .map(|v| v.0)
-                .or(Some(0));
+            let to_select = self.queue.selected_idx().or(ctx.current_song_index()).or(Some(0));
             self.queue.select_idx_opt(to_select, usize::MAX);
         }
 
@@ -533,12 +523,7 @@ impl Pane for QueuePane {
             self.queue.len(),
             self.areas[Areas::Table].height as usize,
         );
-        let to_select = self
-            .queue
-            .selected_with_idx()
-            .or(ctx.find_current_song_in_queue())
-            .map(|v| v.0)
-            .or(Some(0));
+        let to_select = self.queue.selected_idx().or(ctx.current_song_index()).or(Some(0));
         self.queue.select_idx_opt(to_select, ctx.config.scrolloff);
         ctx.render()?;
         Ok(())
@@ -555,7 +540,7 @@ impl Pane for QueuePane {
                 self.queue.items.clone_from(&ctx.queue);
             }
             UiEvent::SongChanged => {
-                if let Some((idx, _)) = ctx.find_current_song_in_queue()
+                if let Some(idx) = ctx.current_song_index()
                     && ctx.config.select_current_song_on_change
                 {
                     match (is_visible, ctx.config.center_current_song_on_change) {
@@ -629,7 +614,7 @@ impl Pane for QueuePane {
                     .and_then(|idx| self.queue.items.get(idx))
                 {
                     let id = song.id;
-                    ctx.command(move |client| {
+                    ctx.command(move |_, client| {
                         client.play_id(id)?;
                         Ok(())
                     });
@@ -646,7 +631,7 @@ impl Pane for QueuePane {
                     .and_then(|idx| self.queue.items.get(idx))
                 {
                     let id = selected_song.id;
-                    ctx.command(move |client| {
+                    ctx.command(move |_, client| {
                         client.delete_id(id)?;
                         Ok(())
                     });
@@ -699,7 +684,7 @@ impl Pane for QueuePane {
                         .title("Select a playlist")
                         .on_confirm(move |ctx, selected, _idx| {
                             let song_file = song_file.clone();
-                            ctx.command(move |client| {
+                            ctx.command(move |_, client| {
                                 if song_file.starts_with('/') {
                                     client.add_to_playlist(
                                         &selected,
@@ -729,7 +714,7 @@ impl Pane for QueuePane {
                         .confirm_label("Add")
                         .title("Select a playlist")
                         .on_confirm(move |ctx, selected, _idx| {
-                            ctx.command(move |client| {
+                            ctx.command(move |_, client| {
                                 let songs_len = song_files.len();
                                 for song_file in song_files {
                                     if song_file.starts_with('/') {
@@ -782,7 +767,7 @@ impl Pane for QueuePane {
             match action {
                 QueueActions::Delete if !self.queue.marked().is_empty() => {
                     for range in self.queue.marked().ranges().rev() {
-                        ctx.command(move |client| {
+                        ctx.command(move |_, client| {
                             client.delete_from_queue(range.into())?;
                             Ok(())
                         });
@@ -793,7 +778,7 @@ impl Pane for QueuePane {
                 }
                 QueueActions::Delete => {
                     if let Some((idx, _)) = self.queue.selected_with_idx() {
-                        ctx.command(move |client| {
+                        ctx.command(move |_, client| {
                             client.delete_from_queue(SingleOrRange::single(idx))?;
                             Ok(())
                         });
@@ -812,7 +797,7 @@ impl Pane for QueuePane {
                             ])
                             .action(Action::Single {
                                 on_confirm: Box::new(|ctx| {
-                                    ctx.command(|client| Ok(client.clear()?));
+                                    ctx.command(|_, client| Ok(client.clear()?));
                                     Ok(())
                                 }),
                                 confirm_label: Some("Clear"),
@@ -825,7 +810,7 @@ impl Pane for QueuePane {
                 QueueActions::Play => {
                     if let Some(selected_song) = self.queue.selected() {
                         let id = selected_song.id;
-                        ctx.command(move |client| {
+                        ctx.command(move |_, client| {
                             client.play_id(id)?;
                             Ok(())
                         });
@@ -863,7 +848,7 @@ impl Pane for QueuePane {
 
                 QueueActions::Shuffle if !self.queue.marked().is_empty() => {
                     for range in self.queue.marked().ranges().rev() {
-                        ctx.command(move |client| {
+                        ctx.command(move |_, client| {
                             client.shuffle(Some(range.into()))?;
                             Ok(())
                         });
@@ -871,7 +856,7 @@ impl Pane for QueuePane {
                     status_info!("Shuffled selected songs");
                 }
                 QueueActions::Shuffle => {
-                    ctx.command(move |client| {
+                    ctx.command(move |_, client| {
                         client.shuffle(None)?;
                         Ok(())
                     });
@@ -947,12 +932,15 @@ impl Pane for QueuePane {
                         }
 
                         let new_start_idx = range.start().saturating_sub(1);
-                        ctx.command(move |client| {
-                            client.move_in_queue(
+                        ctx.app_event_sender
+                            .send(AppEvent::IgnoreIdleEvent(IdleEvent::Playlist))?;
+                        ctx.command(move |tx, client| {
+                            let result = client.move_in_queue(
                                 range.into(),
                                 QueuePosition::Absolute(new_start_idx),
-                            )?;
-                            Ok(())
+                            );
+                            tx.send(AppEvent::UnIgnoreIdleEvent(IdleEvent::Playlist))?;
+                            Ok(result?)
                         });
                     }
 
@@ -987,12 +975,15 @@ impl Pane for QueuePane {
                         }
 
                         let new_start_idx = range.start().saturating_add(1);
-                        ctx.command(move |client| {
-                            client.move_in_queue(
+                        ctx.app_event_sender
+                            .send(AppEvent::IgnoreIdleEvent(IdleEvent::Playlist))?;
+                        ctx.command(move |tx, client| {
+                            let result = client.move_in_queue(
                                 range.into(),
                                 QueuePosition::Absolute(new_start_idx),
-                            )?;
-                            Ok(())
+                            );
+                            tx.send(AppEvent::UnIgnoreIdleEvent(IdleEvent::Playlist))?;
+                            Ok(result?)
                         });
                     }
 
@@ -1013,15 +1004,23 @@ impl Pane for QueuePane {
                         return Ok(());
                     }
 
-                    let Some((idx, selected)) = self.queue.selected_with_idx() else {
+                    let Some(idx) = self.queue.selected_idx() else {
                         return Ok(());
                     };
 
+                    if idx == 0 {
+                        return Ok(());
+                    }
+
                     let new_idx = idx.saturating_sub(1);
-                    let id = selected.id;
-                    ctx.command(move |client| {
-                        client.move_id(id, QueuePosition::Absolute(new_idx))?;
-                        Ok(())
+                    ctx.app_event_sender.send(AppEvent::IgnoreIdleEvent(IdleEvent::Playlist))?;
+                    ctx.command(move |tx, client| {
+                        let result = client.move_in_queue(
+                            SingleOrRange::single(idx),
+                            QueuePosition::Absolute(new_idx),
+                        );
+                        tx.send(AppEvent::UnIgnoreIdleEvent(IdleEvent::Playlist))?;
+                        Ok(result?)
                     });
                     self.queue.select_idx(new_idx, ctx.config.scrolloff);
                     self.queue.items.swap(idx, new_idx);
@@ -1032,15 +1031,19 @@ impl Pane for QueuePane {
                         return Ok(());
                     }
 
-                    let Some((idx, selected)) = self.queue.selected_with_idx() else {
+                    let Some(idx) = self.queue.selected_idx() else {
                         return Ok(());
                     };
 
                     let new_idx = (idx + 1).min(self.queue.len() - 1);
-                    let id = selected.id;
-                    ctx.command(move |client| {
-                        client.move_id(id, QueuePosition::Absolute(new_idx))?;
-                        Ok(())
+                    ctx.app_event_sender.send(AppEvent::IgnoreIdleEvent(IdleEvent::Playlist))?;
+                    ctx.command(move |tx, client| {
+                        let result = client.move_in_queue(
+                            SingleOrRange::single(idx),
+                            QueuePosition::Absolute(new_idx),
+                        );
+                        tx.send(AppEvent::UnIgnoreIdleEvent(IdleEvent::Playlist))?;
+                        Ok(result?)
                     });
                     self.queue.select_idx(new_idx, ctx.config.scrolloff);
                     self.queue.items.swap(idx, new_idx);
@@ -1221,7 +1224,7 @@ impl Pane for QueuePane {
                     max_rating: _,
                 } => {
                     let items = self.enqueue_items(false).0;
-                    ctx.command(move |client| {
+                    ctx.command(move |_, client| {
                         client.set_sticker_multiple(RATING_STICKER, value.to_string(), items)?;
                         Ok(())
                     });
@@ -1233,7 +1236,7 @@ impl Pane for QueuePane {
                     max_rating: _,
                 } => {
                     let items = self.enqueue_items(false).0;
-                    ctx.command(move |client| {
+                    ctx.command(move |_, client| {
                         client.delete_sticker_multiple(RATING_STICKER, items)?;
                         Ok(())
                     });
@@ -1260,21 +1263,21 @@ impl Pane for QueuePane {
                 }
                 CommonAction::Rate { kind: RateKind::Like(), current: false, .. } => {
                     let items = self.enqueue_items(false).0;
-                    ctx.command(move |client| {
+                    ctx.command(move |_, client| {
                         client.set_sticker_multiple(LIKE_STICKER, "2".to_string(), items)?;
                         Ok(())
                     });
                 }
                 CommonAction::Rate { kind: RateKind::Neutral(), current: false, .. } => {
                     let items = self.enqueue_items(false).0;
-                    ctx.command(move |client| {
+                    ctx.command(move |_, client| {
                         client.set_sticker_multiple(LIKE_STICKER, "1".to_string(), items)?;
                         Ok(())
                     });
                 }
                 CommonAction::Rate { kind: RateKind::Dislike(), current: false, .. } => {
                     let items = self.enqueue_items(false).0;
-                    ctx.command(move |client| {
+                    ctx.command(move |_, client| {
                         client.set_sticker_multiple(LIKE_STICKER, "0".to_string(), items)?;
                         Ok(())
                     });

@@ -50,6 +50,10 @@ pub struct Ctx {
     pub(crate) mpd_version: Version,
     pub(crate) config: std::sync::Arc<Config>,
     pub(crate) status: Status,
+    #[cfg(test)]
+    pub(crate) current_song: Option<Song>,
+    #[cfg(not(test))]
+    current_song: Option<Song>,
     pub(crate) queue: Vec<Song>,
     #[cfg(test)]
     pub(crate) stickers: HashMap<String, HashMap<String, String>>,
@@ -101,6 +105,7 @@ impl Ctx {
 
         let status = client.get_status()?;
         let queue = client.playlist_info()?.unwrap_or_default();
+        let current_song = client.get_current_song()?;
         let cached_queue_time_total = queue.iter().filter_map(|s| s.duration).sum();
 
         if !supported_commands.contains("albumart") || !supported_commands.contains("readpicture") {
@@ -121,6 +126,7 @@ impl Ctx {
             config: std::sync::Arc::new(config),
             status,
             queue,
+            current_song,
             stickers: HashMap::new(),
             active_tab,
             supported_commands,
@@ -165,7 +171,7 @@ impl Ctx {
                     self.stickers_supported = StickersSupport::UnsupportedAndChecked;
                     // Shoot a dummy sticker request to MPD to see what error we get to determine
                     // what exactly is wrong.
-                    self.command(|client| {
+                    self.command(|_, client| {
                         if let Err(err) = client.sticker("", "test") {
                             status_error!(
                                 "Stickers are not supported by MPD server: '{}'",
@@ -235,7 +241,7 @@ impl Ctx {
 
     pub(crate) fn command(
         &self,
-        callback: impl FnOnce(&mut Client<'_>) -> Result<()> + Send + 'static,
+        callback: impl FnOnce(&Sender<AppEvent>, &mut Client<'_>) -> Result<()> + Send + 'static,
     ) {
         if let Err(err) = self
             .client_request_sender
@@ -245,26 +251,26 @@ impl Ctx {
         }
     }
 
-    pub(crate) fn find_current_song_in_queue(&self) -> Option<(usize, &Song)> {
+    pub(crate) fn set_current_song(&mut self, song: Option<Song>) {
+        self.current_song = song;
+    }
+
+    pub(crate) fn current_song(&self) -> Option<&Song> {
         if self.status.state == State::Stop {
             return None;
         }
+        self.current_song.as_ref()
+    }
 
-        // Use indexing by "song" instead of finding the song by id when the queue is
-        // very large to avoid performance issues. The indexing is not used by default
-        // because it can cause small/short desyncs when queue is being updated by
-        // moving/shuffling the songs.
-        if self.queue.len() > 3_000 {
-            self.status.song.and_then(|idx| self.queue.get(idx).map(|song| (idx, song)))
-        } else {
-            self.status
-                .songid
-                .and_then(|id| self.queue.iter().enumerate().find(|(_, song)| song.id == id))
+    pub(crate) fn current_song_index(&self) -> Option<usize> {
+        if self.status.state == State::Stop {
+            return None;
         }
+        self.status.song
     }
 
     pub(crate) fn find_current_lyrics_path(&self) -> Option<PathBuf> {
-        let (_, song) = self.find_current_song_in_queue()?;
+        let song = self.current_song()?;
         let lyrics_dir = self.config.lyrics_dir.as_ref()?;
         let path = crate::shared::lrc::get_lrc_path(lyrics_dir, &song.file)
             .ok()

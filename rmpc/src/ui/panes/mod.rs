@@ -552,7 +552,7 @@ impl Property<PropertyKind> {
                     Some(Either::Left(Span::styled(formatted, style)))
                 }
                 StatusProperty::QueueTimeRemaining { separator } => {
-                    let remaining_time = ctx.find_current_song_in_queue().map_or(
+                    let remaining_time = ctx.current_song_index().zip(ctx.current_song()).map_or(
                         Duration::default(),
                         |(current_song_idx, current_song)| {
                             let total_remaining: Duration = ctx
@@ -746,7 +746,7 @@ impl SizedPaneOrSplit {
     ) -> Result<()> {
         let mut stack = vec![(self, area)];
 
-        let song = ctx.find_current_song_in_queue().map(|(_, song)| song);
+        let song = ctx.current_song();
         while let Some((configured_panes, area)) = stack.pop() {
             match configured_panes {
                 SizedPaneOrSplit::Pane(pane) => {
@@ -1460,6 +1460,7 @@ mod format_tests {
             });
 
             ctx.queue = queue;
+            ctx.current_song = Some(current_song.clone());
             ctx.status = Status {
                 elapsed,
                 duration: Duration::from_secs(123),
