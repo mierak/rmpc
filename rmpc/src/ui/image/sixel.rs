@@ -132,9 +132,11 @@ impl Backend for Sixel {
                 repeat = 1;
             }
 
-            if tmux && buf.len() > 1_048_576 {
+            let limit = *tmux::INPUT_BUFFER_LIMIT;
+            if tmux && buf.len() > limit {
                 bail!(
-                    "Tmux supports a maximum of 1MB of data. Sixel image will not be displayed. Try decreasing max album art size."
+                    "Image is {} bytes which is larger than your tmux's 'input-buffer-size'. Increase it and restart rmpc to display this image.",
+                    buf.len()
                 )
             }
 

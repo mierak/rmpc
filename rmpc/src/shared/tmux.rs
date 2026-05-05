@@ -1,10 +1,24 @@
 use std::sync::LazyLock;
 
-use anyhow::Result;
+use anyhow::{Result, bail};
 
 pub static IS_TMUX: LazyLock<bool> = LazyLock::new(|| {
     std::env::var("TMUX").is_ok_and(|v| !v.is_empty())
         && std::env::var("TMUX_PANE").is_ok_and(|v| !v.is_empty())
+});
+
+pub static INPUT_BUFFER_LIMIT: LazyLock<usize> = LazyLock::new(|| {
+    if !*IS_TMUX {
+        return 0;
+    }
+
+    match input_buffer_limit() {
+        Ok(val) => val,
+        Err(err) => {
+            log::warn!(err:?; "Failed to get tmux input buffer limit, defaulting to 1mb");
+            1_048_576
+        }
+    }
 });
 
 static TMUX_PANE: LazyLock<String> = LazyLock::new(|| {
@@ -143,6 +157,27 @@ pub fn version() -> anyhow::Result<Option<String>> {
     log::trace!(stdout; "got tmux version");
 
     Ok(Some(String::from_utf8_lossy(stdout.as_bytes()).to_string()))
+}
+
+pub fn input_buffer_limit() -> anyhow::Result<usize> {
+    if !*IS_TMUX {
+        return Ok(0);
+    }
+
+    let mut cmd = std::process::Command::new("tmux");
+    let cmd = cmd.args(["show", "-Ap", "input-buffer-size"]);
+    let stdout = cmd.output()?.stdout;
+
+    let val = String::from_utf8_lossy(&stdout).trim_end().to_lowercase();
+    if !val.starts_with("input-buffer-size") {
+        bail!("Unexpected tmux input buffer limit value: '{val}'");
+    }
+
+    let (_, val) = val
+        .split_once(' ')
+        .ok_or_else(|| anyhow::anyhow!("Unexpected tmux input buffer limit value: '{val}'"))?;
+
+    Ok(val.trim().parse()?)
 }
 
 pub fn is_passthrough_enabled() -> anyhow::Result<bool> {
