@@ -37,6 +37,9 @@
 ---@field musicbrainz_release_track_id? MetadataValue
 ---@field musicbrainz_work_id? MetadataValue
 
+---@class QueuedSong: Song
+---@field id number
+
 ---@class MetadataValue
 ---Represents a tag that may contain one or many values.
 ---@field first fun(self: MetadataValue): string

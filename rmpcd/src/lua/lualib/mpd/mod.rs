@@ -7,7 +7,10 @@ use rmpc_mpd::{
     mpd_client::MpdClient,
 };
 
-use crate::{async_client::AsyncClient, lua::lualib::mpd::types::Status};
+use crate::{
+    async_client::AsyncClient,
+    lua::lualib::mpd::types::{Song, Status},
+};
 
 mod c2c;
 mod playback;
@@ -68,7 +71,7 @@ pub fn create(lua: &Lua, client: &Arc<AsyncClient>) -> Result<Table> {
         let client = Arc::clone(&c);
         async move {
             match client.run(move |c| c.find_one(&[Filter::new(Tag::File, uri.as_str())])).await {
-                Ok(song) => lua.to_value(&song).into_lua_multi(&lua),
+                Ok(song) => song.map(Song::from).into_lua_multi(&lua),
                 Err(err) => {
                     tracing::error!(err = ?err, "Failed to get song by uri");
                     (Value::Nil, Some(err.to_string())).into_lua_multi(&lua)
@@ -82,7 +85,7 @@ pub fn create(lua: &Lua, client: &Arc<AsyncClient>) -> Result<Table> {
         let client = Arc::clone(&c);
         async move {
             match client.run(move |c| c.playlist_id(id)).await {
-                Ok(song) => lua.to_value(&song).into_lua_multi(&lua),
+                Ok(song) => song.map(Song::from).into_lua_multi(&lua),
                 Err(err) => {
                     tracing::error!(err = ?err, "Failed to get song by id");
                     (Value::Nil, Some(err.to_string())).into_lua_multi(&lua)
@@ -96,7 +99,7 @@ pub fn create(lua: &Lua, client: &Arc<AsyncClient>) -> Result<Table> {
         let client = Arc::clone(&c);
         async move {
             match client.run(move |c| c.get_current_song()).await {
-                Ok(song) => lua.to_value(&song).into_lua_multi(&lua),
+                Ok(song) => song.map(Song::from).into_lua_multi(&lua),
                 Err(err) => {
                     tracing::error!(err = ?err, "Failed to get current song");
                     (Value::Nil, Some(err.to_string())).into_lua_multi(&lua)

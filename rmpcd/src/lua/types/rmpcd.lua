@@ -11,7 +11,7 @@
 ---@class RmpcdPlugin<Args>
 ---@field subscribed_channels string[]|nil
 ---@field setup fun(self, args: Args)|nil
----@field song_change fun(self, old_song: Song|nil, new_song: Song|nil)|nil
+---@field song_change fun(self, old_song: QueuedSong|nil, new_song: QueuedSong|nil)|nil
 ---@field state_change fun(self, old_state: PlaybackState, new_state: PlaybackState)|nil
 ---@field message fun(self, channel: string, message: string)|nil
 ---@field idle_event fun(self, event: IdleEvent)|nil

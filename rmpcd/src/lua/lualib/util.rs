@@ -6,9 +6,9 @@ use tracing::info;
 pub fn create(lua: &Lua) -> mlua::Result<Table> {
     let tbl = lua.create_table()?;
 
-    let dump_table = lua.create_function(|_, tbl: Table| {
+    let dump_table = lua.create_function(|_, val: Value| {
         let mut seen = HashSet::new();
-        info!("{}", dump(&mlua::Value::Table(tbl), 0, &mut seen));
+        info!("{}", dump(&val, 0, &mut seen));
         Ok(())
     })?;
 
