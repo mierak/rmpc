@@ -215,8 +215,8 @@ impl LuaPlugin {
             }
             PluginEvent::SongChange { old, new } => {
                 trace!(name, ON_SONG_CHANGE, "Running plugin callback");
-                let old = old.clone().into_lua(lua)?;
-                let new = new.clone().into_lua(lua)?;
+                let old = old.into_lua(lua)?;
+                let new = new.into_lua(lua)?;
 
                 let func: mlua::Function = state.get(ON_SONG_CHANGE)?;
 

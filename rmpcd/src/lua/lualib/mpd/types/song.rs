@@ -1,10 +1,11 @@
-use mlua::UserData;
+use mlua::{MetaMethod, UserData};
 use rmpc_mpd::commands::Song as MpdSong;
 
 use crate::lua::lualib::mpd::types::{MetadataTag, MetadataTagExt};
 
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub struct Song {
+    pub id: u32,
     pub file: String,
     pub duration: u128,
     pub artist: Option<MetadataTag>,
@@ -44,9 +45,67 @@ pub struct Song {
     pub musicbrainz_workid: Option<MetadataTag>,
 }
 
+impl From<MpdSong> for Song {
+    fn from(mut value: MpdSong) -> Self {
+        Self {
+            id: value.id,
+            file: value.file,
+            duration: value.duration.map(|d| d.as_millis()).unwrap_or_default(),
+            artist: value.metadata.remove("artist").to_metadata_tag(),
+            artistsort: value.metadata.remove("artistsort").to_metadata_tag(),
+            album: value.metadata.remove("album").to_metadata_tag(),
+            albumsort: value.metadata.remove("albumsort").to_metadata_tag(),
+            albumartist: value.metadata.remove("albumartist").to_metadata_tag(),
+            albumartistsort: value.metadata.remove("albumartistsort").to_metadata_tag(),
+            title: value.metadata.remove("title").to_metadata_tag(),
+            titlesort: value.metadata.remove("titlesort").to_metadata_tag(),
+            track: value.metadata.remove("track").to_metadata_tag(),
+            name: value.metadata.remove("name").to_metadata_tag(),
+            genre: value.metadata.remove("genre").to_metadata_tag(),
+            mood: value.metadata.remove("mood").to_metadata_tag(),
+            date: value.metadata.remove("date").to_metadata_tag(),
+            originaldate: value.metadata.remove("originaldate").to_metadata_tag(),
+            composer: value.metadata.remove("composer").to_metadata_tag(),
+            composersort: value.metadata.remove("composersort").to_metadata_tag(),
+            performer: value.metadata.remove("performer").to_metadata_tag(),
+            conductor: value.metadata.remove("conductor").to_metadata_tag(),
+            work: value.metadata.remove("work").to_metadata_tag(),
+            ensemble: value.metadata.remove("ensemble").to_metadata_tag(),
+            movement: value.metadata.remove("movement").to_metadata_tag(),
+            movementnumber: value.metadata.remove("movementnumber").to_metadata_tag(),
+            showmovement: value
+                .metadata
+                .remove("showmovement")
+                .and_then(|v| v.first().parse::<bool>().ok()),
+            location: value.metadata.remove("location").to_metadata_tag(),
+            grouping: value.metadata.remove("grouping").to_metadata_tag(),
+            comment: value.metadata.remove("comment").to_metadata_tag(),
+            disc: value.metadata.remove("disc").to_metadata_tag(),
+            label: value.metadata.remove("label").to_metadata_tag(),
+            musicbrainz_artistid: value.metadata.remove("musicbrainz_artistid").to_metadata_tag(),
+            musicbrainz_albumid: value.metadata.remove("musicbrainz_albumid").to_metadata_tag(),
+            musicbrainz_albumartistid: value
+                .metadata
+                .remove("musicbrainz_albumartistid")
+                .to_metadata_tag(),
+            musicbrainz_trackid: value.metadata.remove("musicbrainz_trackid").to_metadata_tag(),
+            musicbrainz_releasegroupid: value
+                .metadata
+                .remove("musicbrainz_releasegroupid")
+                .to_metadata_tag(),
+            musicbrainz_releasetrackid: value
+                .metadata
+                .remove("musicbrainz_releasetrackid")
+                .to_metadata_tag(),
+            musicbrainz_workid: value.metadata.remove("musicbrainz_workid").to_metadata_tag(),
+        }
+    }
+}
+
 impl From<&MpdSong> for Song {
     fn from(value: &MpdSong) -> Self {
         Self {
+            id: value.id,
             file: value.file.clone(),
             duration: value.duration.map(|d| d.as_millis()).unwrap_or_default(),
             artist: value.metadata.get("artist").to_metadata_tag(),
@@ -101,7 +160,12 @@ impl From<&MpdSong> for Song {
 }
 
 impl UserData for Song {
+    fn add_methods<M: mlua::UserDataMethods<Self>>(methods: &mut M) {
+        methods.add_meta_method(MetaMethod::ToString, |_, this, ()| Ok(format!("{this:?}")));
+    }
+
     fn add_fields<F: mlua::UserDataFields<Self>>(fields: &mut F) {
+        fields.add_field_method_get("id", |_, this| Ok(this.id));
         fields.add_field_method_get("file", |_, this| Ok(this.file.clone()));
         fields.add_field_method_get("duration", |_, this| Ok(this.duration));
         fields.add_field_method_get("artist", |_, this| Ok(this.artist.clone()));
