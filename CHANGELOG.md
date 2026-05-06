@@ -6,10 +6,10 @@ All notable changes to this project will be documented in this file.
 
 ### Added
 
-- `extra_yt_dlp_args` to pass in more things to yt-dlp if required
 - **Breaking** `ExternalCommand` can now have arguments supplied at runtime. This will break your
   existing keybinds if they contained either `{` or `}`. You will now need to escape these by
   doubling them up: `{{` and `}}`.
+- `extra_yt_dlp_args` to pass in more things to yt-dlp if required
 - `scroll_speed` to `song_table_format`
 - `album_art.custom_loader` to allow for more flexibility when choosing the album art image
 - added `CopyToClipboard()` action
@@ -33,6 +33,8 @@ All notable changes to this project will be documented in this file.
 
 ### Changed
 
+- **Breaking** Some color styling options have changed, mainly in relation to `text_color`, you
+  might have to update your theme to get to the old appearance
 - Improved error message when invalid `default_album_art_path` path is provided
 - Environment variables are now resolved when parsing paths in the config file or theme
 - Sixel is no longer hard limited to 1MB of data. Set `input-buffer-size` in your tmux config to
