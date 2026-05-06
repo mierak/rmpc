@@ -58,6 +58,7 @@ keybinds
 - add `iTerm.app` into emulator env variable detection
 - `PREV_SONG` in `on_song_change` is now correctly tracked with consume on
 - `current_item_style` and `highlighted_item_style` merge on top of `text_color` in modals and search
+- The queue should not leave empty space in the table anymore
 
 ## [0.11.0] - 2026-02-01
 
