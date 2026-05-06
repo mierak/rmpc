@@ -47,8 +47,7 @@ pub trait DirStackItem {
 }
 
 pub fn marker_style(ctx: &Ctx, is_current: bool, matches_filter: bool) -> Style {
-    let style =
-        ctx.config.theme.symbols.marker_style.unwrap_or(ctx.config.theme.highlighted_item_style);
+    let style = ctx.config.theme.symbols.marker_style.unwrap_or_default();
     if is_current {
         return style.patch(ctx.config.theme.symbols.marker_current_style.unwrap_or_default());
     } else if matches_filter {
@@ -58,8 +57,7 @@ pub fn marker_style(ctx: &Ctx, is_current: bool, matches_filter: bool) -> Style 
 }
 
 fn dir_style(ctx: &Ctx, is_current: bool, matches_filter: bool) -> Style {
-    let style =
-        ctx.config.theme.symbols.dir_style.unwrap_or(ctx.config.theme.highlighted_item_style);
+    let style = ctx.config.theme.symbols.dir_style.unwrap_or_default();
     if is_current {
         return style.patch(ctx.config.theme.symbols.dir_current_style.unwrap_or_default());
     } else if matches_filter {
@@ -69,8 +67,7 @@ fn dir_style(ctx: &Ctx, is_current: bool, matches_filter: bool) -> Style {
 }
 
 fn playlist_style(ctx: &Ctx, is_current: bool, matches_filter: bool) -> Style {
-    let style =
-        ctx.config.theme.symbols.playlist_style.unwrap_or(ctx.config.theme.highlighted_item_style);
+    let style = ctx.config.theme.symbols.playlist_style.unwrap_or_default();
     if is_current {
         return style.patch(ctx.config.theme.symbols.playlist_current_style.unwrap_or_default());
     } else if matches_filter {
@@ -81,8 +78,7 @@ fn playlist_style(ctx: &Ctx, is_current: bool, matches_filter: bool) -> Style {
 }
 
 fn song_style(ctx: &Ctx, is_current: bool, matches_filter: bool) -> Style {
-    let style =
-        ctx.config.theme.symbols.song_style.unwrap_or(ctx.config.theme.highlighted_item_style);
+    let style = ctx.config.theme.symbols.song_style.unwrap_or_default();
     if is_current {
         return style.patch(ctx.config.theme.symbols.song_current_style.unwrap_or_default());
     } else if matches_filter {

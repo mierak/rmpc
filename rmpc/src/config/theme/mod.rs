@@ -437,7 +437,7 @@ impl TryFrom<UiConfigFile> for UiConfig {
         let fg_color = StringColor(value.text_color.clone()).to_color()?;
         let bg_color = StringColor(value.background_color).to_color()?;
         let header_bg_color = StringColor(value.header_background_color).to_color()?.or(bg_color);
-        let border = value.borders_style.to_config_or(Some(Color::White), None)?;
+        let border = value.borders_style.to_config_or(None, None)?;
         let border_set_lib: BorderSetLib = value.border_symbol_sets.try_into()?;
         let components = convert_components(value.components, &border_set_lib)?;
         let current_style = value.current_item_style.to_config_or(None, None)?;
@@ -464,7 +464,7 @@ impl TryFrom<UiConfigFile> for UiConfig {
             symbols: value.symbols.into(),
             scrollbar: value
                 .scrollbar
-                .map(|sc| sc.into_config(border.fg.unwrap_or(Color::White)))
+                .map(|sc| sc.into_config(border.fg.unwrap_or_default()))
                 .transpose()?,
             progress_bar: value.progress_bar.into_config()?,
             song_table_format: TryInto::<QueueTableColumns>::try_into(value.song_table_format)?.0,
