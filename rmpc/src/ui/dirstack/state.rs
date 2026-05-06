@@ -51,6 +51,12 @@ impl<T: ScrollingState> DirState<T> {
         self.content_len = Some(content_len);
         self.viewport_len = Some(viewport_len);
 
+        let max_offset = content_len.saturating_sub(viewport_len);
+        if self.inner.offset() > max_offset {
+            self.inner.set_offset(max_offset);
+            self.scrollbar_state = self.scrollbar_state.position(max_offset);
+        }
+
         if content_len <= viewport_len {
             self.scrollbar_state =
                 self.scrollbar_state.viewport_content_length(1).content_length(1);
