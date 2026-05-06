@@ -422,7 +422,7 @@ impl Property<PropertyKind> {
         tag_separator: &str,
         strategy: TagResolutionStrategy,
     ) -> Option<Either<Span<'s>, Vec<Span<'s>>>> {
-        let style = self.style.unwrap_or_default();
+        let style = ctx.config.as_text_style().patch(self.style.unwrap_or_default());
         let status = &ctx.status;
         match &self.kind {
             PropertyKindOrText::Text(value) => Some(Either::Left(Span::styled(value, style))),

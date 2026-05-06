@@ -131,7 +131,9 @@ impl<V: Display + std::fmt::Debug, Callback: FnOnce(&Ctx, V, usize) -> Result<()
 
         self.button_group.set_active_style(match self.focused {
             FocusedComponent::List => Style::default().reversed(),
-            FocusedComponent::Buttons => ctx.config.theme.current_item_style,
+            FocusedComponent::Buttons => {
+                ctx.config.as_text_style().patch(ctx.config.theme.current_item_style)
+            }
         });
 
         let scrollbar_area =

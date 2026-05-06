@@ -168,7 +168,9 @@ impl Section for SelectSection {
             } else if let Some(f) = filter
                 && item.label.to_lowercase().contains(f)
             {
-                text = text.style(ctx.config.theme.highlighted_item_style);
+                text = text.style(
+                    ctx.config.as_text_style().patch(ctx.config.theme.highlighted_item_style),
+                );
             } else {
                 text = text.style(
                     ctx.config

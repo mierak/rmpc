@@ -172,14 +172,11 @@ impl Section for ListSection {
             } else if let Some(f) = filter
                 && item.label.to_lowercase().contains(f)
             {
-                text = text.style(ctx.config.theme.highlighted_item_style);
-            } else {
                 text = text.style(
-                    ctx.config
-                        .theme
-                        .text_color
-                        .map_or(Style::default(), |c| Style::default().fg(c)),
+                    ctx.config.as_text_style().patch(ctx.config.theme.highlighted_item_style),
                 );
+            } else {
+                text = text.style(ctx.config.as_text_style());
             }
             let idx = idx.saturating_sub(self.state.offset());
 
