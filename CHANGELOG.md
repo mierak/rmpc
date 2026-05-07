@@ -39,6 +39,7 @@ All notable changes to this project will be documented in this file.
 - Environment variables are now resolved when parsing paths in the config file or theme
 - Sixel is no longer hard limited to 1MB of data. Set `input-buffer-size` in your tmux config to
   alleviate the limitation.
+- `ContextMenu` moved from `<C-z>` to `<C-x>`  to not conflict with putting the job to background
 
 ### Fixed
 
