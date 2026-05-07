@@ -112,7 +112,7 @@
             "<C-r>":      Rename,
             "i":          FocusInput,
             "oi":         ShowInfo,
-            "<C-z>":      ContextMenu(),
+            "<C-x>":      ContextMenu(),
             "<C-s>s":     Save(kind: Modal(all: false, duplicates_strategy: Ask)),
             "<C-s>a":     Save(kind: Modal(all: true, duplicates_strategy: Ask)),
             "r":          Rate(),
