@@ -1389,8 +1389,6 @@ struct QueueRow {
 
 impl QueueRow {
     fn into_row<'a>(self, cells: impl Iterator<Item = Line<'a>>) -> Row<'a> {
-        let row = Row::new(cells);
-
         let mut row_style = Style::default();
 
         if let Some(style) = self.cell_style {
@@ -1404,6 +1402,22 @@ impl QueueRow {
         if self.underlined {
             row_style = row_style.underlined();
         }
+
+        let row = if let Some(cursor) = self.cursor_style {
+            Row::new(
+                cells
+                    .map(|mut line| {
+                        line.style = line.style.patch(cursor);
+                        for span in &mut line.spans {
+                            span.style = span.style.patch(cursor);
+                        }
+                        line
+                    })
+                    .collect::<Vec<_>>(),
+            )
+        } else {
+            Row::new(cells.collect::<Vec<_>>())
+        };
 
         row.style(row_style)
     }
