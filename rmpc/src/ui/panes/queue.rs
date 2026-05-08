@@ -1403,21 +1403,25 @@ impl QueueRow {
             row_style = row_style.underlined();
         }
 
-        let row = if let Some(cursor) = self.cursor_style {
-            Row::new(
-                cells
-                    .map(|mut line| {
+        let row = Row::new(
+            cells
+                .map(|mut line| {
+                    if let Some(style) = self.cell_style {
+                        line.style = line.style.patch(style);
+                        for span in &mut line.spans {
+                            span.style = span.style.patch(style);
+                        }
+                    }
+                    if let Some(cursor) = self.cursor_style {
                         line.style = line.style.patch(cursor);
                         for span in &mut line.spans {
                             span.style = span.style.patch(cursor);
                         }
-                        line
-                    })
-                    .collect::<Vec<_>>(),
-            )
-        } else {
-            Row::new(cells.collect::<Vec<_>>())
-        };
+                    }
+                    line
+                })
+                .collect::<Vec<_>>(),
+        );
 
         row.style(row_style)
     }
