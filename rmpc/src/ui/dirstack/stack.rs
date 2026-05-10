@@ -54,6 +54,10 @@ where
         self.dirs.keys()
     }
 
+    pub fn entries(&self) -> impl Iterator<Item = (&Path, &Dir<T, S>)> {
+        self.dirs.iter()
+    }
+
     pub fn current(&self) -> &Dir<T, S> {
         self.dirs.get(&self.path).unwrap_or(&self.empty)
     }

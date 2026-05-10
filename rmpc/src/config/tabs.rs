@@ -26,7 +26,14 @@ use crate::{
             ConfigColor,
             StyleFile,
             borders::{BorderSetInherited, BorderSetLib, BorderSymbols, BorderSymbolsFile},
-            properties::{Alignment, PropertyKindFileOrText, StatusPropertyFile},
+            properties::{
+                Alignment,
+                PropertyKindFileOrText,
+                PropertyKindOrText,
+                SongProperty,
+                SongPropertyFile,
+                StatusPropertyFile,
+            },
             style::ToConfigOr,
         },
     },
@@ -70,21 +77,36 @@ impl std::hash::Hash for TabName {
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct BrowserTagConfigFile {
-    pub tag: String,
+    pub group_by: Vec<Vec<String>>,
     #[serde(default)]
-    pub group_by: Option<Vec<String>>,
-    #[serde(default)]
-    pub sort_by: Option<Vec<String>>,
-    #[serde(default)]
-    pub separator: Option<String>,
+    pub sort_by: Option<Vec<Vec<String>>>,
+    pub format: Option<Vec<PropertyFile<SongPropertyFile>>>,
 }
 
 #[derive(Debug, Clone, Hash, Eq, PartialEq)]
 pub struct BrowserTagConfig {
-    pub tag: String,
-    pub group_by: Option<Vec<String>>,
-    pub sort_by: Option<Vec<String>>,
-    pub separator: Option<String>,
+    pub group_by: Vec<Vec<String>>,
+    pub sort_by: Option<Vec<Vec<String>>>,
+    pub format: Vec<Property<SongProperty>>,
+}
+
+pub fn tag_property(tags: &[String]) -> Property<SongProperty> {
+    let primary_tag = tags[0].clone();
+
+    Property {
+        kind: PropertyKindOrText::Property(SongProperty::Other(primary_tag.clone())),
+        style: None,
+        default: Some(tags.get(1..).filter(|rest| !rest.is_empty()).map_or_else(
+            || {
+                Box::new(Property {
+                    kind: PropertyKindOrText::Text(format!("<no {primary_tag}>")),
+                    style: None,
+                    default: None,
+                })
+            },
+            |rest| Box::new(tag_property(rest)),
+        )),
+    }
 }
 
 impl TryFrom<BrowserTagConfigFile> for BrowserTagConfig {
@@ -92,10 +114,18 @@ impl TryFrom<BrowserTagConfigFile> for BrowserTagConfig {
 
     fn try_from(value: BrowserTagConfigFile) -> std::result::Result<Self, Self::Error> {
         Ok(Self {
-            tag: value.tag,
+            format: value.format.map_or_else(
+                || {
+                    Ok(value
+                        .group_by
+                        .iter()
+                        .map(|tags: &Vec<String>| tag_property(tags))
+                        .collect_vec())
+                },
+                |f| f.into_iter().map(|p| p.convert()).try_collect(),
+            )?,
             group_by: value.group_by,
             sort_by: value.sort_by,
-            separator: value.separator,
         })
     }
 }
@@ -256,21 +286,19 @@ impl TryFrom<PaneTypeFile> for PaneType {
                     scroll_speed,
                 }
             }
-            PaneTypeFile::Browser { root_tag, separator, levels } => {
+            PaneTypeFile::Browser { root_tag, separator: _, levels } => {
                 if let Some(root_tag) = root_tag {
                     PaneType::Browser {
                         levels: vec![
                             BrowserTagConfig {
-                                tag: root_tag,
-                                group_by: None,
+                                group_by: vec![vec![root_tag]],
                                 sort_by: None,
-                                separator,
+                                format: vec![],
                             },
                             BrowserTagConfig {
-                                tag: "album".to_string(),
-                                group_by: Some(vec!["date".to_string()]),
+                                group_by: vec![vec!["album".to_string(), "date".to_string()]],
                                 sort_by: None,
-                                separator: None,
+                                format: vec![],
                             },
                         ],
                     }
@@ -279,10 +307,16 @@ impl TryFrom<PaneTypeFile> for PaneType {
                         bail!("At least one level is required for browser panes");
                     }
 
-                    if levels[0].group_by.is_some() || levels[0].sort_by.is_some() {
-                        bail!(
-                            "split_by_tag and sort_by are not allowed for the first level of browser panes"
-                        );
+                    if levels[0].group_by.len() != 1 {
+                        bail!("group_by on the first level must have exactly one tag");
+                    }
+
+                    if levels[0].sort_by.is_some() {
+                        bail!("sort_by is not allowed on the first level");
+                    }
+
+                    if levels[0].format.is_none() {
+                        bail!("format is not allowed on the first level");
                     }
 
                     PaneType::Browser {

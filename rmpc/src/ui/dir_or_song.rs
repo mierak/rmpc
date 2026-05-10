@@ -19,6 +19,7 @@ use crate::{
 pub(crate) enum DirOrSong {
     Dir {
         name: String,
+        display_name: Option<String>,
         full_path: String,
         last_modified: chrono::DateTime<chrono::Utc>,
         playlist: bool,
@@ -30,6 +31,17 @@ impl DirOrSong {
     pub fn name_only(name: String) -> Self {
         DirOrSong::Dir {
             name,
+            display_name: None,
+            full_path: String::new(),
+            last_modified: chrono::Utc::now(),
+            playlist: false,
+        }
+    }
+
+    pub fn name_display_name_only(name: String, display_name: String) -> Self {
+        DirOrSong::Dir {
+            name,
+            display_name: Some(display_name),
             full_path: String::new(),
             last_modified: chrono::Utc::now(),
             playlist: false,
@@ -39,6 +51,7 @@ impl DirOrSong {
     pub fn playlist_name_only(name: String) -> Self {
         DirOrSong::Dir {
             name,
+            display_name: None,
             full_path: String::new(),
             last_modified: chrono::Utc::now(),
             playlist: true,
@@ -171,12 +184,17 @@ impl LsInfoEntryExt for LsInfoEntry {
     fn into_dir_or_song(self, show_playlists_mode: ShowPlaylistsMode) -> Option<DirOrSong> {
         match self {
             LsInfoEntry::File(song) => Some(DirOrSong::Song(song)),
-            LsInfoEntry::Dir(Dir { name, full_path, last_modified }) => {
-                Some(DirOrSong::Dir { name, full_path, last_modified, playlist: false })
-            }
+            LsInfoEntry::Dir(Dir { name, full_path, last_modified }) => Some(DirOrSong::Dir {
+                name,
+                display_name: None,
+                full_path,
+                last_modified,
+                playlist: false,
+            }),
             LsInfoEntry::Playlist(playlist) => match show_playlists_mode {
                 ShowPlaylistsMode::All => Some(DirOrSong::Dir {
                     name: playlist.name,
+                    display_name: None,
                     full_path: playlist.full_path,
                     last_modified: playlist.last_modified,
                     playlist: true,
@@ -185,6 +203,7 @@ impl LsInfoEntryExt for LsInfoEntry {
                 ShowPlaylistsMode::NonRoot if playlist.name == playlist.full_path => None,
                 ShowPlaylistsMode::NonRoot => Some(DirOrSong::Dir {
                     name: playlist.name,
+                    display_name: None,
                     full_path: playlist.full_path,
                     last_modified: playlist.last_modified,
                     playlist: true,
@@ -458,9 +477,11 @@ mod ordtest {
     fn dir(name: &str) -> DirOrSong {
         dir_mtime(name, &NOW.to_rfc3339())
     }
+
     fn dir_mtime(name: &str, mtime: &str) -> DirOrSong {
         DirOrSong::Dir {
             name: name.to_string(),
+            display_name: None,
             full_path: name.to_string(),
             last_modified: mtime.parse().unwrap(),
             playlist: false,

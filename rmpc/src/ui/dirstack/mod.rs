@@ -111,9 +111,15 @@ impl DirStackItem for DirOrSong {
 
     fn matches(&self, song_format: &[Property<SongProperty>], ctx: &Ctx, filter: &str) -> bool {
         match self {
-            DirOrSong::Dir { name, .. } => if name.is_empty() { "Untitled" } else { name.as_str() }
+            DirOrSong::Dir { name, display_name, .. } => {
+                if display_name.as_ref().unwrap_or(name).clone().is_empty() {
+                    "Untitled"
+                } else {
+                    display_name.as_ref().unwrap_or(name).as_str()
+                }
                 .to_lowercase()
-                .contains(&filter.to_lowercase()),
+                .contains(&filter.to_lowercase())
+            }
             DirOrSong::Song(s) => s.matches_formats(song_format, filter, ctx),
         }
     }
@@ -127,7 +133,7 @@ impl DirStackItem for DirOrSong {
         additional_content: Option<String>,
     ) -> ListItem<'a> {
         match self {
-            DirOrSong::Dir { name, playlist: is_playlist, .. } => {
+            DirOrSong::Dir { name, display_name, playlist: is_playlist, .. } => {
                 let config = &ctx.config;
                 let marker_style = marker_style(ctx, is_current, matches_filter);
                 let dir_style = dir_style(ctx, is_current, matches_filter);
@@ -146,10 +152,10 @@ impl DirStackItem for DirOrSong {
                         Span::styled(config.theme.symbols.dir.clone(), dir_style)
                     },
                     Span::from(" "),
-                    Span::from(if name.is_empty() {
+                    Span::from(if display_name.as_ref().unwrap_or(name).is_empty() {
                         Cow::Borrowed("Untitled")
                     } else {
-                        Cow::Owned(name.to_owned())
+                        Cow::Owned(display_name.as_ref().unwrap_or(name).to_owned())
                     }),
                 ]);
 
@@ -173,7 +179,9 @@ impl DirStackItem for DirOrSong {
 
     fn format(&self, format: &[Property<SongProperty>], sep: &str, ctx: &Ctx) -> String {
         match self {
-            DirOrSong::Dir { name, .. } => name.clone(),
+            DirOrSong::Dir { name, display_name, .. } => {
+                display_name.as_ref().unwrap_or(name).clone()
+            }
             DirOrSong::Song(s) => <Song as DirStackItem>::format(s, format, sep, ctx),
         }
     }

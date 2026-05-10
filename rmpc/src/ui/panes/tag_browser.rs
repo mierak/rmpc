@@ -5,17 +5,20 @@ use ratatui::{Frame, prelude::Rect, widgets::ListState};
 use rmpc_mpd::{
     client::Client,
     commands::Song,
-    filter::{Filter, FilterKind, Tag},
+    filter::{Filter, Tag},
     mpd_client::MpdClient,
 };
-use rmpc_shared::string_ext::StringExt;
 
 use super::Pane;
 use crate::{
     MpdQueryResult,
-    config::tabs::{BrowserTagConfig, PaneType},
+    config::{
+        sort_mode::{SortMode, SortOptions},
+        tabs::{BrowserTagConfig, PaneType},
+        theme::properties::SongProperty,
+    },
     ctx::Ctx,
-    shared::{cmp::StringCompare, keys::ActionEvent, mouse_event::MouseEvent},
+    shared::{cmp::StringCompare, id, keys::ActionEvent, mouse_event::MouseEvent},
     ui::{
         UiEvent,
         browser::BrowserPane,
@@ -39,6 +42,12 @@ pub struct TagBrowserPane {
 const INIT: &str = "init";
 const FETCH_SONGS: &str = "fetch_songs";
 
+struct SongGroup {
+    id: String,
+    display_name: String,
+    songs: Vec<Song>,
+}
+
 impl TagBrowserPane {
     pub fn new(tags: Vec<BrowserTagConfig>, target_pane: PaneType, _ctx: &Ctx) -> Self {
         Self {
@@ -50,96 +59,68 @@ impl TagBrowserPane {
         }
     }
 
-    fn root_tag_filter<'value>(
-        root_tag: Tag,
-        separator: Option<&str>,
-        value: &'value str,
-    ) -> Filter<'value> {
-        match separator {
-            None => Filter::new(root_tag, value),
-            Some(_) if value.is_empty() => Filter::new(root_tag, value),
-            // Exact match search cannot be used when separator is present because a single item in
-            // the list might be only part of the whole tag value. Thus we search for the value
-            // prependend by either start of the line or *anything* followed by the separator and
-            // followed by either end of the line or *anything* followed by the separator again.
-            Some(separator) => Filter::new_with_kind(
-                root_tag,
-                format!("(^|.*{separator}){value}($|{separator}.*)"),
-                FilterKind::Regex,
-            ),
-        }
-    }
-
-    fn group_songs_by_tag(
-        songs: Vec<Song>,
-        tag: &BrowserTagConfig,
-        ctx: &Ctx,
-    ) -> Vec<(String, Vec<Song>)> {
+    fn group_songs_by_tag(songs: Vec<Song>, tag: &BrowserTagConfig, ctx: &Ctx) -> Vec<SongGroup> {
         let sep = ctx.config.theme.format_tag_separator.as_str();
         let sort_opts = &ctx.config.browser_song_sort;
 
-        let tag_of = |song: &Song| {
-            song.metadata
-                .get(&tag.tag)
-                .map_or_else(|| format!("<no {}>", tag.tag), |v| v.join(sep).into_owned())
+        let tag_of_with_fallback = |song: &Song, tags: &[String]| {
+            tags.iter()
+                .find_map(|tag| song.metadata.get(tag.as_str()))
+                .map(|v| v.join(sep).into_owned())
         };
 
-        let first_tag_of = |song: &Song, tags: &[String]| {
-            tags.iter().find_map(|tag| song.metadata.get(tag).map(|v| v.last().to_string()))
+        let tags_of = |song: &Song, tags: &Vec<Vec<String>>| -> Vec<Option<String>> {
+            tags.iter().map(|group_tag| tag_of_with_fallback(song, group_tag.as_slice())).collect()
         };
 
-        let group_tags = tag.group_by.as_deref().unwrap_or(&[]);
-
-        let mut groups: Vec<(String, Option<String>, Option<String>, Vec<Song>)> = songs
+        let groups: Vec<(Vec<Option<String>>, Vec<Song>)> = songs
             .into_iter()
-            .into_group_map_by(|s| (tag_of(s), first_tag_of(s, group_tags)))
+            .into_group_map_by(|s| tags_of(s, &tag.group_by))
             .into_iter()
-            .flat_map(|((name, split_tag), mut songs)| {
+            .map(|(tags, mut songs)| {
                 songs.sort_by(|a, b| {
                     a.with_custom_sort(sort_opts).cmp(&b.with_custom_sort(sort_opts))
                 });
 
-                // There can be songs with different sort tag values within the
-                // same group. Pick the first one as the sanest
-                // approach, this will never be perfect but should
-                // be good enough in most cases.
-                let sort_tag = tag
-                    .sort_by
-                    .as_ref()
-                    .and_then(|t| songs.iter().find_map(|s| first_tag_of(s, t)));
-
-                let names = if let Some(tag_separator) = &tag.separator {
-                    name.split(tag_separator).map(str::to_string).unique().collect_vec()
-                } else {
-                    vec![name]
-                };
-
-                names
-                    .into_iter()
-                    .map(move |name| (name, split_tag.clone(), sort_tag.clone(), songs.clone()))
+                (tags, songs)
             })
             .collect_vec();
 
-        groups.sort_by(
-            |(name_a, split_tag_a, sort_tag_a, _), (name_b, split_tag_b, sort_tag_b, _)| match tag
-                .sort_by
-            {
-                None => name_a.cmp(name_b).then_with(|| split_tag_a.cmp(split_tag_b)),
-                Some(_) => sort_tag_a.cmp(sort_tag_b).then_with(|| name_a.cmp(name_b)),
-            },
-        );
+        let props = match &tag.sort_by {
+            Some(sort_tags) => sort_tags
+                .iter()
+                .flat_map(|tag| tag.iter().map(|t| SongProperty::Other(t.clone())))
+                .collect_vec(),
+            None => vec![],
+        };
+        let opts = SortOptions {
+            mode: SortMode::Format(props),
+            group_by_type: ctx.config.directories_sort.group_by_type,
+            reverse: ctx.config.directories_sort.reverse,
+            ignore_leading_the: ctx.config.directories_sort.ignore_leading_the,
+            fold_case: ctx.config.directories_sort.fold_case,
+        };
 
         groups
             .into_iter()
-            .map(|(name, split_tag, _, songs)| {
-                let display_name = match &tag.group_by {
-                    Some(tags) => format!(
-                        "({}) {name}",
-                        split_tag.unwrap_or_else(|| format!("<no {}>", tags.join(sep)))
-                    ),
-                    None => name,
-                };
-                (display_name, songs)
+            .map(|(_tags, songs)| {
+                let display_name = DirStackItem::format(&songs[0], &tag.format, "", ctx);
+                SongGroup { id: id::new().to_string(), display_name, songs }
+            })
+            .sorted_by(|a, b| {
+                //
+                match &tag.sort_by {
+                    Some(_) => {
+                        // Pick tags from the first song in the group. This is not a perfect
+                        // solution in case there are songs with different
+                        // tag values within the same group, but
+                        // it's hard to come up with a better solution and it should
+                        // work well in most cases. Only time this is an issue is when
+                        // sort tags are not a subset of the grouping tags.
+                        a.songs[0].with_custom_sort(&opts).cmp(&b.songs[0].with_custom_sort(&opts))
+                    }
+                    None => StringCompare::from(&opts).compare(&a.display_name, &b.display_name),
+                }
             })
             .collect()
     }
@@ -166,12 +147,15 @@ impl TagBrowserPane {
 
         stack.insert(
             current_path.clone(),
-            groups.iter().map(|(name, _)| DirOrSong::name_only(name.clone())).collect(),
+            groups
+                .iter()
+                .map(|gr| DirOrSong::name_display_name_only(gr.id.clone(), gr.display_name.clone()))
+                .collect(),
         );
 
-        for (name, group_songs) in groups {
-            let child_path = current_path.join(&name);
-            Self::insert_level(stack, child_path, group_songs, rest, ctx);
+        for SongGroup { id, display_name: _, songs } in groups {
+            let child_path = current_path.join(&id);
+            Self::insert_level(stack, child_path, songs, rest, ctx);
         }
     }
 
@@ -199,7 +183,7 @@ impl Pane for TagBrowserPane {
 
     fn before_show(&mut self, ctx: &Ctx) -> Result<()> {
         if !self.initialized {
-            let root_tag = self.tags[0].tag.clone();
+            let root_tag = self.tags[0].group_by[0][0].clone();
             let target = self.target_pane.clone();
             ctx.query().id(INIT).replace_id(INIT).target(target).query(move |client| {
                 let result =
@@ -217,7 +201,7 @@ impl Pane for TagBrowserPane {
     fn on_event(&mut self, event: &mut UiEvent, _is_visible: bool, ctx: &Ctx) -> Result<()> {
         match event {
             UiEvent::Database => {
-                let root_tag = self.tags[0].tag.clone();
+                let root_tag = self.tags[0].group_by[0][0].clone();
                 let target = self.target_pane.clone();
                 self.stack = DirStack::default();
                 ctx.query().id(INIT).replace_id(INIT).target(target).query(move |client| {
@@ -271,19 +255,11 @@ impl Pane for TagBrowserPane {
             (INIT, MpdQueryResult::LsInfo { data, path: _ }) => {
                 let sort_opts = ctx.config.browser_song_sort.as_ref();
 
-                let data = if let Some(sep) = &self.tags[0].separator {
-                    data.into_iter()
-                        .flat_map(|item| item.split(sep).map(str::to_string).collect_vec())
-                        .unique()
-                        .sorted_by(|a, b| StringCompare::from(sort_opts).compare(a, b))
-                        .map(DirOrSong::name_only)
-                        .collect_vec()
-                } else {
-                    data.into_iter()
-                        .sorted_by(|a, b| StringCompare::from(sort_opts).compare(a, b))
-                        .map(DirOrSong::name_only)
-                        .collect_vec()
-                };
+                let data = data
+                    .into_iter()
+                    .sorted_by(|a, b| StringCompare::from(sort_opts).compare(a, b))
+                    .map(DirOrSong::name_only)
+                    .collect_vec();
 
                 self.stack = DirStack::new(data);
                 if let Some(sel) = self.stack.current().selected() {
@@ -322,17 +298,14 @@ impl BrowserPane<DirOrSong> for TagBrowserPane {
         match self.stack.path().as_slice() {
             [] => {
                 let current = selected.as_path();
-                let root_tag = Tag::Custom(self.tags[0].tag.clone());
-                let escaped_separator =
-                    self.tags[0].separator.as_ref().map(|sep| sep.escape_regex_chars());
+                let root_tag = Tag::Custom(self.tags[0].group_by[0][0].clone());
                 let target = self.target_pane.clone();
                 let current = current.to_owned();
 
                 ctx.query().id(FETCH_SONGS).replace_id(FETCH_SONGS).target(target).query(
                     move |client| {
-                        let separator = escaped_separator.as_deref();
                         let all_songs: Vec<Song> =
-                            client.find(&[Self::root_tag_filter(root_tag, separator, &current)])?;
+                            client.find(&[Filter::new(root_tag, &current)])?;
                         Ok(MpdQueryResult::SongsList {
                             data: all_songs,
                             path: Some(current.into()),
@@ -356,7 +329,10 @@ mod tests {
 
     use super::*;
     use crate::{
-        config::Config,
+        config::{
+            Config,
+            theme::properties::{Property, PropertyKindOrText, SongProperty},
+        },
         tests::fixtures::{config, ctx},
     };
 
@@ -423,44 +399,106 @@ mod tests {
             .expect("expected artist dir to exist")
             .items
             .iter()
-            .map(|item| item.as_path().to_owned())
+            .map(|item| match item {
+                DirOrSong::Dir { display_name, .. } => {
+                    display_name.as_ref().map_or_else(|| item.as_path().to_string(), |n| n.clone())
+                }
+                DirOrSong::Song(_) => {
+                    panic!(
+                        "expected only dirs at this level, found song with path {:?}",
+                        item.as_path()
+                    );
+                }
+            })
             .collect_vec()
     }
 
-    fn tag(tag: impl Into<String>) -> BrowserTagConfig {
+    fn tag(tag: impl Into<String> + Clone) -> BrowserTagConfig {
         BrowserTagConfig {
-            tag: tag.into(),
-            group_by: Some(vec!["date".to_string()]),
-            sort_by: Some(vec!["date".to_string()]),
-            separator: None,
+            group_by: vec![vec![tag.clone().into()], vec!["date".to_string()]],
+            sort_by: Some(vec![vec!["date".to_string()]]),
+            format: vec![
+                Property {
+                    kind: PropertyKindOrText::Property(SongProperty::Other(tag.into())),
+                    style: None,
+                    default: None,
+                },
+                Property {
+                    kind: PropertyKindOrText::Text(" ".to_string()),
+                    style: None,
+                    default: None,
+                },
+                Property {
+                    kind: PropertyKindOrText::Property(SongProperty::Other("date".to_string())),
+                    style: None,
+                    default: None,
+                },
+            ],
         }
     }
 
     fn album_tag(sort_tag: Option<&str>, date_tags: Option<&[&str]>) -> BrowserTagConfig {
-        let date_tags = date_tags.map(|tags| tags.iter().map(|tag| tag.to_string()).collect_vec());
+        album_tags(sort_tag.map(|t| vec![t.to_string()]), date_tags)
+    }
+
+    fn album_tags(sort_tag: Option<Vec<String>>, date_tags: Option<&[&str]>) -> BrowserTagConfig {
+        let mut group_by = vec![vec!["album".to_string()]];
+        if let Some(date_tags) = date_tags {
+            group_by.extend(vec![date_tags.iter().map(|s| s.to_string()).collect_vec()]);
+        }
+
+        let mut format = vec![Property {
+            kind: PropertyKindOrText::Property(SongProperty::Other("album".to_string())),
+            style: None,
+            default: None,
+        }];
+
+        if let Some(date_tags) = date_tags {
+            format.insert(0, Property {
+                kind: PropertyKindOrText::Text(") ".to_string()),
+                style: None,
+                default: None,
+            });
+            format.insert(0, Property {
+                kind: PropertyKindOrText::Property(SongProperty::Other(date_tags[0].to_string())),
+                style: None,
+                default: Some(Box::new(Property {
+                    kind: date_tags.get(1).map_or_else(
+                        || PropertyKindOrText::Text(format!("<no {}>", date_tags[0])),
+                        |t| PropertyKindOrText::Property(SongProperty::Other(t.to_string())),
+                    ),
+                    style: None,
+                    default: Some(Box::new(Property {
+                        kind: PropertyKindOrText::Text("testing ast".to_string()),
+                        style: None,
+                        default: None,
+                    })),
+                })),
+            });
+            format.insert(0, Property {
+                kind: PropertyKindOrText::Text("(".to_string()),
+                style: None,
+                default: None,
+            });
+        }
 
         BrowserTagConfig {
-            tag: "album".to_string(),
-            group_by: date_tags,
-            sort_by: sort_tag.map(|tag| vec![tag.to_string()]),
-            separator: None,
+            group_by,
+            sort_by: sort_tag.map(|tags| tags.into_iter().map(|tag| vec![tag]).collect()),
+            format,
         }
     }
 
-    fn song_with_multi_album(album: impl Into<String>, date: impl Into<String>, n: u32) -> Song {
-        let album = album.into();
-        let date = date.into();
-        Song {
-            id: n,
-            file: format!("{date} {album} track{n}"),
-            duration: None,
-            metadata: HashMap::from([
-                ("album".to_string(), album.into()),
-                ("date".to_string(), date.into()),
-            ]),
-            last_modified: chrono::Utc::now(),
-            added: None,
-        }
+    fn find_dir_by_display_name<'a>(pane: &'a TagBrowserPane, name: &str) -> &'a DirOrSong {
+        pane.stack
+            .entries()
+            .find_map(|(_path, item)| {
+                item.items.iter().find(|i| {
+                    matches!(i, DirOrSong::Dir { display_name, .. } if
+                        display_name.as_ref().is_some_and(|n| n == name))
+                })
+            })
+            .expect("expected to find album_a dir")
     }
 
     #[rstest]
@@ -481,12 +519,6 @@ mod tests {
 
         pane.process_songs(artist.clone(), songs, &ctx);
 
-        assert_eq!(pane.stack.contained_paths().sorted().collect_vec(), vec![
-            &Path::from([]),
-            &Path::from("artist"),
-            &Path::from(["artist", "album_a"]),
-            &Path::from(["artist", "album_b"]),
-        ]);
         assert_eq!(pane_albums(&pane), vec!["album_a", "album_b"]);
     }
 
@@ -508,13 +540,7 @@ mod tests {
 
         pane.process_songs(artist.clone(), songs, &ctx);
 
-        assert_eq!(pane.stack.contained_paths().sorted().collect_vec(), vec![
-            &Path::from([]),
-            &Path::from("artist"),
-            &Path::from(["artist", "(2020) album_a"]),
-            &Path::from(["artist", "(2021) album_a"]),
-            &Path::from(["artist", "(2022) album_b"]),
-        ]);
+        assert_eq!(pane.stack.len(), 5);
         assert_eq!(pane_albums(&pane), vec!["(2020) album_a", "(2021) album_a", "(2022) album_b"]);
     }
 
@@ -536,13 +562,7 @@ mod tests {
 
         pane.process_songs(artist.clone(), songs, &ctx);
 
-        assert_eq!(pane.stack.contained_paths().sorted().collect_vec(), vec![
-            &Path::from([]),
-            &Path::from("artist"),
-            &Path::from(["artist", "(2019) album_b"]),
-            &Path::from(["artist", "(2020) album_a"]),
-            &Path::from(["artist", "(2021) album_a"]),
-        ]);
+        assert_eq!(pane.stack.len(), 5);
         assert_eq!(pane_albums(&pane), vec!["(2019) album_b", "(2020) album_a", "(2021) album_a"]);
     }
 
@@ -550,7 +570,10 @@ mod tests {
     fn albums_split_date_sort_date_and_then_sort_name(mut ctx: Ctx, config: Config) {
         ctx.config = std::sync::Arc::new(config);
         let mut pane = TagBrowserPane::new(
-            vec![tag("artist"), album_tag(Some("date"), Some(&["date"]))],
+            vec![
+                tag("artist"),
+                album_tags(Some(vec!["date".to_string(), "album".to_string()]), Some(&["date"])),
+            ],
             PaneType::Artists,
             &ctx,
         );
@@ -564,14 +587,7 @@ mod tests {
 
         pane.process_songs(artist.clone(), songs, &ctx);
 
-        assert_eq!(pane.stack.contained_paths().sorted().collect_vec(), vec![
-            &Path::from([]),
-            &Path::from("artist"),
-            &Path::from(["artist", "(2020) album_a"]),
-            &Path::from(["artist", "(2020) album_b"]),
-            &Path::from(["artist", "(2020) album_c"]),
-            &Path::from(["artist", "(2020) album_d"]),
-        ]);
+        assert_eq!(pane.stack.len(), 6);
         assert_eq!(pane_albums(&pane), vec![
             "(2020) album_a",
             "(2020) album_b",
@@ -598,12 +614,6 @@ mod tests {
 
         pane.process_songs(artist.clone(), songs, &ctx);
 
-        assert_eq!(pane.stack.contained_paths().sorted().collect_vec(), vec![
-            &Path::from([]),
-            &Path::from("artist"),
-            &Path::from(["artist", "album_a"]),
-            &Path::from(["artist", "album_b"]),
-        ]);
         assert_eq!(pane_albums(&pane), vec!["album_b", "album_a"]);
     }
 
@@ -625,12 +635,7 @@ mod tests {
 
         pane.process_songs(artist.clone(), songs, &ctx);
 
-        assert_eq!(pane.stack.contained_paths().sorted().collect_vec(), vec![
-            &Path::from([]),
-            &Path::from("artist"),
-            &Path::from(["artist", "(1969) album_a"]), // Uses originaldate, not date
-            &Path::from(["artist", "(1970) album_b"]), // Uses originaldate, not date
-        ]);
+        assert_eq!(pane.stack.len(), 4);
         assert_eq!(pane_albums(&pane), vec!["(1969) album_a", "(1970) album_b"]);
     }
 
@@ -650,12 +655,7 @@ mod tests {
 
         pane.process_songs(artist.clone(), songs, &ctx);
 
-        assert_eq!(pane.stack.contained_paths().sorted().collect_vec(), vec![
-            &Path::from([]),
-            &Path::from("artist"),
-            &Path::from(["artist", "(1969) album_a"]), // Uses originaldate (first in list)
-            &Path::from(["artist", "(1990) album_b"]), // Falls back to date (second in list)
-        ]);
+        assert_eq!(pane.stack.len(), 4);
         assert_eq!(pane_albums(&pane), vec!["(1969) album_a", "(1990) album_b"]);
     }
 
@@ -674,11 +674,6 @@ mod tests {
 
         pane.process_songs(artist.clone(), songs, &ctx);
 
-        assert_eq!(pane.stack.contained_paths().sorted().collect_vec(), vec![
-            &Path::from([]),
-            &Path::from("artist"),
-            &Path::from(["artist", "(<no originaldate>) album_a"]) // Falls back to default
-        ]);
         assert_eq!(pane_albums(&pane), vec!["(<no originaldate>) album_a"]);
     }
 
@@ -740,10 +735,8 @@ mod tests {
             pane.stack_mut().current_mut().select_idx(0, 0);
             pane.stack_mut().enter();
 
-            let result = pane.songs_for_item(&DirOrSong::name_only("album_a".to_string()));
+            let result = pane.songs_for_item(find_dir_by_display_name(&pane, "album_a"));
 
-            dbg!(&pane.stack.current().selected());
-            dbg!(&pane.stack.current());
             assert_eq!(result.len(), songs_a.len());
             assert!(result.iter().all(|s| s.file.contains("album_a")));
         }
@@ -770,10 +763,9 @@ mod tests {
         fn at_album_level_with_more_nesting(mut ctx: Ctx, config: Config) {
             ctx.config = std::sync::Arc::new(config);
             let disc_tag = BrowserTagConfig {
-                tag: "disc".to_string(),
-                group_by: None,
+                group_by: vec![vec!["disc".to_string()]],
                 sort_by: None,
-                separator: None,
+                format: vec![],
             };
             let mut pane = TagBrowserPane::new(
                 vec![tag("artist"), album_tag(None, None), disc_tag],
@@ -797,93 +789,11 @@ mod tests {
             pane.stack_mut().current_mut().select_idx(0, 0);
             pane.stack_mut().enter();
 
-            let result = pane.songs_for_item(&DirOrSong::name_only("album_a".to_string()));
+            let result = pane.songs_for_item(find_dir_by_display_name(&pane, "album_a"));
 
             let expected_count = disc1_songs.len() + disc2_songs.len();
             assert_eq!(result.len(), expected_count);
             assert!(result.iter().all(|s| s.file.contains("album_a")));
-        }
-    }
-
-    mod separator {
-        use super::*;
-
-        #[rstest]
-        fn splits_multi_value_album_into_separate_entries(mut ctx: Ctx, config: Config) {
-            ctx.config = std::sync::Arc::new(config);
-            let mut pane = TagBrowserPane::new(
-                vec![tag("artist"), BrowserTagConfig {
-                    tag: "album".to_string(),
-                    group_by: None,
-                    sort_by: None,
-                    separator: Some("/".to_string()),
-                }],
-                PaneType::Artists,
-                &ctx,
-            );
-            let songs = vec![song_with_multi_album("album_a/album_b", "2020", 1)];
-
-            pane.stack.insert(Path::new(), vec![DirOrSong::name_only("artist".to_string())]);
-            pane.process_songs("artist".to_string(), songs, &ctx);
-            pane.stack_mut().current_mut().select_idx(0, 0);
-
-            let albums = pane_albums(&pane);
-            assert_eq!(albums, vec!["album_a", "album_b"]);
-            let all_songs = pane.songs_for_item(&DirOrSong::name_only("artist".to_string()));
-            assert_eq!(all_songs.len(), 2);
-        }
-
-        #[rstest]
-        fn song_appears_under_each_split_album(mut ctx: Ctx, config: Config) {
-            ctx.config = std::sync::Arc::new(config);
-            let mut pane = TagBrowserPane::new(
-                vec![tag("artist"), BrowserTagConfig {
-                    tag: "album".to_string(),
-                    group_by: None,
-                    sort_by: None,
-                    separator: Some("/".to_string()),
-                }],
-                PaneType::Artists,
-                &ctx,
-            );
-            let song1 = song_with_multi_album("album_a/album_b", "2020", 1);
-            let song2 = song_with_multi_album("album_a/album_b", "2021", 2);
-
-            pane.stack.insert(Path::new(), vec![DirOrSong::name_only("artist".to_string())]);
-            pane.process_songs("artist".to_string(), vec![song1.clone(), song2.clone()], &ctx);
-            pane.stack_mut().current_mut().select_idx(0, 0);
-            pane.stack_mut().enter();
-
-            let under_album_a = pane.songs_for_item(&DirOrSong::name_only("album_a".to_string()));
-            assert_eq!(under_album_a.len(), 2);
-
-            let under_album_b = pane.songs_for_item(&DirOrSong::name_only("album_b".to_string()));
-            assert_eq!(under_album_b.len(), 2);
-        }
-
-        #[rstest]
-        fn deduplicates_identical_split_values(mut ctx: Ctx, config: Config) {
-            ctx.config = std::sync::Arc::new(config);
-            let mut pane = TagBrowserPane::new(
-                vec![tag("artist"), BrowserTagConfig {
-                    tag: "album".to_string(),
-                    group_by: None,
-                    sort_by: None,
-                    separator: Some("/".to_string()),
-                }],
-                PaneType::Artists,
-                &ctx,
-            );
-            let songs = vec![song_with_multi_album("album_a/album_a", "2020", 1)];
-
-            pane.stack.insert(Path::new(), vec![DirOrSong::name_only("artist".to_string())]);
-            pane.process_songs("artist".to_string(), songs, &ctx);
-            pane.stack_mut().current_mut().select_idx(0, 0);
-
-            let albums = pane_albums(&pane);
-            assert_eq!(albums, vec!["album_a"]);
-            let all_songs = pane.songs_for_item(&DirOrSong::name_only("artist".to_string()));
-            assert_eq!(all_songs.len(), 1);
         }
     }
 }

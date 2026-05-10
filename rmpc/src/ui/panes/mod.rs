@@ -33,7 +33,7 @@ use crate::{
     MpdQueryResult,
     config::{
         artists::{AlbumDisplayMode, AlbumSortMode},
-        tabs::{BrowserTagConfig, Pane as ConfigPane, PaneType, SizedPaneOrSplit},
+        tabs::{BrowserTagConfig, Pane as ConfigPane, PaneType, SizedPaneOrSplit, tag_property},
         theme::{
             TagResolutionStrategy,
             properties::{
@@ -146,6 +146,33 @@ impl<'panes> PaneContainer<'panes> {
             .iter()
             .map(|tag| <&'static str>::from(tag).to_owned())
             .collect_vec();
+        let mut album_format = VecDeque::new();
+        match display_mode {
+            AlbumDisplayMode::SplitByDate => {
+                album_format.push_back(Property {
+                    kind: PropertyKindOrText::Text("(".to_string()),
+                    style: None,
+                    default: None,
+                });
+                let prop = tag_property(&date_tags);
+                album_format.push_back(prop);
+                album_format.push_back(Property {
+                    kind: PropertyKindOrText::Text(") ".to_string()),
+                    style: None,
+                    default: None,
+                });
+            }
+            AlbumDisplayMode::NameOnly => {}
+        }
+        album_format.push_back(Property {
+            kind: PropertyKindOrText::Property(SongProperty::Album),
+            style: None,
+            default: Some(Box::new(Property {
+                kind: PropertyKindOrText::Text("<no album>".to_string()),
+                style: None,
+                default: None,
+            })),
+        });
 
         Ok(Self {
             queue: QueuePane::new(ctx),
@@ -155,10 +182,9 @@ impl<'panes> PaneContainer<'panes> {
             directories: DirectoriesPane::new(ctx),
             albums: TagBrowserPane::new(
                 vec![BrowserTagConfig {
-                    tag: "album".to_string(),
-                    group_by: None,
+                    group_by: vec![vec!["album".to_string()]],
                     sort_by: None,
-                    separator: None,
+                    format: vec![],
                 }],
                 PaneType::Albums,
                 ctx,
@@ -166,22 +192,26 @@ impl<'panes> PaneContainer<'panes> {
             artists: TagBrowserPane::new(
                 vec![
                     BrowserTagConfig {
-                        tag: "artist".to_string(),
-                        group_by: None,
+                        group_by: vec![vec!["artist".to_string()]],
                         sort_by: None,
-                        separator: None,
+                        format: vec![],
                     },
                     BrowserTagConfig {
-                        tag: "album".to_string(),
                         group_by: match display_mode {
-                            AlbumDisplayMode::SplitByDate => Some(date_tags.clone()),
-                            AlbumDisplayMode::NameOnly => None,
+                            AlbumDisplayMode::SplitByDate => {
+                                vec![vec!["album".to_string()], date_tags.clone()]
+                            }
+                            AlbumDisplayMode::NameOnly => {
+                                vec![vec!["album".to_string()]]
+                            }
                         },
                         sort_by: match sort_by {
                             AlbumSortMode::Name => None,
-                            AlbumSortMode::Date => Some(date_tags.clone()),
+                            AlbumSortMode::Date => {
+                                Some(vec![date_tags.clone(), vec!["album".to_string()]])
+                            }
                         },
-                        separator: None,
+                        format: album_format.clone().into(),
                     },
                 ],
                 PaneType::Artists,
@@ -190,22 +220,26 @@ impl<'panes> PaneContainer<'panes> {
             album_artists: TagBrowserPane::new(
                 vec![
                     BrowserTagConfig {
-                        tag: "albumartist".to_string(),
-                        group_by: None,
+                        group_by: vec![vec!["albumartist".to_string()]],
                         sort_by: None,
-                        separator: None,
+                        format: vec![],
                     },
                     BrowserTagConfig {
-                        tag: "album".to_string(),
                         group_by: match display_mode {
-                            AlbumDisplayMode::SplitByDate => Some(date_tags.clone()),
-                            AlbumDisplayMode::NameOnly => None,
+                            AlbumDisplayMode::SplitByDate => {
+                                vec![vec!["album".to_string()], date_tags.clone()]
+                            }
+                            AlbumDisplayMode::NameOnly => {
+                                vec![vec!["album".to_string()]]
+                            }
                         },
                         sort_by: match sort_by {
                             AlbumSortMode::Name => None,
-                            AlbumSortMode::Date => Some(date_tags),
+                            AlbumSortMode::Date => {
+                                Some(vec![date_tags.clone(), vec!["album".to_string()]])
+                            }
                         },
-                        separator: None,
+                        format: album_format.into(),
                     },
                 ],
                 PaneType::AlbumArtists,
