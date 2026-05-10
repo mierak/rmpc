@@ -4,22 +4,19 @@ use std::{
 };
 
 use album_art::AlbumArtPane;
-use albums::AlbumsPane;
 use anyhow::{Context, Result};
 use cava::CavaPane;
 use directories::DirectoriesPane;
 use either::Either;
 use header::HeaderPane;
+use itertools::Itertools;
 use lyrics::LyricsPane;
 use playlists::PlaylistsPane;
 use progress_bar::ProgressBarPane;
 use property::PropertyPane;
 use queue::QueuePane;
 use ratatui::{Frame, layout::Layout, prelude::Rect, style::Color, text::Span, widgets::Block};
-use rmpc_mpd::{
-    commands::{Song, State, status::OnOffOneshot, volume::Bound},
-    filter::Tag,
-};
+use rmpc_mpd::commands::{Song, State, status::OnOffOneshot, volume::Bound};
 use search::SearchPane;
 use strum::{Display, IntoDiscriminant};
 use tabs::TabsPane;
@@ -35,7 +32,15 @@ use super::{
 use crate::{
     MpdQueryResult,
     config::{
-        tabs::{Pane as ConfigPane, PaneType, SizedPaneOrSplit},
+        artists::{AlbumDisplayMode, AlbumSortMode},
+        tabs::{
+            BrowserTagConfig,
+            CollapseLevel,
+            Pane as ConfigPane,
+            PaneType,
+            SizedPaneOrSplit,
+            tag_property,
+        },
         theme::{
             TagResolutionStrategy,
             properties::{
@@ -64,7 +69,6 @@ use crate::{
 };
 
 pub mod album_art;
-pub mod albums;
 pub mod cava;
 pub mod directories;
 pub mod empty;
@@ -93,7 +97,7 @@ pub enum Panes<'pane_ref, 'pane> {
     Directories(&'pane_ref mut DirectoriesPane),
     Artists(&'pane_ref mut TagBrowserPane),
     AlbumArtists(&'pane_ref mut TagBrowserPane),
-    Albums(&'pane_ref mut AlbumsPane),
+    Albums(&'pane_ref mut TagBrowserPane),
     Playlists(&'pane_ref mut PlaylistsPane),
     Search(&'pane_ref mut SearchPane),
     AlbumArt(&'pane_ref mut AlbumArtPane),
@@ -121,7 +125,7 @@ pub struct PaneContainer<'panes> {
     #[cfg(debug_assertions)]
     pub logs: LogsPane,
     pub directories: DirectoriesPane,
-    pub albums: AlbumsPane,
+    pub albums: TagBrowserPane,
     pub artists: TagBrowserPane,
     pub album_artists: TagBrowserPane,
     pub playlists: PlaylistsPane,
@@ -140,15 +144,119 @@ pub struct PaneContainer<'panes> {
 
 impl<'panes> PaneContainer<'panes> {
     pub fn new(ctx: &Ctx) -> Result<Self> {
+        let display_mode = ctx.config.artists.album_display_mode;
+        let sort_by = ctx.config.artists.album_sort_by;
+        let date_tags = ctx
+            .config
+            .artists
+            .album_date_tags
+            .iter()
+            .map(|tag| <&'static str>::from(tag).to_owned())
+            .collect_vec();
+        let mut album_format = VecDeque::new();
+        match display_mode {
+            AlbumDisplayMode::SplitByDate => {
+                album_format.push_back(Property {
+                    kind: PropertyKindOrText::Text("(".to_string()),
+                    style: None,
+                    default: None,
+                });
+                let prop = tag_property(&date_tags);
+                album_format.push_back(prop);
+                album_format.push_back(Property {
+                    kind: PropertyKindOrText::Text(") ".to_string()),
+                    style: None,
+                    default: None,
+                });
+            }
+            AlbumDisplayMode::NameOnly => {}
+        }
+        album_format.push_back(Property {
+            kind: PropertyKindOrText::Property(SongProperty::Album),
+            style: None,
+            default: Some(Box::new(Property {
+                kind: PropertyKindOrText::Text("<no album>".to_string()),
+                style: None,
+                default: None,
+            })),
+        });
+
         Ok(Self {
             queue: QueuePane::new(ctx),
             queue_header: QueueHeaderPane::new(ctx),
             #[cfg(debug_assertions)]
             logs: LogsPane::new(),
             directories: DirectoriesPane::new(ctx),
-            albums: AlbumsPane::new(ctx),
-            artists: TagBrowserPane::new(Tag::Artist, PaneType::Artists, None, ctx),
-            album_artists: TagBrowserPane::new(Tag::AlbumArtist, PaneType::AlbumArtists, None, ctx),
+            albums: TagBrowserPane::new(
+                vec![BrowserTagConfig {
+                    group_by: vec![vec!["album".to_string()]],
+                    sort_by: None,
+                    format: vec![],
+                    skip: CollapseLevel::default(),
+                }],
+                PaneType::Albums,
+                ctx,
+            ),
+            artists: TagBrowserPane::new(
+                vec![
+                    BrowserTagConfig {
+                        group_by: vec![vec!["artist".to_string()]],
+                        sort_by: None,
+                        format: vec![],
+                        skip: CollapseLevel::default(),
+                    },
+                    BrowserTagConfig {
+                        group_by: match display_mode {
+                            AlbumDisplayMode::SplitByDate => {
+                                vec![vec!["album".to_string()], date_tags.clone()]
+                            }
+                            AlbumDisplayMode::NameOnly => {
+                                vec![vec!["album".to_string()]]
+                            }
+                        },
+                        sort_by: match sort_by {
+                            AlbumSortMode::Name => None,
+                            AlbumSortMode::Date => {
+                                Some(vec![date_tags.clone(), vec!["album".to_string()]])
+                            }
+                        },
+                        format: album_format.clone().into(),
+                        skip: CollapseLevel::default(),
+                    },
+                ],
+                PaneType::Artists,
+                ctx,
+            ),
+            album_artists: TagBrowserPane::new(
+                vec![
+                    BrowserTagConfig {
+                        group_by: vec![vec!["albumartist".to_string()]],
+                        sort_by: None,
+                        format: vec![],
+                        skip: CollapseLevel::default(),
+                    },
+                    BrowserTagConfig {
+                        group_by: match display_mode {
+                            AlbumDisplayMode::SplitByDate => {
+                                vec![vec!["album".to_string()], date_tags.clone()]
+                            }
+                            AlbumDisplayMode::NameOnly => {
+                                vec![vec!["album".to_string()]]
+                            }
+                        },
+                        sort_by: match sort_by {
+                            AlbumSortMode::Name => None,
+                            AlbumSortMode::Date => {
+                                Some(vec![date_tags.clone(), vec!["album".to_string()]])
+                            }
+                        },
+                        format: album_format.into(),
+                        skip: CollapseLevel::default(),
+                    },
+                ],
+                PaneType::AlbumArtists,
+                ctx,
+            ),
             playlists: PlaylistsPane::new(ctx),
             search: SearchPane::new(ctx),
             album_art: AlbumArtPane::new(ctx),
@@ -174,14 +282,10 @@ impl<'panes> PaneContainer<'panes> {
             .flat_map(|tab| tab.panes.panes_iter())
             .chain(ctx.config.theme.layout.panes_iter())
             .filter_map(|pane| match &pane.pane {
-                PaneType::Browser { root_tag, separator } => Some((
+                PaneType::Browser { levels } => Some((
                     pane.pane.clone(),
-                    Box::new(TagBrowserPane::new(
-                        Tag::Custom(root_tag.clone()),
-                        pane.pane.clone(),
-                        separator.clone(),
-                        ctx,
-                    )) as Box<dyn BoxedPane>,
+                    Box::new(TagBrowserPane::new(levels.clone(), pane.pane.clone(), ctx))
+                        as Box<dyn BoxedPane>,
                 )),
                 PaneType::Volume { kind } => Some((
                     pane.pane.clone(),

@@ -30,11 +30,18 @@ All notable changes to this project will be documented in this file.
 - Song info modal now respects `duration_format`
 - Add `-v`/`--version` args to cli
 - `SelectAlbum` queue keybind
+- More felixbility to `Browser` panes. They can now be configured to any arbitrary levels of nesting
+  instead of hardcoded `["root_tag", "album"]`
 
 ### Changed
 
 - **Breaking** Some color styling options have changed, mainly in relation to `text_color`, you
   might have to update your theme to get to the old appearance
+- **Breaking** `config.artists` is now ignored in the `Browser` panes. Use the configuration in the
+  `Browser` pane directly to replicate the old behavior.
+- **Breaking** `separator` has been removed from `Browser` pane configuration. This feature should
+  not be needed since MPD and rmpc both support multiple values for a single tag. Tag you files
+  properly and there should be no need for this feature.
 - Improved error message when invalid `default_album_art_path` path is provided
 - Environment variables are now resolved when parsing paths in the config file or theme
 - Sixel is no longer hard limited to 1MB of data. Set `input-buffer-size` in your tmux config to

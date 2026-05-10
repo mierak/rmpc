@@ -46,8 +46,16 @@ where
         self.dirs.get(path)
     }
 
+    pub fn get_ensure(&mut self, path: Path) -> &mut Dir<T, S> {
+        self.dirs.entry(path).or_default()
+    }
+
     pub fn contained_paths(&self) -> impl Iterator<Item = &Path> {
         self.dirs.keys()
+    }
+
+    pub fn entries(&self) -> impl Iterator<Item = (&Path, &Dir<T, S>)> {
+        self.dirs.iter()
     }
 
     pub fn current(&self) -> &Dir<T, S> {
@@ -110,6 +118,21 @@ where
         new_state.set_content_len(Some(items.len()));
 
         self.dirs.insert(path, Dir::new_with_state(items, new_state));
+    }
+
+    pub fn insert_or_append(&mut self, path: Path, items: Vec<T>) {
+        if let Some(existing) = self.dirs.get_mut(&path) {
+            existing.items.extend(items);
+            existing.state.set_content_len(Some(existing.items.len()));
+        } else {
+            let mut new_state = DirState::default();
+            if !items.is_empty() {
+                new_state.select(Some(0), 0);
+            }
+            new_state.set_content_len(Some(items.len()));
+
+            self.dirs.insert(path, Dir::new_with_state(items, new_state));
+        }
     }
 
     pub fn enter(&mut self) {

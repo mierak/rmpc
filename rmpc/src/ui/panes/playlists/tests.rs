@@ -538,6 +538,7 @@ fn song(name: &str) -> Song {
 fn dir(name: &str) -> DirOrSong {
     DirOrSong::Dir {
         name: name.to_string(),
+        display_name: None,
         full_path: name.to_string(),
         last_modified: *NOW,
         playlist: false,
