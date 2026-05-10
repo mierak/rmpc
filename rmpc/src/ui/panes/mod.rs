@@ -33,7 +33,14 @@ use crate::{
     MpdQueryResult,
     config::{
         artists::{AlbumDisplayMode, AlbumSortMode},
-        tabs::{BrowserTagConfig, Pane as ConfigPane, PaneType, SizedPaneOrSplit, tag_property},
+        tabs::{
+            BrowserTagConfig,
+            CollapseLevel,
+            Pane as ConfigPane,
+            PaneType,
+            SizedPaneOrSplit,
+            tag_property,
+        },
         theme::{
             TagResolutionStrategy,
             properties::{
@@ -185,6 +192,7 @@ impl<'panes> PaneContainer<'panes> {
                     group_by: vec![vec!["album".to_string()]],
                     sort_by: None,
                     format: vec![],
+                    skip: CollapseLevel::default(),
                 }],
                 PaneType::Albums,
                 ctx,
@@ -195,6 +203,7 @@ impl<'panes> PaneContainer<'panes> {
                         group_by: vec![vec!["artist".to_string()]],
                         sort_by: None,
                         format: vec![],
+                        skip: CollapseLevel::default(),
                     },
                     BrowserTagConfig {
                         group_by: match display_mode {
@@ -212,6 +221,7 @@ impl<'panes> PaneContainer<'panes> {
                             }
                         },
                         format: album_format.clone().into(),
+                        skip: CollapseLevel::default(),
                     },
                 ],
                 PaneType::Artists,
@@ -223,6 +233,7 @@ impl<'panes> PaneContainer<'panes> {
                         group_by: vec![vec!["albumartist".to_string()]],
                         sort_by: None,
                         format: vec![],
+                        skip: CollapseLevel::default(),
                     },
                     BrowserTagConfig {
                         group_by: match display_mode {
@@ -240,6 +251,7 @@ impl<'panes> PaneContainer<'panes> {
                             }
                         },
                         format: album_format.into(),
+                        skip: CollapseLevel::default(),
                     },
                 ],
                 PaneType::AlbumArtists,

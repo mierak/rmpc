@@ -75,12 +75,23 @@ impl std::hash::Hash for TabName {
     }
 }
 
+#[derive(Default, Debug, Clone, Serialize, Deserialize, PartialEq, Eq, Hash)]
+pub enum CollapseLevel {
+    #[default]
+    None,
+    Single,
+    SingleEmpty,
+    UnpackEmpty,
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct BrowserTagConfigFile {
     pub group_by: Vec<Vec<String>>,
     #[serde(default)]
     pub sort_by: Option<Vec<Vec<String>>>,
     pub format: Option<Vec<PropertyFile<SongPropertyFile>>>,
+    #[serde(default)]
+    pub skip: CollapseLevel,
 }
 
 #[derive(Debug, Clone, Hash, Eq, PartialEq)]
@@ -88,6 +99,7 @@ pub struct BrowserTagConfig {
     pub group_by: Vec<Vec<String>>,
     pub sort_by: Option<Vec<Vec<String>>>,
     pub format: Vec<Property<SongProperty>>,
+    pub skip: CollapseLevel,
 }
 
 pub fn tag_property(tags: &[String]) -> Property<SongProperty> {
@@ -126,6 +138,7 @@ impl TryFrom<BrowserTagConfigFile> for BrowserTagConfig {
             )?,
             group_by: value.group_by,
             sort_by: value.sort_by,
+            skip: value.skip,
         })
     }
 }
@@ -294,11 +307,13 @@ impl TryFrom<PaneTypeFile> for PaneType {
                                 group_by: vec![vec![root_tag]],
                                 sort_by: None,
                                 format: vec![],
+                                skip: CollapseLevel::default(),
                             },
                             BrowserTagConfig {
                                 group_by: vec![vec!["album".to_string(), "date".to_string()]],
                                 sort_by: None,
                                 format: vec![],
+                                skip: CollapseLevel::default(),
                             },
                         ],
                     }

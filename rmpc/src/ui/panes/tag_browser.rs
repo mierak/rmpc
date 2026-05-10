@@ -14,7 +14,7 @@ use crate::{
     MpdQueryResult,
     config::{
         sort_mode::{SortMode, SortOptions},
-        tabs::{BrowserTagConfig, PaneType},
+        tabs::{BrowserTagConfig, CollapseLevel, PaneType},
         theme::properties::SongProperty,
     },
     ctx::Ctx,
@@ -44,6 +44,7 @@ const FETCH_SONGS: &str = "fetch_songs";
 
 struct SongGroup {
     id: String,
+    tags: Vec<Option<String>>,
     display_name: String,
     songs: Vec<Song>,
 }
@@ -103,9 +104,9 @@ impl TagBrowserPane {
 
         groups
             .into_iter()
-            .map(|(_tags, songs)| {
+            .map(|(tags, songs)| {
                 let display_name = DirStackItem::format(&songs[0], &tag.format, "", ctx);
-                SongGroup { id: id::new().to_string(), display_name, songs }
+                SongGroup { id: id::new().to_string(), tags, display_name, songs }
             })
             .sorted_by(|a, b| {
                 //
@@ -136,16 +137,50 @@ impl TagBrowserPane {
             let sort_opts = ctx.config.browser_song_sort.as_ref();
             let mut songs = songs;
             songs.sort_by(|a, b| a.with_custom_sort(sort_opts).cmp(&b.with_custom_sort(sort_opts)));
-            stack.insert(current_path, songs.into_iter().map(DirOrSong::Song).collect());
+            stack.insert_or_append(current_path, songs.into_iter().map(DirOrSong::Song).collect());
             return;
         }
 
         let tag = &remaining_tags[0];
         let rest = &remaining_tags[1..];
 
-        let groups = Self::group_songs_by_tag(songs, tag, ctx);
+        let mut groups = Self::group_songs_by_tag(songs, tag, ctx);
 
-        stack.insert(
+        match (&tag.skip, &mut groups[..]) {
+            (CollapseLevel::Single, [group]) => {
+                Self::insert_level(
+                    stack,
+                    current_path,
+                    std::mem::take(&mut group.songs),
+                    rest,
+                    ctx,
+                );
+                return;
+            }
+            (CollapseLevel::SingleEmpty, [group]) if group.tags.iter().all(|tag| tag.is_none()) => {
+                Self::insert_level(
+                    stack,
+                    current_path,
+                    std::mem::take(&mut group.songs),
+                    rest,
+                    ctx,
+                );
+                return;
+            }
+            (CollapseLevel::UnpackEmpty, _) if rest.is_empty() => {
+                let (empty, non_empty): (Vec<SongGroup>, Vec<SongGroup>) = groups
+                    .into_iter()
+                    .partition(|group| group.tags.iter().all(|tag| tag.is_none()));
+                groups = non_empty;
+
+                for group in empty {
+                    Self::insert_level(stack, current_path.clone(), group.songs, rest, ctx);
+                }
+            }
+            _ => {}
+        }
+
+        stack.insert_or_append(
             current_path.clone(),
             groups
                 .iter()
@@ -153,7 +188,12 @@ impl TagBrowserPane {
                 .collect(),
         );
 
-        for SongGroup { id, display_name: _, songs } in groups {
+        if matches!(tag.skip, CollapseLevel::UnpackEmpty) {
+            let dir = stack.get_ensure(current_path.clone());
+            dir.items.sort_by_key(|item| matches!(item, DirOrSong::Song(_)));
+        }
+
+        for SongGroup { id, tags: _, display_name: _, songs } in groups {
             let child_path = current_path.join(&id);
             Self::insert_level(stack, child_path, songs, rest, ctx);
         }
@@ -331,6 +371,7 @@ mod tests {
     use crate::{
         config::{
             Config,
+            tabs::CollapseLevel,
             theme::properties::{Property, PropertyKindOrText, SongProperty},
         },
         tests::fixtures::{config, ctx},
@@ -434,6 +475,7 @@ mod tests {
                     default: None,
                 },
             ],
+            skip: CollapseLevel::default(),
         }
     }
 
@@ -486,6 +528,7 @@ mod tests {
             group_by,
             sort_by: sort_tag.map(|tags| tags.into_iter().map(|tag| vec![tag]).collect()),
             format,
+            skip: CollapseLevel::default(),
         }
     }
 
@@ -766,6 +809,7 @@ mod tests {
                 group_by: vec![vec!["disc".to_string()]],
                 sort_by: None,
                 format: vec![],
+                skip: CollapseLevel::default(),
             };
             let mut pane = TagBrowserPane::new(
                 vec![tag("artist"), album_tag(None, None), disc_tag],

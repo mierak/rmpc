@@ -120,6 +120,21 @@ where
         self.dirs.insert(path, Dir::new_with_state(items, new_state));
     }
 
+    pub fn insert_or_append(&mut self, path: Path, items: Vec<T>) {
+        if let Some(existing) = self.dirs.get_mut(&path) {
+            existing.items.extend(items);
+            existing.state.set_content_len(Some(existing.items.len()));
+        } else {
+            let mut new_state = DirState::default();
+            if !items.is_empty() {
+                new_state.select(Some(0), 0);
+            }
+            new_state.set_content_len(Some(items.len()));
+
+            self.dirs.insert(path, Dir::new_with_state(items, new_state));
+        }
+    }
+
     pub fn enter(&mut self) {
         if let Some(next_path) = self.next_path() {
             self.path = next_path;
