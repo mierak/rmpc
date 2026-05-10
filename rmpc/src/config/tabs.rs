@@ -315,7 +315,7 @@ impl TryFrom<PaneTypeFile> for PaneType {
                         bail!("sort_by is not allowed on the first level");
                     }
 
-                    if levels[0].format.is_none() {
+                    if levels[0].format.is_some() {
                         bail!("format is not allowed on the first level");
                     }
 
