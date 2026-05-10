@@ -112,13 +112,10 @@ impl DirStackItem for DirOrSong {
     fn matches(&self, song_format: &[Property<SongProperty>], ctx: &Ctx, filter: &str) -> bool {
         match self {
             DirOrSong::Dir { name, display_name, .. } => {
-                if display_name.as_ref().unwrap_or(name).clone().is_empty() {
-                    "Untitled"
-                } else {
-                    display_name.as_ref().unwrap_or(name).as_str()
-                }
-                .to_lowercase()
-                .contains(&filter.to_lowercase())
+                let name = display_name.as_ref().unwrap_or(name);
+                if name.is_empty() { "Untitled" } else { name.as_str() }
+                    .to_lowercase()
+                    .contains(&filter.to_lowercase())
             }
             DirOrSong::Song(s) => s.matches_formats(song_format, filter, ctx),
         }
@@ -144,6 +141,7 @@ impl DirStackItem for DirOrSong {
                 } else {
                     Span::from(" ".repeat(config.theme.symbols.marker.chars().count()))
                 };
+                let name = display_name.as_ref().unwrap_or(name);
                 let mut value = Line::from(vec![
                     marker_span,
                     if *is_playlist {
@@ -152,10 +150,10 @@ impl DirStackItem for DirOrSong {
                         Span::styled(config.theme.symbols.dir.clone(), dir_style)
                     },
                     Span::from(" "),
-                    Span::from(if display_name.as_ref().unwrap_or(name).is_empty() {
+                    Span::from(if name.is_empty() {
                         Cow::Borrowed("Untitled")
                     } else {
-                        Cow::Owned(display_name.as_ref().unwrap_or(name).to_owned())
+                        Cow::Owned(name.to_owned())
                     }),
                 ]);
 
