@@ -1,6 +1,6 @@
 use std::{collections::HashSet, fmt::Write};
 
-use mlua::{Lua, Table, Value};
+use mlua::{ExternalError, IntoLuaMulti, Lua, LuaSerdeExt, Table, Value};
 use tracing::info;
 
 pub fn create(lua: &Lua) -> mlua::Result<Table> {
@@ -21,10 +21,36 @@ pub fn create(lua: &Lua) -> mlua::Result<Table> {
 
     let nil_or_null = lua.create_function(|_, val: Value| Ok(val.is_nil() || val.is_null()))?;
 
+    let deserialize_ron = lua.create_function(|lua, data: Vec<u8>| {
+        let mut val = match ron::de::Deserializer::from_bytes(&data) {
+            Ok(val) => val,
+            Err(err) => {
+                return (Value::Nil, err.into_lua_err()).into_lua_multi(lua);
+            }
+        };
+
+        let result: ron::Value = match serde_path_to_error::deserialize(&mut val) {
+            Ok(val) => val,
+            Err(err) => {
+                return (Value::Nil, err.into_lua_err()).into_lua_multi(lua);
+            }
+        };
+
+        let val = match lua.to_value(&result) {
+            Ok(val) => val,
+            Err(err) => {
+                return (Value::Nil, err.into_lua_err()).into_lua_multi(lua);
+            }
+        };
+
+        (val, Value::Nil).into_lua_multi(lua)
+    })?;
+
     tbl.set("dump_table", dump_table)?;
     tbl.set("md5", md5)?;
     tbl.set("which", which)?;
     tbl.set("nil_or_null", nil_or_null)?;
+    tbl.set("deserialize_ron", deserialize_ron)?;
 
     Ok(tbl)
 }
