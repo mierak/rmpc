@@ -25,7 +25,7 @@ use crate::{
         dir_or_song::DirOrSong,
         dirstack::{DirStack, DirStackItem, Path, WalkDirStackItem},
         input::InputResultEvent,
-        song_ext::SongExt as _,
+        song_ext::SongExt,
         widgets::browser::{Browser, BrowserArea},
     },
 };
@@ -64,13 +64,20 @@ impl TagBrowserPane {
         let sep = ctx.config.theme.format_tag_separator.as_str();
         let sort_opts = &ctx.config.browser_song_sort;
 
-        let tag_of_with_fallback = |song: &Song, tags: &[String]| {
+        let tag_of_with_fallback = |song: &Song, tags: &[SongProperty]| {
             tags.iter()
-                .find_map(|tag| song.metadata.get(tag.as_str()))
-                .map(|v| v.join(sep).into_owned())
+                .find_map(|tag| {
+                    SongExt::format(
+                        song,
+                        tag,
+                        sep,
+                        ctx.config.theme.multiple_tag_resolution_strategy,
+                    )
+                })
+                .map(|v| v.into_owned())
         };
 
-        let tags_of = |song: &Song, tags: &Vec<Vec<String>>| -> Vec<Option<String>> {
+        let tags_of = |song: &Song, tags: &Vec<Vec<SongProperty>>| -> Vec<Option<String>> {
             tags.iter().map(|group_tag| tag_of_with_fallback(song, group_tag.as_slice())).collect()
         };
 
@@ -88,10 +95,7 @@ impl TagBrowserPane {
             .collect_vec();
 
         let props = match &tag.sort_by {
-            Some(sort_tags) => sort_tags
-                .iter()
-                .flat_map(|tag| tag.iter().map(|t| SongProperty::Other(t.clone())))
-                .collect_vec(),
+            Some(sort_tags) => sort_tags.iter().flat_map(|tag| tag.clone()).collect_vec(),
             None => vec![],
         };
         let opts = SortOptions {
@@ -223,11 +227,10 @@ impl Pane for TagBrowserPane {
 
     fn before_show(&mut self, ctx: &Ctx) -> Result<()> {
         if !self.initialized {
-            let root_tag = self.tags[0].group_by[0][0].clone();
+            let root_tag = self.tags[0].group_by[0][0].clone().try_into()?;
             let target = self.target_pane.clone();
             ctx.query().id(INIT).replace_id(INIT).target(target).query(move |client| {
-                let result =
-                    client.list_tag(Tag::Custom(root_tag), None).context("Cannot list artists")?;
+                let result = client.list_tag(root_tag, None).context("Cannot list artists")?;
                 log::debug!("Fetched root tag values: {:?}", result.0);
                 Ok(MpdQueryResult::LsInfo { data: result.0, path: None })
             });
@@ -241,13 +244,11 @@ impl Pane for TagBrowserPane {
     fn on_event(&mut self, event: &mut UiEvent, _is_visible: bool, ctx: &Ctx) -> Result<()> {
         match event {
             UiEvent::Database => {
-                let root_tag = self.tags[0].group_by[0][0].clone();
+                let root_tag = self.tags[0].group_by[0][0].clone().try_into()?;
                 let target = self.target_pane.clone();
                 self.stack = DirStack::default();
                 ctx.query().id(INIT).replace_id(INIT).target(target).query(move |client| {
-                    let result = client
-                        .list_tag(Tag::Custom(root_tag), None)
-                        .context("Cannot list artists")?;
+                    let result = client.list_tag(root_tag, None).context("Cannot list artists")?;
                     Ok(MpdQueryResult::LsInfo { data: result.0, path: None })
                 });
             }
@@ -338,7 +339,7 @@ impl BrowserPane<DirOrSong> for TagBrowserPane {
         match self.stack.path().as_slice() {
             [] => {
                 let current = selected.as_path();
-                let root_tag = Tag::Custom(self.tags[0].group_by[0][0].clone());
+                let root_tag: Tag = self.tags[0].group_by[0][0].clone().try_into()?;
                 let target = self.target_pane.clone();
                 let current = current.to_owned();
 
@@ -456,8 +457,10 @@ mod tests {
 
     fn tag(tag: impl Into<String> + Clone) -> BrowserTagConfig {
         BrowserTagConfig {
-            group_by: vec![vec![tag.clone().into()], vec!["date".to_string()]],
-            sort_by: Some(vec![vec!["date".to_string()]]),
+            group_by: vec![vec![SongProperty::Other(tag.clone().into())], vec![
+                SongProperty::Other("date".to_string()),
+            ]],
+            sort_by: Some(vec![vec![SongProperty::Other("date".to_string())]]),
             format: vec![
                 Property {
                     kind: PropertyKindOrText::Property(SongProperty::Other(tag.into())),
@@ -484,13 +487,15 @@ mod tests {
     }
 
     fn album_tags(sort_tag: Option<Vec<String>>, date_tags: Option<&[&str]>) -> BrowserTagConfig {
-        let mut group_by = vec![vec!["album".to_string()]];
+        let mut group_by = vec![vec![SongProperty::Album]];
         if let Some(date_tags) = date_tags {
-            group_by.extend(vec![date_tags.iter().map(|s| s.to_string()).collect_vec()]);
+            group_by.extend(vec![
+                date_tags.iter().map(|s| SongProperty::Other(s.to_string())).collect_vec(),
+            ]);
         }
 
         let mut format = vec![Property {
-            kind: PropertyKindOrText::Property(SongProperty::Other("album".to_string())),
+            kind: PropertyKindOrText::Property(SongProperty::Album),
             style: None,
             default: None,
         }];
@@ -526,7 +531,8 @@ mod tests {
 
         BrowserTagConfig {
             group_by,
-            sort_by: sort_tag.map(|tags| tags.into_iter().map(|tag| vec![tag]).collect()),
+            sort_by: sort_tag
+                .map(|tags| tags.into_iter().map(|tag| vec![SongProperty::Other(tag)]).collect()),
             format,
             skip: CollapseLevel::default(),
         }
@@ -806,7 +812,7 @@ mod tests {
         fn at_album_level_with_more_nesting(mut ctx: Ctx, config: Config) {
             ctx.config = std::sync::Arc::new(config);
             let disc_tag = BrowserTagConfig {
-                group_by: vec![vec!["disc".to_string()]],
+                group_by: vec![vec![SongProperty::Disc]],
                 sort_by: None,
                 format: vec![],
                 skip: CollapseLevel::default(),
