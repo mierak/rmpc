@@ -48,6 +48,7 @@ use crate::{
                 PropertyKind,
                 PropertyKindOrText,
                 SongProperty,
+                SongPropertyFile,
                 StatusProperty,
                 Transform,
                 WidgetProperty,
@@ -146,13 +147,15 @@ impl<'panes> PaneContainer<'panes> {
     pub fn new(ctx: &Ctx) -> Result<Self> {
         let display_mode = ctx.config.artists.album_display_mode;
         let sort_by = ctx.config.artists.album_sort_by;
-        let date_tags = ctx
+        let date_tags_file = ctx
             .config
             .artists
             .album_date_tags
             .iter()
-            .map(|tag| <&'static str>::from(tag).to_owned())
+            .map(|tag| SongPropertyFile::Other(<&'static str>::from(tag).to_owned()))
             .collect_vec();
+        let date_tags = date_tags_file.iter().map(|t| SongProperty::from(t.clone())).collect_vec();
+
         let mut album_format = VecDeque::new();
         match display_mode {
             AlbumDisplayMode::SplitByDate => {
@@ -161,7 +164,7 @@ impl<'panes> PaneContainer<'panes> {
                     style: None,
                     default: None,
                 });
-                let prop = tag_property(&date_tags);
+                let prop = tag_property(&date_tags_file);
                 album_format.push_back(prop);
                 album_format.push_back(Property {
                     kind: PropertyKindOrText::Text(") ".to_string()),
@@ -189,7 +192,7 @@ impl<'panes> PaneContainer<'panes> {
             directories: DirectoriesPane::new(ctx),
             albums: TagBrowserPane::new(
                 vec![BrowserTagConfig {
-                    group_by: vec![vec!["album".to_string()]],
+                    group_by: vec![vec![SongProperty::Album]],
                     sort_by: None,
                     format: vec![],
                     skip: CollapseLevel::default(),
@@ -200,7 +203,7 @@ impl<'panes> PaneContainer<'panes> {
             artists: TagBrowserPane::new(
                 vec![
                     BrowserTagConfig {
-                        group_by: vec![vec!["artist".to_string()]],
+                        group_by: vec![vec![SongProperty::Artist]],
                         sort_by: None,
                         format: vec![],
                         skip: CollapseLevel::default(),
@@ -208,16 +211,16 @@ impl<'panes> PaneContainer<'panes> {
                     BrowserTagConfig {
                         group_by: match display_mode {
                             AlbumDisplayMode::SplitByDate => {
-                                vec![vec!["album".to_string()], date_tags.clone()]
+                                vec![vec![SongProperty::Album], date_tags.clone()]
                             }
                             AlbumDisplayMode::NameOnly => {
-                                vec![vec!["album".to_string()]]
+                                vec![vec![SongProperty::Album]]
                             }
                         },
                         sort_by: match sort_by {
                             AlbumSortMode::Name => None,
                             AlbumSortMode::Date => {
-                                Some(vec![date_tags.clone(), vec!["album".to_string()]])
+                                Some(vec![date_tags.clone(), vec![SongProperty::Album]])
                             }
                         },
                         format: album_format.clone().into(),
@@ -230,7 +233,7 @@ impl<'panes> PaneContainer<'panes> {
             album_artists: TagBrowserPane::new(
                 vec![
                     BrowserTagConfig {
-                        group_by: vec![vec!["albumartist".to_string()]],
+                        group_by: vec![vec![SongProperty::Other("albumartist".to_string())]],
                         sort_by: None,
                         format: vec![],
                         skip: CollapseLevel::default(),
@@ -238,16 +241,16 @@ impl<'panes> PaneContainer<'panes> {
                     BrowserTagConfig {
                         group_by: match display_mode {
                             AlbumDisplayMode::SplitByDate => {
-                                vec![vec!["album".to_string()], date_tags.clone()]
+                                vec![vec![SongProperty::Album], date_tags.clone()]
                             }
                             AlbumDisplayMode::NameOnly => {
-                                vec![vec!["album".to_string()]]
+                                vec![vec![SongProperty::Album]]
                             }
                         },
                         sort_by: match sort_by {
                             AlbumSortMode::Name => None,
                             AlbumSortMode::Date => {
-                                Some(vec![date_tags.clone(), vec!["album".to_string()]])
+                                Some(vec![date_tags.clone(), vec![SongProperty::Album]])
                             }
                         },
                         format: album_format.into(),

@@ -86,9 +86,9 @@ pub enum CollapseLevel {
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct BrowserTagConfigFile {
-    pub group_by: Vec<Vec<String>>,
+    pub group_by: Vec<Vec<SongPropertyFile>>,
     #[serde(default)]
-    pub sort_by: Option<Vec<Vec<String>>>,
+    pub sort_by: Option<Vec<Vec<SongPropertyFile>>>,
     pub format: Option<Vec<PropertyFile<SongPropertyFile>>>,
     #[serde(default)]
     pub skip: CollapseLevel,
@@ -96,17 +96,17 @@ pub struct BrowserTagConfigFile {
 
 #[derive(Debug, Clone, Hash, Eq, PartialEq)]
 pub struct BrowserTagConfig {
-    pub group_by: Vec<Vec<String>>,
-    pub sort_by: Option<Vec<Vec<String>>>,
+    pub group_by: Vec<Vec<SongProperty>>,
+    pub sort_by: Option<Vec<Vec<SongProperty>>>,
     pub format: Vec<Property<SongProperty>>,
     pub skip: CollapseLevel,
 }
 
-pub fn tag_property(tags: &[String]) -> Property<SongProperty> {
-    let primary_tag = tags[0].clone();
+pub fn tag_property(tags: &[SongPropertyFile]) -> Property<SongProperty> {
+    let primary_tag = SongProperty::from(tags[0].clone());
 
     Property {
-        kind: PropertyKindOrText::Property(SongProperty::Other(primary_tag.clone())),
+        kind: PropertyKindOrText::Property(primary_tag.clone()),
         style: None,
         default: Some(tags.get(1..).filter(|rest| !rest.is_empty()).map_or_else(
             || {
@@ -127,17 +127,23 @@ impl TryFrom<BrowserTagConfigFile> for BrowserTagConfig {
     fn try_from(value: BrowserTagConfigFile) -> std::result::Result<Self, Self::Error> {
         Ok(Self {
             format: value.format.map_or_else(
-                || {
-                    Ok(value
-                        .group_by
-                        .iter()
-                        .map(|tags: &Vec<String>| tag_property(tags))
-                        .collect_vec())
-                },
+                || Ok(value.group_by.iter().map(|tags| tag_property(tags)).collect_vec()),
                 |f| f.into_iter().map(|p| p.convert()).try_collect(),
             )?,
-            group_by: value.group_by,
-            sort_by: value.sort_by,
+            group_by: value
+                .group_by
+                .into_iter()
+                .map(|tags| tags.into_iter().map(SongProperty::try_from).try_collect())
+                .try_collect()?,
+            sort_by: value
+                .sort_by
+                .map(|sort_by| {
+                    sort_by
+                        .into_iter()
+                        .map(|tags| tags.into_iter().map(SongProperty::try_from).try_collect())
+                        .try_collect()
+                })
+                .transpose()?,
             skip: value.skip,
         })
     }
@@ -304,13 +310,16 @@ impl TryFrom<PaneTypeFile> for PaneType {
                     PaneType::Browser {
                         levels: vec![
                             BrowserTagConfig {
-                                group_by: vec![vec![root_tag]],
+                                group_by: vec![vec![SongProperty::Other(root_tag)]],
                                 sort_by: None,
                                 format: vec![],
                                 skip: CollapseLevel::default(),
                             },
                             BrowserTagConfig {
-                                group_by: vec![vec!["album".to_string(), "date".to_string()]],
+                                group_by: vec![vec![
+                                    SongProperty::Album,
+                                    SongProperty::Other("date".to_string()),
+                                ]],
                                 sort_by: None,
                                 format: vec![],
                                 skip: CollapseLevel::default(),
