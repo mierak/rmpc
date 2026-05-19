@@ -3,7 +3,9 @@ use std::sync::LazyLock;
 use anyhow::Result;
 use crossterm::{
     event::{
+        DisableFocusChange,
         DisableMouseCapture,
+        EnableFocusChange,
         EnableMouseCapture,
         KeyboardEnhancementFlags,
         PopKeyboardEnhancementFlags,
@@ -196,10 +198,13 @@ impl Terminal {
         }
     }
 
-    pub fn try_restore(enable_mouse: bool) -> std::io::Result<()> {
+    pub fn try_restore(enable_mouse: bool, enable_focus_events: bool) -> std::io::Result<()> {
         let mut writer = TERMINAL.writer();
         if enable_mouse {
             execute!(writer, DisableMouseCapture)?;
+        }
+        if enable_focus_events {
+            execute!(writer, DisableFocusChange)?;
         }
         if TERMINAL.kitty_keyboard_protocol {
             execute!(writer, PopKeyboardEnhancementFlags)?;
@@ -209,16 +214,19 @@ impl Terminal {
         Ok(())
     }
 
-    pub fn restore(enable_mouse: bool) {
-        if let Err(err) = Self::try_restore(enable_mouse) {
+    pub fn restore(enable_mouse: bool, enable_focus_events: bool) {
+        if let Err(err) = Self::try_restore(enable_mouse, enable_focus_events) {
             eprintln!("Failed to restore terminal state after panic: {err}");
         }
     }
 
-    pub fn setup(enable_mouse: bool) -> Result<ratatui::Terminal<CrosstermLockingBackend>> {
+    pub fn setup(
+        enable_mouse: bool,
+        enable_focus_events: bool,
+    ) -> Result<ratatui::Terminal<CrosstermLockingBackend>> {
         let original_hook = std::panic::take_hook();
         std::panic::set_hook(Box::new(move |info| {
-            Self::restore(enable_mouse);
+            Self::restore(enable_mouse, enable_focus_events);
             original_hook(info);
         }));
 
@@ -227,6 +235,9 @@ impl Terminal {
         execute!(writer, EnterAlternateScreen)?;
         if enable_mouse {
             execute!(writer, EnableMouseCapture)?;
+        }
+        if enable_focus_events {
+            execute!(writer, EnableFocusChange)?;
         }
 
         if TERMINAL.kitty_keyboard_protocol {

@@ -172,6 +172,7 @@ pub(crate) enum AppEvent {
     IgnoreIdleEvent(IdleEvent),
     UnIgnoreIdleEvent(IdleEvent),
     ReconcileIdleEvent(IdleEvent),
+    FocusGained,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, Copy, Eq, Hash, PartialEq)]

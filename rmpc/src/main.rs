@@ -455,7 +455,9 @@ fn main() -> Result<()> {
             };
 
             let enable_mouse = ctx.config.enable_mouse;
-            let terminal = Terminal::setup(enable_mouse).context("Failed to setup terminal")?;
+            let enable_focus_events = ctx.config.enable_focus_events;
+            let terminal = Terminal::setup(enable_mouse, enable_focus_events)
+                .context("Failed to setup terminal")?;
             core::input::init(event_tx.clone())?;
 
             let event_loop_handle = core::event_loop::init(ctx, event_rx, terminal)?;
@@ -464,7 +466,7 @@ fn main() -> Result<()> {
 
             event_loop_handle.join().expect("event loop to not panic");
 
-            Terminal::restore(enable_mouse);
+            Terminal::restore(enable_mouse, enable_focus_events);
         }
     }
 
