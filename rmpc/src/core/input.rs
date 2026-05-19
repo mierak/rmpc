@@ -36,6 +36,11 @@ fn input_poll_task(event_tx: &Sender<AppEvent>) {
                         log::error!(error:? = err; "Failed to render request after resize");
                     }
                 }
+                Ok(Event::FocusGained) => {
+                    if let Err(err) = event_tx.send(AppEvent::FocusGained) {
+                        log::error!(error:? = err; "Failed to send focus gained");
+                    }
+                }
                 Ok(ev) => {
                     log::warn!(ev:?; "Unexpected event");
                 }

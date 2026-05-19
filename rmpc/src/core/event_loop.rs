@@ -61,7 +61,7 @@ fn main_task<B: Backend + std::io::Write>(
     event_rx: Receiver<AppEvent>,
     mut terminal: Terminal<B>,
 ) -> Terminal<B> {
-    let size = terminal.size().expect("To be able to get terminal size");
+    let mut size = terminal.size().expect("To be able to get terminal size");
     let area = Rect::new(0, 0, size.width, size.height);
     let mut ui = Ui::new(&ctx).expect("UI to be created correctly");
     let event_receiver = event_rx;
@@ -703,6 +703,29 @@ fn main_task<B: Backend + std::io::Write>(
                     }
                     render_wanted = true;
                 }
+                AppEvent::FocusGained => match terminal.size() {
+                    Ok(new_size) => {
+                        if size != new_size {
+                            ctx.scheduler.schedule_replace(
+                                *ON_RESIZE_SCHEDULE_ID,
+                                Duration::from_millis(500),
+                                move |(tx, _)| {
+                                    tx.send(AppEvent::ResizedDebounced {
+                                        columns: new_size.width,
+                                        rows: new_size.height,
+                                    })?;
+                                    Ok(())
+                                },
+                            );
+                            render_wanted = true;
+                        }
+
+                        size = new_size;
+                    }
+                    Err(err) => {
+                        status_error!(error:? = err; "Unable to refresh terminal size after focus gain");
+                    }
+                },
                 AppEvent::UiAppEvent(event) => match ui.on_ui_app_event(event, &mut ctx) {
                     Ok(()) => {}
                     Err(err) => {
