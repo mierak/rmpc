@@ -6,6 +6,7 @@ All notable changes to this project will be documented in this file.
 
 ### Added
 
+- Added a new vertical volume slider pane.
 - **Breaking** `ExternalCommand` can now have arguments supplied at runtime. This will break your
   existing keybinds if they contained either `{` or `}`. You will now need to escape these by
   doubling them up: `{{` and `}}`.
