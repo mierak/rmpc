@@ -67,6 +67,44 @@ impl Pane for VolumePane {
                     frame.buffer_mut().set_string(area.x + i, area.y, c, style);
                 }
             }
+            VolumeType::VerticalSlider(config) => {
+                if area.height < 1 || area.width < 1 {
+                    return Ok(());
+                }
+
+                let symbols = &config.symbols;
+                let filled_len = (f64::from(area.height - 1)
+                    * f64::from(*ctx.status.volume.value())
+                    / 100.0) as u16;
+
+                for i in 0..area.height {
+                    let inv_i = area.height - 1 - i;
+
+                    let style = if inv_i <= filled_len && filled_len > 0 {
+                        config.filled_style
+                    } else {
+                        config.track_style
+                    };
+
+                    let (c, style) = if let Some(sym) = &config.symbols.start
+                        && i == 0
+                    {
+                        (sym, style)
+                    } else if inv_i < filled_len {
+                        (&symbols.filled, style)
+                    } else if let Some(sym) = &config.symbols.end
+                        && i == area.height - 1
+                    {
+                        (sym, style)
+                    } else if inv_i == filled_len {
+                        (&symbols.thumb, config.thumb_style)
+                    } else {
+                        (&symbols.track, style)
+                    };
+
+                    frame.buffer_mut().set_string(area.x, area.y + i, c, style);
+                }
+            }
         }
 
         Ok(())
@@ -87,9 +125,22 @@ impl Pane for VolumePane {
                     return Ok(());
                 }
 
-                let volume_ratio =
-                    f32::from(event.x.saturating_sub(self.area.x)) / f32::from(self.area.width - 1);
-
+                let volume_ratio = match &self.config {
+                    VolumeType::Slider(_) => {
+                        if self.area.width == 0 {
+                            return Ok(());
+                        }
+                        f32::from(event.x.saturating_sub(self.area.x))
+                            / f32::from(self.area.width - 1)
+                    }
+                    VolumeType::VerticalSlider(_) => {
+                        if self.area.height == 0 {
+                            return Ok(());
+                        }
+                        1.0 - f32::from(event.y.saturating_sub(self.area.y))
+                            / f32::from(self.area.height - 1)
+                    }
+                };
                 // Safe conversion: clamped to 0-100 range and rounded, so cast is always valid
                 let new_volume = (volume_ratio * 100.0).clamp(0.0, 100.0).round() as u32;
 
@@ -125,10 +176,22 @@ impl Pane for VolumePane {
                     return Ok(());
                 }
 
-                let volume_ratio =
-                    f32::from(event.x.saturating_sub(self.area.x)) / f32::from(self.area.width - 1);
-
-                // Safe conversion: clamped to 0-100 range and rounded, so cast is always valid
+                let volume_ratio = match &self.config {
+                    VolumeType::Slider(_) => {
+                        if self.area.width == 0 {
+                            return Ok(());
+                        }
+                        f32::from(event.x.saturating_sub(self.area.x))
+                            / f32::from(self.area.width - 1)
+                    }
+                    VolumeType::VerticalSlider(_) => {
+                        if self.area.height == 0 {
+                            return Ok(());
+                        }
+                        1.0 - f32::from(event.y.saturating_sub(self.area.y))
+                            / f32::from(self.area.height - 1)
+                    }
+                };
                 let new_volume = (volume_ratio * 100.0).clamp(0.0, 100.0).round() as u32;
 
                 ctx.command(move |_, client| {
