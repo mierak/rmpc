@@ -1,4 +1,4 @@
-use anyhow::Result;
+use anyhow::{Ok, Result};
 use ratatui::{Frame, prelude::Rect};
 use rmpc_mpd::{
     commands::volume::Bound,
@@ -120,23 +120,19 @@ impl Pane for VolumePane {
                 if !self.area.contains(event.into()) {
                     return Ok(());
                 }
-                // Avoid division by zero (if width is set to 0)
-                if self.area.width == 0 {
-                    return Ok(());
+                // Avoid division by zero (if width or height is set to 0)
+                match &self.config {
+                    VolumeType::Slider(_) if self.area.width == 0 => return Ok(()),
+                    VolumeType::VerticalSlider(_) if self.area.height == 0 => return Ok(()),
+                    _ => {}
                 }
 
                 let volume_ratio = match &self.config {
                     VolumeType::Slider(_) => {
-                        if self.area.width == 0 {
-                            return Ok(());
-                        }
                         f32::from(event.x.saturating_sub(self.area.x))
                             / f32::from(self.area.width - 1)
                     }
                     VolumeType::VerticalSlider(_) => {
-                        if self.area.height == 0 {
-                            return Ok(());
-                        }
                         1.0 - f32::from(event.y.saturating_sub(self.area.y))
                             / f32::from(self.area.height - 1)
                     }
@@ -176,22 +172,23 @@ impl Pane for VolumePane {
                     return Ok(());
                 }
 
+                match &self.config {
+                    VolumeType::Slider(_) if self.area.width == 0 => return Ok(()),
+                    VolumeType::VerticalSlider(_) if self.area.height == 0 => return Ok(()),
+                    _ => {}
+                }
+
                 let volume_ratio = match &self.config {
                     VolumeType::Slider(_) => {
-                        if self.area.width == 0 {
-                            return Ok(());
-                        }
                         f32::from(event.x.saturating_sub(self.area.x))
                             / f32::from(self.area.width - 1)
                     }
                     VolumeType::VerticalSlider(_) => {
-                        if self.area.height == 0 {
-                            return Ok(());
-                        }
                         1.0 - f32::from(event.y.saturating_sub(self.area.y))
                             / f32::from(self.area.height - 1)
                     }
                 };
+                // Safe conversion: clamped to 0-100 range and rounded, so cast is always valid
                 let new_volume = (volume_ratio * 100.0).clamp(0.0, 100.0).round() as u32;
 
                 ctx.command(move |_, client| {
