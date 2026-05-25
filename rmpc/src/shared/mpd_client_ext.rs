@@ -151,31 +151,56 @@ impl<T: MpdClient + MpdCommand + ProtoClient> MpdClientExt for T {
             items.reverse();
         }
 
-        self.send_start_cmd_list()?;
         if replace {
-            self.send_clear()?;
+            self.clear()?;
         }
 
         let items_len = items.len();
-        for item in items {
-            match item {
-                Enqueue::File { path } => self.send_add(&path, position),
-                Enqueue::Playlist { name } => self.send_load_playlist(&name, position),
-                Enqueue::Find { filter } => self.send_find_add(
-                    &filter
-                        .into_iter()
-                        .map(|(tag, kind, value)| Filter::new_with_kind(tag, value, kind))
-                        .collect_vec(),
-                    position,
-                ),
-            }?;
+        let mut i = 0;
+        let mut errors = 0;
+        while i < items_len {
+            self.send_start_cmd_list()?;
+            for item in &items[i..] {
+                match item {
+                    Enqueue::File { path } => self.send_add(path, position),
+                    Enqueue::Playlist { name } => self.send_load_playlist(name, position),
+                    Enqueue::Find { filter } => self.send_find_add(
+                        &filter
+                            .iter()
+                            .map(|(tag, kind, value)| {
+                                Filter::new_with_kind(tag.clone(), value, kind.clone())
+                            })
+                            .collect_vec(),
+                        position,
+                    ),
+                }?;
+            }
+            self.send_execute_cmd_list()?;
+            match self.read_ok() {
+                Ok(()) => i = items_len,
+                Err(MpdError::Mpd(err)) => {
+                    i += 1 + err.command_list_index as usize;
+                    errors += 1;
+                }
+                err => err?,
+            }
         }
-        self.send_execute_cmd_list()?;
-        self.read_ok()?;
-        if items_len == 1 {
-            status_info!("Added 1 item to the queue");
+        if errors == 0 {
+            if items_len == 1 {
+                status_info!("Added 1 item to the queue");
+            } else {
+                status_info!("Added {items_len} items to the queue");
+            }
         } else {
-            status_info!("Added {items_len} items to the queue");
+            if items_len == 1 {
+                status_info!("No items added to the queue, an error occurred");
+            } else {
+                status_info!(
+                    "Added {} items to the queue, {} errors occurred",
+                    items_len.saturating_sub(errors),
+                    errors
+                );
+            }
         }
 
         if let Some(autoplay_idx) = autoplay_idx {

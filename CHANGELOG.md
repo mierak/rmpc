@@ -70,6 +70,7 @@ keybinds
 - `fg` from `current_item_style` and `highlighted_item_style` in queue rows now correctly applies when using `Reversed`
 - The queue should not leave empty space in the table anymore
 - rmpc will now handle focused events and attempt to resize the TUI if needed
+- Loading a playlist when with missing songs will now load the existing songs instead of nothing
 
 ## [0.11.0] - 2026-02-01
 
