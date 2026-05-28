@@ -33,6 +33,14 @@ pub async fn notify_consumer(
     let no_track_path = OwnedObjectPath::try_from("/org/mpris/MediaPlayer2/TrackList/NoTrack")
         .expect("NoTrack path should always be a valid object path");
 
+    macro_rules! emit_player_changed {
+        ($method:ident, $property:literal) => {
+            if let Err(err) = player.get().await.$method(player_emmiter).await {
+                error!(err = ?err, property = $property, "Failed to emit property changed signal");
+            }
+        };
+    }
+
     loop {
         let ev = if let Some(ev) = rx.recv().await {
             ev
@@ -42,29 +50,30 @@ pub async fn notify_consumer(
 
         match ev {
             Change::Volume => {
-                if let Err(err) = player.get().await.volume_changed(player_emmiter).await {
-                    error!(err = ?err, "Failed to emit volume changed signal");
-                }
+                emit_player_changed!(volume_changed, "Volume");
             }
             Change::PlaybackState => {
-                if let Err(err) = player.get().await.playback_status_changed(player_emmiter).await {
-                    error!(err = ?err, "Failed to emit playback status changed signal");
-                }
+                emit_player_changed!(playback_status_changed, "PlaybackStatus");
+                emit_player_changed!(can_play_changed, "CanPlay");
+                emit_player_changed!(can_go_next_changed, "CanGoNext");
+                emit_player_changed!(can_go_previous_changed, "CanGoPrevious");
             }
             Change::Metadata => {
-                if let Err(err) = player.get().await.metadata_changed(player_emmiter).await {
-                    error!(err = ?err, "Failed to emit metadata changed signal");
-                }
+                emit_player_changed!(metadata_changed, "Metadata");
+                emit_player_changed!(can_go_next_changed, "CanGoNext");
+                emit_player_changed!(can_go_previous_changed, "CanGoPrevious");
             }
             Change::Queue => {
-                let state = ctx.read().await;
-                let tracks =
-                    state.queue.iter().map(|song| song.to_mpris_id().into_inner()).collect();
-
-                let current_track = state
-                    .current_song
-                    .as_ref()
-                    .map_or_else(|| no_track_path.clone(), |song| song.to_mpris_id());
+                let (tracks, current_track) = {
+                    let state = ctx.read().await;
+                    let tracks: Vec<_> =
+                        state.queue.iter().map(|song| song.to_mpris_id().into_inner()).collect();
+                    let current_track = state
+                        .current_song
+                        .as_ref()
+                        .map_or_else(|| no_track_path.clone(), |song| song.to_mpris_id());
+                    (tracks, current_track)
+                };
 
                 if let Err(err) = Tracklist::track_list_replaced(
                     tracklist_emmiter,
@@ -75,6 +84,10 @@ pub async fn notify_consumer(
                 {
                     error!(err = ?err, "Failed to emit track list replaced signal");
                 }
+
+                emit_player_changed!(can_play_changed, "CanPlay");
+                emit_player_changed!(can_go_next_changed, "CanGoNext");
+                emit_player_changed!(can_go_previous_changed, "CanGoPrevious");
             }
         }
     }
