@@ -21,7 +21,7 @@ impl Tracklist {
     }
 }
 
-#[interface(name = "org.mpris.MedPlayer2.TrackList")]
+#[interface(name = "org.mpris.MediaPlayer2.TrackList")]
 impl Tracklist {
     #[zbus()]
     async fn get_tracks_metadata(
