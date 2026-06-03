@@ -10,6 +10,7 @@ mod metadata;
 mod notify;
 mod player;
 mod root;
+mod seek;
 mod tracklist;
 pub use notify::{Change, notify_consumer};
 pub use player::Player;
