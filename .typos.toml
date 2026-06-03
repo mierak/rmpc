@@ -6,4 +6,5 @@ extend-ignore-re = [
 	"\\bnumer_denom_ms\\b",	# method from `ratatui` `Frame`
 	"\\bseeked\\b", # copied from MPD's docs and seek is a term used with media players
 	"(hel|helo)", # used in ui input tests as test data
+	"seeked", # microseconds seeked, this is a normal term in media players and not a typo
 ]
