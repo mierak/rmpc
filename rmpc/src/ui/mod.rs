@@ -850,6 +850,7 @@ impl<'ui> Ui<'ui> {
     pub fn on_ui_app_event(&mut self, event: UiAppEvent, ctx: &mut Ctx) -> Result<()> {
         match event {
             UiAppEvent::Modal(modal) => {
+                let modal = modal.0;
                 let existing_modal = modal.replacement_id().and_then(|id| {
                     self.modals
                         .iter_mut()
@@ -1083,9 +1084,29 @@ impl<'ui> Ui<'ui> {
     }
 }
 
+/// Wrapper around a boxed [`Modal`] that asserts `Send + Sync`.
+///
+/// # Safety
+/// Modals are constructed and consumed exclusively on the single "main"
+/// event-loop thread (see `core::event_loop`). [`Ctx`] — which owns the only
+/// `app_event_sender` used to emit `UiAppEvent::Modal` — is moved into that
+/// thread and is never `Clone`d elsewhere, so a boxed modal is merely routed
+/// through the app-event channel back to the same thread it originated on and
+/// never actually migrates across threads. ratatui's `Block` (held transitively
+/// through `ButtonGroup`) carries a non-`Send`/`Sync` `Arc<dyn CellEffect>`
+/// shadow since ratatui 0.30.1, but because the value stays on one thread this
+/// is sound.
+#[derive(Debug)]
+pub struct ModalWrapper(pub Box<dyn Modal>);
+
+// SAFETY: see the type-level docs — modals never leave the main event-loop thread.
+unsafe impl Send for ModalWrapper {}
+// SAFETY: see the type-level docs — modals never leave the main event-loop thread.
+unsafe impl Sync for ModalWrapper {}
+
 #[derive(Debug)]
 pub enum UiAppEvent {
-    Modal(Box<dyn Modal + Send + Sync>),
+    Modal(ModalWrapper),
     PopModal(Id),
     PopConfigErrorModal,
     ChangeTab(TabName),
