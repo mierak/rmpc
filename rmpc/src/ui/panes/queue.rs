@@ -380,6 +380,10 @@ impl Pane for QueuePane {
 
                 let columns = (0..formats.len()).map(|i| {
                     let mut max_len: usize = widths[i].width.into();
+                    // Reserve one cell in the first column for the selection strip.
+                    if i == 0 {
+                        max_len = max_len.saturating_sub(1);
+                    }
                     // We have to subtract marker symbol length from max len in order to make space
                     // for the marker symbol in case we are in the first column of the table and the
                     // song is marked.
@@ -429,6 +433,8 @@ impl Pane for QueuePane {
                 if idx % 2 == 1 {
                     row.zebra_bg = Some(Color::Rgb(0x1c, 0x21, 0x2a));
                 }
+                row.strip = (is_under_cursor && self.highlight_enabled)
+                    .then(|| config.theme.highlight_border_style.fg.unwrap_or(Color::Cyan));
                 let sep = ctx.config.theme.song_table_album_separator;
                 if new_album_indices.contains(&idx)
                     && matches!(sep, AlbumSeparator::Underline)
@@ -1407,6 +1413,7 @@ struct QueueRow {
     cursor_style: Option<Style>,
     underlined: bool,
     zebra_bg: Option<Color>,
+    strip: Option<Color>,
 }
 impl QueueRow {
     fn into_row<'a>(self, cells: impl Iterator<Item = Line<'a>>) -> Row<'a> {
@@ -1423,7 +1430,7 @@ impl QueueRow {
         if self.underlined {
             row_style = row_style.underlined();
         }
-        let collected: Vec<Line<'a>> = cells
+        let mut collected: Vec<Line<'a>> = cells
             .map(|mut line| {
                 if let Some(style) = self.cell_style {
                     line.style = line.style.patch(style);
@@ -1440,6 +1447,16 @@ impl QueueRow {
                 line
             })
             .collect();
+        // Uniform 1-cell selection strip on the first column (accent ▎ on the
+        // cursor row, blank otherwise) so rows stay aligned. Added after style
+        // patching so the accent colour is preserved.
+        if let Some(first) = collected.first_mut() {
+            let strip = match self.strip {
+                Some(c) => Span::styled("\u{258e}", Style::default().fg(c)),
+                None => Span::raw(" "),
+            };
+            first.spans.insert(0, strip);
+        }
         Row::new(collected).style(row_style)
     }
 }
