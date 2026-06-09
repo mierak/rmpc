@@ -22,11 +22,15 @@ pub enum BrowserArea {
 pub struct Browser<T: std::fmt::Debug + DirStackItem + Clone + Send> {
     state_type_marker: std::marker::PhantomData<T>,
     pub areas: EnumMap<BrowserArea, Rect>,
+    pub column_titles: Option<[String; 3]>,
 }
-
 impl<T: std::fmt::Debug + DirStackItem + Clone + Send> Browser<T> {
     pub fn new() -> Self {
-        Self { state_type_marker: std::marker::PhantomData, areas: EnumMap::default() }
+        Self {
+            state_type_marker: std::marker::PhantomData,
+            areas: EnumMap::default(),
+            column_titles: None,
+        }
     }
 }
 const MIDDLE_COLUMN_SYMBOLS: symbols::border::Set = symbols::border::Set {
@@ -65,7 +69,7 @@ where
 
         let current = state.current().to_list_items(song_format, ctx);
 
-        let [previous_area, current_area, preview_area] = *Layout::horizontal([
+        let [mut previous_area, mut current_area, mut preview_area] = *Layout::horizontal([
             Constraint::Percentage(config.theme.column_widths[0]),
             Constraint::Percentage(config.theme.column_widths[1]),
             Constraint::Percentage(config.theme.column_widths[2]),
@@ -73,7 +77,31 @@ where
         .split(area) else {
             return;
         };
-
+        // Render column titles if configured
+        if let Some([t0, t1, t2]) = &self.column_titles {
+            let accent = config.theme.highlight_border_style.fg.unwrap_or(Color::Cyan);
+            let title_style = Style::default().fg(accent).add_modifier(Modifier::BOLD);
+            if area.height > 0 {
+                if config.theme.column_widths[0] > 0 {
+                    Line::styled(t0.as_str(), title_style)
+                        .render(Rect { height: 1, ..previous_area }, buf);
+                    previous_area.y += 1;
+                    previous_area.height = previous_area.height.saturating_sub(1);
+                }
+                if config.theme.column_widths[1] > 0 {
+                    Line::styled(t1.as_str(), title_style)
+                        .render(Rect { height: 1, ..current_area }, buf);
+                    current_area.y += 1;
+                    current_area.height = current_area.height.saturating_sub(1);
+                }
+                if config.theme.column_widths[2] > 0 {
+                    Line::styled(t2.as_str(), title_style)
+                        .render(Rect { height: 1, ..preview_area }, buf);
+                    preview_area.y += 1;
+                    preview_area.height = preview_area.height.saturating_sub(1);
+                }
+            }
+        }
         self.areas[BrowserArea::Preview] = preview_area;
         if config.theme.column_widths[2] > 0 {
             let result = if let Some(current) = state.current().selected()

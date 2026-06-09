@@ -205,78 +205,115 @@ impl<'panes> PaneContainer<'panes> {
             queue_header: QueueHeaderPane::new(ctx),
             #[cfg(debug_assertions)]
             logs: LogsPane::new(),
-            directories: DirectoriesPane::new(ctx),
-            albums: TagBrowserPane::new(
-                vec![BrowserTagConfig {
-                    group_by: vec![vec![SongProperty::Album]],
-                    sort_by: None,
-                    format: vec![],
-                    skip: CollapseLevel::default(),
-                }],
-                PaneType::Albums,
-                ctx,
-            ),
-            artists: TagBrowserPane::new(
-                vec![
-                    BrowserTagConfig {
-                        group_by: vec![vec![SongProperty::Artist]],
+            directories: {
+                let mut p = DirectoriesPane::new(ctx);
+                p.browser.column_titles = Some([
+                    "\u{f07b} Directories".into(),
+                    "\u{f0ca} Contents".into(),
+                    "\u{f05a} Preview".into(),
+                ]);
+                p
+            },
+            albums: {
+                let mut p = TagBrowserPane::new(
+                    vec![BrowserTagConfig {
+                        group_by: vec![vec![SongProperty::Album]],
                         sort_by: None,
                         format: vec![],
                         skip: CollapseLevel::default(),
-                    },
-                    BrowserTagConfig {
-                        group_by: match display_mode {
-                            AlbumDisplayMode::SplitByDate => {
-                                vec![vec![SongProperty::Album], date_tags.clone()]
-                            }
-                            AlbumDisplayMode::NameOnly => {
-                                vec![vec![SongProperty::Album]]
-                            }
+                    }],
+                    PaneType::Albums,
+                    ctx,
+                );
+                p.browser.column_titles =
+                    Some(["\u{f001} Albums".into(), String::new(), "\u{f05a} Preview".into()]);
+                p
+            },
+            artists: {
+                let mut p = TagBrowserPane::new(
+                    vec![
+                        BrowserTagConfig {
+                            group_by: vec![vec![SongProperty::Artist]],
+                            sort_by: None,
+                            format: vec![],
+                            skip: CollapseLevel::default(),
                         },
-                        sort_by: match sort_by {
-                            AlbumSortMode::Name => None,
-                            AlbumSortMode::Date => {
-                                Some(vec![date_tags.clone(), vec![SongProperty::Album]])
-                            }
+                        BrowserTagConfig {
+                            group_by: match display_mode {
+                                AlbumDisplayMode::SplitByDate => {
+                                    vec![vec![SongProperty::Album], date_tags.clone()]
+                                }
+                                AlbumDisplayMode::NameOnly => {
+                                    vec![vec![SongProperty::Album]]
+                                }
+                            },
+                            sort_by: match sort_by {
+                                AlbumSortMode::Name => None,
+                                AlbumSortMode::Date => {
+                                    Some(vec![date_tags.clone(), vec![SongProperty::Album]])
+                                }
+                            },
+                            format: album_format.clone().into(),
+                            skip: CollapseLevel::default(),
                         },
-                        format: album_format.clone().into(),
-                        skip: CollapseLevel::default(),
-                    },
-                ],
-                PaneType::Artists,
-                ctx,
-            ),
-            album_artists: TagBrowserPane::new(
-                vec![
-                    BrowserTagConfig {
-                        group_by: vec![vec![SongProperty::Other("albumartist".to_string())]],
-                        sort_by: None,
-                        format: vec![],
-                        skip: CollapseLevel::default(),
-                    },
-                    BrowserTagConfig {
-                        group_by: match display_mode {
-                            AlbumDisplayMode::SplitByDate => {
-                                vec![vec![SongProperty::Album], date_tags.clone()]
-                            }
-                            AlbumDisplayMode::NameOnly => {
-                                vec![vec![SongProperty::Album]]
-                            }
+                    ],
+                    PaneType::Artists,
+                    ctx,
+                );
+                p.browser.column_titles = Some([
+                    "\u{f007} Artists".into(),
+                    "\u{f001} Albums".into(),
+                    "\u{f05a} Preview".into(),
+                ]);
+                p
+            },
+            album_artists: {
+                let mut p = TagBrowserPane::new(
+                    vec![
+                        BrowserTagConfig {
+                            group_by: vec![vec![SongProperty::Other("albumartist".to_string())]],
+                            sort_by: None,
+                            format: vec![],
+                            skip: CollapseLevel::default(),
                         },
-                        sort_by: match sort_by {
-                            AlbumSortMode::Name => None,
-                            AlbumSortMode::Date => {
-                                Some(vec![date_tags.clone(), vec![SongProperty::Album]])
-                            }
+                        BrowserTagConfig {
+                            group_by: match display_mode {
+                                AlbumDisplayMode::SplitByDate => {
+                                    vec![vec![SongProperty::Album], date_tags.clone()]
+                                }
+                                AlbumDisplayMode::NameOnly => {
+                                    vec![vec![SongProperty::Album]]
+                                }
+                            },
+                            sort_by: match sort_by {
+                                AlbumSortMode::Name => None,
+                                AlbumSortMode::Date => {
+                                    Some(vec![date_tags.clone(), vec![SongProperty::Album]])
+                                }
+                            },
+                            format: album_format.into(),
+                            skip: CollapseLevel::default(),
                         },
-                        format: album_format.into(),
-                        skip: CollapseLevel::default(),
-                    },
-                ],
-                PaneType::AlbumArtists,
-                ctx,
-            ),
-            playlists: PlaylistsPane::new(ctx),
+                    ],
+                    PaneType::AlbumArtists,
+                    ctx,
+                );
+                p.browser.column_titles = Some([
+                    "\u{f007} Album Artists".into(),
+                    "\u{f001} Albums".into(),
+                    "\u{f05a} Preview".into(),
+                ]);
+                p
+            },
+            playlists: {
+                let mut p = PlaylistsPane::new(ctx);
+                p.browser.column_titles = Some([
+                    "\u{f0ca} Playlists".into(),
+                    "\u{f001} Songs".into(),
+                    "\u{f05a} Preview".into(),
+                ]);
+                p
+            },
             search: SearchPane::new(ctx),
             album_art: AlbumArtPane::new(ctx),
             gradient_art: GradientArtPane::new(),
