@@ -108,63 +108,135 @@ where
 
         self.areas[BrowserArea::Preview] = right_area;
         if w_right > 0 {
-            let result = if let Some(current) = state.current().selected()
-                && current.is_file()
-            {
-                let previews = current.to_file_preview(ctx);
-                let mut result = Vec::new();
-                let accent = config.theme.highlight_border_style.fg.unwrap_or(Color::Cyan);
-                let album = current.format(
+            let accent = config.theme.highlight_border_style.fg.unwrap_or(Color::Cyan);
+            let warm = config.theme.highlighted_item_style.fg.unwrap_or(accent);
+            let faint = config.theme.borders_style.fg.unwrap_or(Color::DarkGray);
+            let pw = right_area.width as usize;
+            let prop = |item: &T, sp: SongProperty| {
+                item.format(
                     &[Property {
-                        kind: PropertyKindOrText::Property(SongProperty::Album),
+                        kind: PropertyKindOrText::Property(sp),
                         style: None,
                         default: None,
                     }],
                     "",
                     ctx,
-                );
-                let artist = current.format(
-                    &[Property {
-                        kind: PropertyKindOrText::Property(SongProperty::Artist),
-                        style: None,
-                        default: None,
-                    }],
-                    "",
-                    ctx,
-                );
-                result.push(ListItem::new(Line::from(vec![
-                    Span::styled(album, Style::default().fg(accent).add_modifier(Modifier::BOLD)),
-                    Span::styled(" — ", Style::default().add_modifier(Modifier::DIM)),
-                    Span::styled(artist, Style::default().fg(accent)),
-                ])));
-                result.push(ListItem::new(Span::raw("")));
-                for group in previews {
-                    if let Some(name) = group.name {
-                        let mut item = ListItem::new(name);
-                        if let Some(style) = group.header_style {
-                            item = item.style(style);
-                        }
-                        result.push(item);
-                    }
-                    result.extend(group.items);
-                    result.push(ListItem::new(Span::raw("")));
-                }
-                result
-            } else if state.current().selected().is_some() {
-                let items = state.next_dir_items().map_or(Vec::new(), |p| {
-                    p.iter()
-                        .take(self.areas[BrowserArea::Preview].height as usize)
-                        .map(|item| item.to_list_item_simple(ctx))
-                        .collect_vec()
-                });
-                if let Some(next) = state.next_mut() {
-                    next.state.set_content_and_viewport_len(items.len(), right_area.height.into());
-                }
-                items
-            } else {
-                Vec::new()
+                )
             };
-
+            let sep = || {
+                ListItem::new(Line::from(Span::styled(
+                    "\u{2500}".repeat(pw),
+                    Style::default().fg(faint),
+                )))
+            };
+            let sel_is_file = state.current().selected().map(DirStackItem::is_file);
+            let mut result: Vec<ListItem> = Vec::new();
+            match sel_is_file {
+                // A song is selected: show its metadata, framed by a title/artist header.
+                Some(true) => {
+                    if let Some(sel) = state.current().selected() {
+                        let album = prop(sel, SongProperty::Album);
+                        let title = prop(sel, SongProperty::Title);
+                        let artist = prop(sel, SongProperty::Artist);
+                        result.push(ListItem::new(Line::from(Span::styled(
+                            if album.is_empty() { title } else { album },
+                            Style::default().fg(accent).add_modifier(Modifier::BOLD),
+                        ))));
+                        if !artist.is_empty() {
+                            result.push(ListItem::new(Line::from(Span::styled(
+                                artist,
+                                Style::default().fg(warm),
+                            ))));
+                        }
+                        result.push(sep());
+                        for group in sel.to_file_preview(ctx) {
+                            if let Some(name) = group.name {
+                                let mut item = ListItem::new(name);
+                                if let Some(style) = group.header_style {
+                                    item = item.style(style);
+                                }
+                                result.push(item);
+                            }
+                            result.extend(group.items);
+                        }
+                    }
+                }
+                // A directory is selected: if its contents are songs, render an
+                // album-style preview (header + track list); otherwise list contents.
+                Some(false) => {
+                    let is_songs = state
+                        .next_dir_items()
+                        .is_some_and(|v| v.first().is_some_and(DirStackItem::is_file));
+                    if is_songs {
+                        let children: &[T] = state.next_dir_items().map_or(&[], Vec::as_slice);
+                        let count = children.len();
+                        let first = &children[0];
+                        let album = prop(first, SongProperty::Album);
+                        let artist = prop(first, SongProperty::Artist);
+                        let genre = prop(first, SongProperty::Other("genre".to_string()));
+                        let year = prop(first, SongProperty::Other("date".to_string()));
+                        result.push(ListItem::new(Line::from(Span::styled(
+                            if album.is_empty() { "Preview".to_string() } else { album },
+                            Style::default().fg(accent).add_modifier(Modifier::BOLD),
+                        ))));
+                        if !artist.is_empty() {
+                            result.push(ListItem::new(Line::from(Span::styled(
+                                artist,
+                                Style::default().fg(warm),
+                            ))));
+                        }
+                        let mut meta: Vec<String> = Vec::new();
+                        if !genre.is_empty() {
+                            meta.push(genre);
+                        }
+                        if !year.is_empty() {
+                            meta.push(year);
+                        }
+                        meta.push(format!("{count} tracks"));
+                        result.push(ListItem::new(Line::from(Span::styled(
+                            meta.join(" \u{b7} "),
+                            Style::default().fg(faint),
+                        ))));
+                        result.push(sep());
+                        let rows = (right_area.height as usize).saturating_sub(result.len());
+                        for song in children.iter().take(rows) {
+                            let track = prop(song, SongProperty::Track);
+                            let title_raw = prop(song, SongProperty::Title);
+                            let title = if title_raw.is_empty() {
+                                prop(song, SongProperty::Filename)
+                            } else {
+                                title_raw
+                            };
+                            let dur = prop(song, SongProperty::Duration);
+                            let dur_w = dur.chars().count();
+                            let head_w = 4usize;
+                            let title_max = pw.saturating_sub(head_w + dur_w + 1);
+                            let title_disp: String = title.chars().take(title_max).collect();
+                            let used = head_w + title_disp.chars().count() + dur_w;
+                            let pad = pw.saturating_sub(used).max(1);
+                            result.push(ListItem::new(Line::from(vec![
+                                Span::styled(format!("{track:>3} "), Style::default().fg(faint)),
+                                Span::styled(title_disp, config.as_text_style()),
+                                Span::raw(" ".repeat(pad)),
+                                Span::styled(dur, Style::default().fg(faint)),
+                            ])));
+                        }
+                    } else {
+                        let items: Vec<ListItem> = state.next_dir_items().map_or(Vec::new(), |p| {
+                            p.iter()
+                                .take(right_area.height as usize)
+                                .map(|item| item.to_list_item_simple(ctx))
+                                .collect_vec()
+                        });
+                        let len = items.len();
+                        result = items;
+                        if let Some(next) = state.next_mut() {
+                            next.state.set_content_and_viewport_len(len, right_area.height.into());
+                        }
+                    }
+                }
+                None => {}
+            }
             let preview = List::new(result).style(config.as_text_style());
             ratatui::widgets::Widget::render(preview, right_area, buf);
         }
