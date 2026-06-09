@@ -224,10 +224,11 @@
         "volume": Split(
             direction: Horizontal,
             panes: [
+                (size: "2", pane: Pane(Empty())),
                 (size: "2", pane: Pane(Property(content: [(kind: Text("\u{f028} "), style: (fg: "#45cdd4"))]))),
                 (size: "100%", pane: Pane(Volume(kind: Slider(symbols: (filled: "━", thumb: "●", track: "─"), filled_style: (fg: "#45cdd4"), thumb_style: (fg: "#7fe0e8", modifiers: "Bold"), track_style: (fg: "#2d333c"))))),
                 (size: "3", pane: Pane(Property(content: [(kind: Property(Status(Volume)), style: (fg: "#45cdd4"))], align: Right))),
-                (size: "2", pane: Pane(Property(content: [(kind: Text("%"), style: (fg: "#45cdd4"))]))),
+                (size: "3", pane: Pane(Property(content: [(kind: Text("% "), style: (fg: "#45cdd4"))]))),
             ]
         ),
         "elapsed_and_bitrate": Pane(Property(

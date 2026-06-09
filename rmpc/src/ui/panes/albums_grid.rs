@@ -164,7 +164,11 @@ impl AlbumsGridPane {
         let col = self.selected % cols;
         let cx = self.area.x + 1 + (col as u16) * (CARD_W + GAP_X);
         let cy = self.area.y + 1 + ((row - self.scroll_row) as u16) * CARD_H;
-        Some(Rect::new(cx, cy, CARD_W, COVER_H))
+        let area_bottom = self.area.y.saturating_add(self.area.height);
+        if cy >= area_bottom {
+            return None;
+        }
+        Some(Rect::new(cx, cy, CARD_W, COVER_H.min(area_bottom - cy)))
     }
 
     /// Fetch the selected album's cover bytes and hand them to the facade.
@@ -246,13 +250,23 @@ impl Pane for AlbumsGridPane {
             let cy = area.y + pad_y + ((row - self.scroll_row) as u16) * CARD_H;
 
             let selected = i == self.selected;
-            let cover_area = Rect::new(cx, cy, CARD_W, COVER_H);
+            let area_bottom = area.y.saturating_add(area.height);
+            if cy >= area_bottom {
+                continue;
+            }
+            let cover_h = COVER_H.min(area_bottom - cy);
+            let cover_area = Rect::new(cx, cy, CARD_W, cover_h);
             if selected && self.crisp && self.has_cover {
                 // leave blank — the facade paints the crisp cover here; the buffer
                 // cells stay unchanged frame-to-frame so the image persists
                 let blank = Style::default().bg(theme.background_color.unwrap_or_default());
-                for yy in 0..COVER_H {
-                    buf.set_string(cx, cy + yy, " ".repeat(CARD_W as usize), blank);
+                for yy in 0..cover_h {
+                    for xx in 0..CARD_W {
+                        if let Some(cell) = buf.cell_mut((cx + xx, cy + yy)) {
+                            cell.set_char(' ');
+                            cell.set_style(blank);
+                        }
+                    }
                 }
             } else if let Some(img) = self.covers.get(name) {
                 paint_image_cover(buf, cover_area, img);
@@ -261,13 +275,23 @@ impl Pane for AlbumsGridPane {
             }
 
             let style = if selected { sel_style } else { normal };
-            // pad the label to the card width so the selection highlight reads as a bar
-            let mut label: String = name.chars().take(CARD_W as usize).collect();
-            let w = label.chars().count();
-            if w < CARD_W as usize {
-                label.push_str(&" ".repeat(CARD_W as usize - w));
+            let label_y = cy + COVER_H;
+            if label_y < area_bottom {
+                let label: String = name.chars().take(CARD_W as usize).collect();
+                for (k, ch) in label.chars().enumerate() {
+                    if let Some(cell) = buf.cell_mut((cx + k as u16, label_y)) {
+                        cell.set_char(ch);
+                        cell.set_style(style);
+                    }
+                }
+                // pad the rest of the label width so the selection bar reads full-width
+                for k in label.chars().count()..CARD_W as usize {
+                    if let Some(cell) = buf.cell_mut((cx + k as u16, label_y)) {
+                        cell.set_char(' ');
+                        cell.set_style(style);
+                    }
+                }
             }
-            buf.set_string(cx, cy + COVER_H, &label, style);
         }
         if self.crisp
             && let Some(rect) = self.selected_cover_rect()
