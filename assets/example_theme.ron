@@ -106,32 +106,40 @@
     ],
     song_table_format: [
         (
-            prop: (kind: Property(Artist),
-                default: (kind: Text("Unknown"))
+            prop: (kind: Property(Track),
+                default: (kind: Text(""))
             ),
-            label_prop: (kind: Text("Artist")),
-            width: "20%",
+            label_prop: (kind: Text("#")),
+            width: "6%",
+            alignment: Right,
         ),
         (
             prop: (kind: Property(Title),
                 default: (kind: Text("Unknown"))
             ),
             label_prop: (kind: Text("Title")),
-            width: "35%",
+            width: "37%",
+        ),
+        (
+            prop: (kind: Property(Artist), style: (fg: "#959aa3"),
+                default: (kind: Text("Unknown"), style: (fg: "#959aa3"))
+            ),
+            label_prop: (kind: Text("Artist")),
+            width: "22%",
         ),
         (
             prop: (kind: Property(Album), style: (fg: "#959aa3"),
                 default: (kind: Text("Unknown Album"), style: (fg: "#959aa3"))
             ),
             label_prop: (kind: Text("Album")),
-            width: "30%",
+            width: "23%",
         ),
         (
             prop: (kind: Property(Duration),
                 default: (kind: Text("-"))
             ),
-            label_prop: (kind: Text("Duration")),
-            width: "15%",
+            label_prop: (kind: Text("Time")),
+            width: "12%",
             alignment: Right,
         ),
     ],
