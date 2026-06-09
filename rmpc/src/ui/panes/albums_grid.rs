@@ -9,7 +9,8 @@ use ratatui::{
     style::{Color, Style},
 };
 use rmpc_mpd::{
-    filter::{Filter, Tag},
+    client::Client,
+    filter::{Filter, FilterKind, Tag},
     mpd_client::MpdClient,
 };
 
@@ -18,15 +19,23 @@ use super::{
     gradient_art::{paint_cover, seed_of},
 };
 use crate::{
-    config::{album_art::ImageMethod, keys::CommonAction, tabs::PaneType},
+    config::{
+        album_art::ImageMethod,
+        keys::{
+            CommonAction,
+            actions::{AutoplayKind, Position},
+        },
+        tabs::PaneType,
+    },
     ctx::Ctx,
     shared::{
         keys::ActionEvent,
+        macros::modal,
         mouse_event::{MouseEvent, MouseEventKind},
-        mpd_client_ext::MpdClientExt,
+        mpd_client_ext::{Enqueue, MpdClientExt},
         mpd_query::MpdQueryResult,
     },
-    ui::{UiEvent, image::facade::AlbumArtFacade},
+    ui::{UiEvent, image::facade::AlbumArtFacade, modals::menu::modal::MenuModal},
 };
 
 const INIT: &str = "albums_grid_init";
@@ -94,12 +103,67 @@ impl AlbumsGridPane {
         let Some(name) = self.albums.get(self.selected).cloned() else {
             return;
         };
-        ctx.command(move |_, client| {
-            client
-                .find_add(&[Filter::new(Tag::Album, name.as_str())], None)
-                .context("Failed to add album to queue")?;
-            Ok(())
-        });
+        Client::resolve_and_enqueue(
+            ctx,
+            vec![Enqueue::Find { filter: vec![(Tag::Album, FilterKind::Exact, name)] }],
+            Position::EndOfQueue,
+            AutoplayKind::None,
+            None,
+            None,
+        );
+    }
+
+    fn album_enqueue(name: String) -> Vec<Enqueue> {
+        vec![Enqueue::Find { filter: vec![(Tag::Album, FilterKind::Exact, name)] }]
+    }
+
+    fn open_context_menu(&self, ctx: &Ctx) {
+        let Some(name) = self.albums.get(self.selected).cloned() else {
+            return;
+        };
+        let (n1, n2, n3) = (name.clone(), name.clone(), name);
+        let modal = MenuModal::new(ctx)
+            .list_section(ctx, move |section| {
+                Some(
+                    section
+                        .item("Add to queue", move |ctx| {
+                            Client::resolve_and_enqueue(
+                                ctx,
+                                Self::album_enqueue(n1),
+                                Position::EndOfQueue,
+                                AutoplayKind::None,
+                                None,
+                                None,
+                            );
+                            Ok(())
+                        })
+                        .item("Add & play", move |ctx| {
+                            Client::resolve_and_enqueue(
+                                ctx,
+                                Self::album_enqueue(n2),
+                                Position::EndOfQueue,
+                                AutoplayKind::First,
+                                None,
+                                None,
+                            );
+                            Ok(())
+                        })
+                        .item("Replace queue & play", move |ctx| {
+                            Client::resolve_and_enqueue(
+                                ctx,
+                                Self::album_enqueue(n3),
+                                Position::Replace,
+                                AutoplayKind::First,
+                                None,
+                                None,
+                            );
+                            Ok(())
+                        }),
+                )
+            })
+            .list_section(ctx, |section| Some(section.item("Cancel", |_ctx| Ok(()))))
+            .build();
+        modal!(ctx, modal);
     }
 
     fn card_at(&self, x: u16, y: u16) -> Option<usize> {
@@ -377,6 +441,20 @@ impl Pane for AlbumsGridPane {
         self.album_art.hide(ctx)
     }
 
+    fn resize(&mut self, _area: Rect, ctx: &Ctx) -> Result<()> {
+        // the grid reflows automatically in render (cols/rows derive from the
+        // area); force the crisp cover to re-render at the new geometry so the
+        // stale image is cleared and re-placed.
+        if self.crisp {
+            self.shown_album = None;
+            self.has_cover = false;
+            self.album_art.hide(ctx)?;
+            self.fetch_selected_cover(ctx);
+        }
+        ctx.render()?;
+        Ok(())
+    }
+
     fn handle_mouse_event(&mut self, event: MouseEvent, ctx: &Ctx) -> Result<()> {
         match event.kind {
             MouseEventKind::LeftClick => {
@@ -393,6 +471,26 @@ impl Pane for AlbumsGridPane {
                     self.enqueue_selected(ctx);
                     ctx.render()?;
                 }
+            }
+            MouseEventKind::RightClick => {
+                if let Some(idx) = self.card_at(event.x, event.y) {
+                    self.selected = idx;
+                    self.fetch_selected_cover(ctx);
+                    self.open_context_menu(ctx);
+                }
+            }
+            MouseEventKind::ScrollDown => {
+                let len = self.albums.len();
+                if len > 0 {
+                    self.selected = (self.selected + self.cols.max(1)).min(len - 1);
+                    self.fetch_selected_cover(ctx);
+                    ctx.render()?;
+                }
+            }
+            MouseEventKind::ScrollUp if !self.albums.is_empty() => {
+                self.selected = self.selected.saturating_sub(self.cols.max(1));
+                self.fetch_selected_cover(ctx);
+                ctx.render()?;
             }
             _ => {}
         }
@@ -413,16 +511,16 @@ impl Pane for AlbumsGridPane {
             CommonAction::Left => self.selected = self.selected.saturating_sub(1),
             CommonAction::Right => self.selected = (self.selected + 1).min(len - 1),
             CommonAction::Up => self.selected = self.selected.saturating_sub(cols),
-            CommonAction::Down => {
-                if self.selected + cols < len {
-                    self.selected += cols;
-                }
-            }
+            CommonAction::Down => self.selected = (self.selected + cols).min(len - 1),
             CommonAction::PageUp => self.selected = self.selected.saturating_sub(page),
             CommonAction::PageDown => self.selected = (self.selected + page).min(len - 1),
             CommonAction::Top => self.selected = 0,
             CommonAction::Bottom => self.selected = len - 1,
             CommonAction::Confirm => self.enqueue_selected(ctx),
+            CommonAction::ContextMenu => {
+                self.open_context_menu(ctx);
+                return Ok(());
+            }
             _ => return Ok(()),
         }
         self.fetch_selected_cover(ctx);
