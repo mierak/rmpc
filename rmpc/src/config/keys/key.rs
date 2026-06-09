@@ -5,7 +5,7 @@ use serde_with::{DeserializeFromStr, SerializeDisplay};
 use winnow::{
     Parser,
     Result,
-    combinator::{alt, dispatch, empty, fail, opt, permutation, repeat, seq, trace},
+    combinator::{alt, dispatch, empty, fail, repeat, seq, trace},
     token::{any, literal},
 };
 
@@ -279,22 +279,17 @@ fn parse_key(input: &mut &str) -> winnow::error::Result<Key> {
 }
 
 fn parse_modifier(input: &mut &str) -> winnow::error::Result<KeyModifiers> {
-    let mods = permutation((
-        opt(literal("C-").value(KeyModifiers::CONTROL)),
-        opt(literal("A-").value(KeyModifiers::ALT)),
-        opt(literal("S-").value(KeyModifiers::SHIFT)),
-    ))
+    let mods: Vec<KeyModifiers> = repeat(
+        0..,
+        alt((
+            literal("C-").value(KeyModifiers::CONTROL),
+            literal("A-").value(KeyModifiers::ALT),
+            literal("S-").value(KeyModifiers::SHIFT),
+        )),
+    )
     .parse_next(input)?;
 
-    let mut modifiers = KeyModifiers::NONE;
-    for modifier in [mods.0, mods.1, mods.2] {
-        match modifier {
-            Some(KeyModifiers::CONTROL) => modifiers |= KeyModifiers::CONTROL,
-            Some(KeyModifiers::ALT) => modifiers |= KeyModifiers::ALT,
-            Some(KeyModifiers::SHIFT) => modifiers |= KeyModifiers::SHIFT,
-            _ => {}
-        }
-    }
+    let modifiers = mods.into_iter().fold(KeyModifiers::NONE, |acc, modifier| acc | modifier);
 
     Ok(modifiers)
 }
@@ -310,25 +305,10 @@ fn parse_char_key(input: &mut &str) -> Result<(KeyModifiers, KeyCode)> {
 
 fn parse_special_key(input: &mut &str) -> winnow::error::Result<(KeyModifiers, KeyCode)> {
     let mut parser = alt((
-        alt((
-            "BS",
-            "Backspace",
-            "CR",
-            "Enter",
-            "Left",
-            "Right",
-            "Up",
-            "Down",
-            "Home",
-            "End",
-            "PageUp",
-            "PageDown",
-            "Tab",
-        )),
-        alt((
-            "Del", "Insert", "Esc", "Space", "F10", "F11", "F12", "F1", "F2", "F3", "F4", "F5",
-            "F6", "F7", "F8", "F9",
-        )),
+        alt(("BS", "Backspace", "CR", "Enter", "Left", "Right", "Up", "Down", "Home")),
+        alt(("End", "PageUp", "PageDown", "Tab", "Del", "Insert", "Esc", "Space", "F10")),
+        alt(("F11", "F12", "F1", "F2", "F3", "F4", "F5", "F6", "F7")),
+        alt(("F8", "F9")),
     ));
 
     let mut parser = dispatch! {parser;
