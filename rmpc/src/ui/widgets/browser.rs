@@ -110,7 +110,8 @@ where
         if w_right > 0 {
             let accent = config.theme.highlight_border_style.fg.unwrap_or(Color::Cyan);
             let warm = config.theme.highlighted_item_style.fg.unwrap_or(accent);
-            let faint = config.theme.borders_style.fg.unwrap_or(Color::DarkGray);
+            let faint = config.theme.preview_label_style.fg.unwrap_or(Color::Gray);
+            let rule = config.theme.borders_style.fg.unwrap_or(Color::DarkGray);
             let pw = right_area.width as usize;
             let prop = |item: &T, sp: SongProperty| {
                 item.format(
@@ -126,7 +127,7 @@ where
             let sep = || {
                 ListItem::new(Line::from(Span::styled(
                     "\u{2500}".repeat(pw),
-                    Style::default().fg(faint),
+                    Style::default().fg(rule),
                 )))
             };
             let sel_is_file = state.current().selected().map(DirStackItem::is_file);

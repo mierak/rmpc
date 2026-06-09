@@ -1082,7 +1082,7 @@ impl Pane for SearchPane {
             return Ok(());
         }
         let accent = ctx.config.theme.highlight_border_style.fg.unwrap_or(Color::Cyan);
-        let text_muted = ctx.config.theme.borders_style.fg.unwrap_or(Color::Gray);
+        let text_muted = ctx.config.theme.preview_label_style.fg.unwrap_or(Color::Gray);
         let [search_section, results_area] =
             *Layout::vertical([Constraint::Length(3), Constraint::Fill(1)]).split(area)
         else {
