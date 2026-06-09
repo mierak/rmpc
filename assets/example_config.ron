@@ -35,6 +35,25 @@
         vertical_align: Center,
         horizontal_align: Center,
     ),
+    // Audio visualizer (Queue tab). Requires the `cava` binary installed.
+    // Default: capture the system output monitor via PulseAudio/PipeWire
+    // ("auto" picks the default sink's monitor) — works when MPD plays through
+    // pulse/pipewire, with no MPD-side config.
+    //
+    // If MPD outputs straight to ALSA (or you want the most reliable route),
+    // add a FIFO output to your mpd.conf:
+    //     audio_output {
+    //         type   "fifo"
+    //         name   "rmpc_visualizer"
+    //         path   "/tmp/mpd.fifo"
+    //         format "44100:16:2"
+    //     }
+    // then switch the input below to:
+    //     input: (method: Fifo, source: "/tmp/mpd.fifo", sample_rate: 44100, sample_bits: 16, channels: 2),
+    cava: (
+        framerate: 60,
+        input: (method: Pulse, source: "auto"),
+    ),
     keybinds: (
         global: {
             "q":          Quit,
