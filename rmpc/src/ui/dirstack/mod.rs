@@ -2,7 +2,7 @@ use std::borrow::Cow;
 
 use itertools::Itertools;
 use ratatui::{
-    style::Style,
+    style::{Color, Modifier, Style},
     text::{Line, Span},
     widgets::{ListItem, ListState, TableState},
 };
@@ -144,7 +144,6 @@ impl DirStackItem for DirOrSong {
                 let marker_style = marker_style(ctx, is_current, matches_filter);
                 let dir_style = dir_style(ctx, is_current, matches_filter);
                 let playlist_style = playlist_style(ctx, is_current, matches_filter);
-
                 let marker_span = if is_marked {
                     Span::styled(config.theme.symbols.marker.clone(), marker_style)
                 } else {
@@ -165,17 +164,17 @@ impl DirStackItem for DirOrSong {
                         Cow::Owned(name.to_owned())
                     }),
                 ]);
-
                 if let Some(content) = additional_content {
                     value.push_span(Span::raw(content));
                 }
-
                 if is_current {
+                    let accent = config.theme.highlight_border_style.fg.unwrap_or(Color::Cyan);
+                    value.spans.insert(0, Span::styled("│ ", Style::default().fg(accent)));
                     ListItem::from(value).style(config.theme.current_item_style)
                 } else if matches_filter {
                     ListItem::from(value).style(config.theme.highlighted_item_style)
                 } else {
-                    ListItem::from(value)
+                    ListItem::from(value).style(Style::default().add_modifier(Modifier::DIM))
                 }
             }
             DirOrSong::Song(s) => s.to_list_item(
@@ -261,11 +260,13 @@ impl DirStackItem for Song {
         }
 
         if is_current {
+            let accent = config.theme.highlight_border_style.fg.unwrap_or(Color::Cyan);
+            value.spans.insert(0, Span::styled("│ ", Style::default().fg(accent)));
             ListItem::from(value).style(config.theme.current_item_style)
         } else if matches_filter {
             ListItem::from(value).style(config.theme.highlighted_item_style)
         } else {
-            ListItem::from(value)
+            ListItem::from(value).style(Style::default().add_modifier(Modifier::DIM))
         }
     }
 
