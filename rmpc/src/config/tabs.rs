@@ -171,6 +171,7 @@ pub enum PaneTypeFile {
     AlbumArt,
     GradientArt,
     PlaybackControls,
+    StatesControls,
     AlbumsGrid,
     Lyrics,
     ProgressBar,
@@ -220,6 +221,7 @@ pub enum PaneType {
     AlbumArt,
     GradientArt,
     PlaybackControls,
+    StatesControls,
     AlbumsGrid,
     Lyrics,
     ProgressBar,
@@ -247,10 +249,11 @@ pub const PANES_ALLOWED_IN_BOTH_TAB_AND_LAYOUT: [PaneTypeDiscriminants; 2] =
     [PaneTypeDiscriminants::Property, PaneTypeDiscriminants::Empty];
 
 #[cfg(debug_assertions)]
-pub const UNFOSUSABLE_TABS: [PaneTypeDiscriminants; 14] = [
+pub const UNFOSUSABLE_TABS: [PaneTypeDiscriminants; 15] = [
     PaneTypeDiscriminants::AlbumArt,
     PaneTypeDiscriminants::GradientArt,
     PaneTypeDiscriminants::PlaybackControls,
+    PaneTypeDiscriminants::StatesControls,
     PaneTypeDiscriminants::Lyrics,
     PaneTypeDiscriminants::ProgressBar,
     PaneTypeDiscriminants::Volume,
@@ -265,10 +268,11 @@ pub const UNFOSUSABLE_TABS: [PaneTypeDiscriminants; 14] = [
 ];
 
 #[cfg(not(debug_assertions))]
-pub const UNFOSUSABLE_TABS: [PaneTypeDiscriminants; 13] = [
+pub const UNFOSUSABLE_TABS: [PaneTypeDiscriminants; 14] = [
     PaneTypeDiscriminants::AlbumArt,
     PaneTypeDiscriminants::GradientArt,
     PaneTypeDiscriminants::PlaybackControls,
+    PaneTypeDiscriminants::StatesControls,
     PaneTypeDiscriminants::Lyrics,
     PaneTypeDiscriminants::ProgressBar,
     PaneTypeDiscriminants::Volume,
@@ -313,6 +317,7 @@ impl TryFrom<PaneTypeFile> for PaneType {
             PaneTypeFile::AlbumArt => PaneType::AlbumArt,
             PaneTypeFile::GradientArt => PaneType::GradientArt,
             PaneTypeFile::PlaybackControls => PaneType::PlaybackControls,
+            PaneTypeFile::StatesControls => PaneType::StatesControls,
             PaneTypeFile::AlbumsGrid => PaneType::AlbumsGrid,
             PaneTypeFile::Lyrics => PaneType::Lyrics,
             PaneTypeFile::ProgressBar => PaneType::ProgressBar,

@@ -22,6 +22,7 @@ use ratatui::{Frame, layout::Layout, prelude::Rect, style::Color, text::Span, wi
 use recently_played::RecentlyPlayedPane;
 use rmpc_mpd::commands::{Song, State, status::OnOffOneshot, volume::Bound};
 use search::SearchPane;
+use states_controls::StatesControlsPane;
 use strum::{Display, IntoDiscriminant};
 use tabs::TabsPane;
 use tag_browser::TagBrowserPane;
@@ -93,6 +94,7 @@ pub mod queue;
 pub mod queue_header;
 pub mod recently_played;
 pub mod search;
+pub mod states_controls;
 pub mod tabs;
 pub mod tag_browser;
 pub mod volume;
@@ -113,6 +115,7 @@ pub enum Panes<'pane_ref, 'pane> {
     GradientArt(&'pane_ref mut GradientArtPane),
     PlaybackControls(&'pane_ref mut PlaybackControlsPane),
     AlbumsGrid(&'pane_ref mut AlbumsGridPane),
+    StatesControls(&'pane_ref mut StatesControlsPane),
     Lyrics(&'pane_ref mut LyricsPane),
     ProgressBar(&'pane_ref mut ProgressBarPane),
     Header(&'pane_ref mut HeaderPane),
@@ -146,6 +149,7 @@ pub struct PaneContainer<'panes> {
     pub gradient_art: GradientArtPane,
     pub playback_controls: PlaybackControlsPane,
     pub albums_grid: AlbumsGridPane,
+    pub states_controls: StatesControlsPane,
     pub lyrics: LyricsPane,
     pub progress_bar: ProgressBarPane,
     pub header: HeaderPane,
@@ -280,6 +284,7 @@ impl<'panes> PaneContainer<'panes> {
             gradient_art: GradientArtPane::new(),
             playback_controls: PlaybackControlsPane::new(),
             albums_grid: AlbumsGridPane::new(ctx),
+            states_controls: StatesControlsPane::new(),
             lyrics: LyricsPane::new(ctx),
             progress_bar: ProgressBarPane::new(),
             header: HeaderPane::new(),
@@ -344,6 +349,7 @@ impl<'panes> PaneContainer<'panes> {
             PaneType::GradientArt => Ok(Panes::GradientArt(&mut self.gradient_art)),
             PaneType::PlaybackControls => Ok(Panes::PlaybackControls(&mut self.playback_controls)),
             PaneType::AlbumsGrid => Ok(Panes::AlbumsGrid(&mut self.albums_grid)),
+            PaneType::StatesControls => Ok(Panes::StatesControls(&mut self.states_controls)),
             PaneType::Lyrics => Ok(Panes::Lyrics(&mut self.lyrics)),
             PaneType::ProgressBar => Ok(Panes::ProgressBar(&mut self.progress_bar)),
             PaneType::Header => Ok(Panes::Header(&mut self.header)),
@@ -392,6 +398,7 @@ macro_rules! pane_call {
             Panes::GradientArt(s) => s.$fn($($param),+),
             Panes::PlaybackControls(s) => s.$fn($($param),+),
             Panes::AlbumsGrid(s) => s.$fn($($param),+),
+            Panes::StatesControls(s) => s.$fn($($param),+),
             Panes::Lyrics(s) => s.$fn($($param),+),
             Panes::ProgressBar(s) => s.$fn($($param),+),
             Panes::Header(s) => s.$fn($($param),+),
