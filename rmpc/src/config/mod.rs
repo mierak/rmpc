@@ -496,4 +496,23 @@ mod tests {
 
         assert_eq!(theme, file);
     }
+
+    #[test]
+    fn refined_themes_parse_and_convert() {
+        use crate::config::theme::{UiConfig, UiConfigFile};
+        let base = PathBuf::from(std::env::var("CARGO_MANIFEST_DIR").unwrap())
+            .parent()
+            .unwrap()
+            .join("assets")
+            .join("themes");
+        for name in ["rmpc-refined.ron", "rmpc-refined-light.ron"] {
+            let path = base.join(name);
+            let raw = std::fs::read_to_string(&path)
+                .unwrap_or_else(|e| panic!("failed to read {name}: {e}"));
+            let file: UiConfigFile = ron::de::from_str(&raw)
+                .unwrap_or_else(|e| panic!("failed to parse {name}: {e}"));
+            UiConfig::try_from(file)
+                .unwrap_or_else(|e| panic!("failed to convert {name}: {e}"));
+        }
+    }
 }

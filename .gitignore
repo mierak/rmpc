@@ -1,6 +1,7 @@
 /target
 **.ron
 !assets/**.ron
+!assets/**/*.ron
 # Nix
 /.direnv
 result
