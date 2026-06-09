@@ -28,10 +28,10 @@
     borders_style: (fg: "#2d333c"),
     highlight_border_style: (fg: "#33c0c7"),
     symbols: (
-        song: "",
-        dir: "",
-        playlist: "",
-        marker: "",
+        song: "\u{f001}",
+        dir: "\u{f07b}",
+        playlist: "\u{f03a}",
+        marker: "\u{f00c}",
         ellipsis: "…",
         song_style: (fg: "#959aa3"),
         dir_style: (fg: "#45cdd4"),
@@ -59,6 +59,7 @@
         elapsed_style: (fg: "#45cdd4"),
         thumb_style: (fg: "#45cdd4"),
         use_track_when_empty: true,
+        elapsed_gradient: ("#45cdd4", "#8b5cf6"),
     ),
     scrollbar: (
         symbols: ["│", "┃", "▲", "▼"],
@@ -200,9 +201,13 @@
     components: {
         "state": Pane(Property(
             content: [
-                (kind: Text("["), style: (fg: "#f0b96b", modifiers: "Bold")),
-                (kind: Property(Status(StateV2( ))), style: (fg: "#f0b96b", modifiers: "Bold")),
-                (kind: Text("]"), style: (fg: "#f0b96b", modifiers: "Bold")),
+                (kind: Text("\u{f048}  "), style: (fg: "#5f646b")),
+                (kind: Property(Status(StateV2(
+                    playing_label: "\u{f04c}",
+                    paused_label: "\u{f04b}",
+                    stopped_label: "\u{f04d}",
+                ))), style: (fg: "#f0b96b", modifiers: "Bold")),
+                (kind: Text("  \u{f051}"), style: (fg: "#5f646b")),
             ], align: Left,
         )),
         "title": Pane(Property(
@@ -214,8 +219,8 @@
         "volume": Split(
             direction: Horizontal,
             panes: [
-                (size: "1", pane: Pane(Property(content: [(kind: Text(""))]))),
-                (size: "100%", pane: Pane(Volume(kind: Slider(symbols: (filled: "─", thumb: "●", track: "─"))))),
+                (size: "2", pane: Pane(Property(content: [(kind: Text("\u{f028} "), style: (fg: "#45cdd4"))]))),
+                (size: "100%", pane: Pane(Volume(kind: Slider(symbols: (filled: "━", thumb: "●", track: "─"), filled_style: (fg: "#45cdd4"), thumb_style: (fg: "#7fe0e8", modifiers: "Bold"), track_style: (fg: "#2d333c"))))),
                 (size: "3", pane: Pane(Property(content: [(kind: Property(Status(Volume)), style: (fg: "#45cdd4"))], align: Right))),
                 (size: "2", pane: Pane(Property(content: [(kind: Text("%"), style: (fg: "#45cdd4"))]))),
             ]
@@ -253,42 +258,39 @@
                     pane: Pane(Property(content: [(kind: Property(Status(InputBuffer())), style: (fg: "#45cdd4"), align: Left)]))
                 ),
                 (
-                    size: "6",
+                    size: "12",
                     pane: Pane(Property(content: [
-                        (kind: Text("["), style: (fg: "#45cdd4", modifiers: "Bold")),
+                        (kind: Text(" ")),
                         (kind: Property(Status(RepeatV2(
-                            on_label: "z",
-                            off_label: "z",
+                            on_label: "\u{f01e}", off_label: "\u{f01e}",
                             on_style: (fg: "#f0b96b", modifiers: "Bold"),
                             off_style: (fg: "#4e9397", modifiers: "Dim"),
                         )))),
+                        (kind: Text("  ")),
                         (kind: Property(Status(RandomV2(
-                            on_label: "x",
-                            off_label: "x",
+                            on_label: "\u{f074}", off_label: "\u{f074}",
                             on_style: (fg: "#f0b96b", modifiers: "Bold"),
                             off_style: (fg: "#4e9397", modifiers: "Dim"),
                         )))),
+                        (kind: Text("  ")),
                         (kind: Property(Status(ConsumeV2(
-                            on_label: "c",
-                            off_label: "c",
-                            oneshot_label: "c",
+                            on_label: "\u{f014}", off_label: "\u{f014}", oneshot_label: "\u{f014}",
                             on_style: (fg: "#f0b96b", modifiers: "Bold"),
                             off_style: (fg: "#4e9397", modifiers: "Dim"),
                             oneshot_style: (fg: "#e06c75", modifiers: "Dim"),
                         )))),
+                        (kind: Text("  ")),
                         (kind: Property(Status(SingleV2(
-                            on_label: "v",
-                            off_label: "v",
-                            oneshot_label: "v",
+                            on_label: "\u{f0e2}", off_label: "\u{f0e2}", oneshot_label: "\u{f0e2}",
                             on_style: (fg: "#f0b96b", modifiers: "Bold"),
                             off_style: (fg: "#4e9397", modifiers: "Dim"),
                             oneshot_style: (fg: "#e06c75", modifiers: "Bold"),
                         )))),
-                        (kind: Text("]"), style: (fg: "#45cdd4", modifiers: "Bold")),
+                        (kind: Text(" ")),
                         ],
                         align: Right
                     ))
-                ),
+                )
             ]
         ),
         "input_mode": Pane(Property(

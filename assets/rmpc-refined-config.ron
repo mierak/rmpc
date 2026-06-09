@@ -25,18 +25,18 @@
     theme: "rmpc-refined",
     keybinds: (
         global: {
-            "1": SwitchToTab(" Queue"),
-            "2": SwitchToTab(" Directories"),
-            "3": SwitchToTab(" Artists"),
-            "4": SwitchToTab(" Albums"),
-            "5": SwitchToTab(" Search"),
-            "6": SwitchToTab(" Playlists"),
-            "7": SwitchToTab(" Lyrics"),
+            "1": SwitchToTab("\u{f0cb} Queue"),
+            "2": SwitchToTab("\u{f07b} Directories"),
+            "3": SwitchToTab("\u{f007} Artists"),
+            "4": SwitchToTab("\u{f00a} Albums"),
+            "5": SwitchToTab("\u{f002} Search"),
+            "6": SwitchToTab("\u{f03a} Playlists"),
+            "7": SwitchToTab("\u{f036} Lyrics"),
         },
     ),
     tabs: [
         (
-            name: " Queue",
+            name: "\u{f0cb} Queue",
             pane: Split(
                 direction: Horizontal,
                 panes: [
@@ -177,37 +177,37 @@
             ),
         ),
         (
-            name: " Directories",
+            name: "\u{f07b} Directories",
             borders: "ALL",
             border_symbols: Rounded,
             pane: Split(size: "100%", direction: Vertical, panes: [(pane: Pane(Directories), size: "100%")]),
         ),
         (
-            name: " Artists",
+            name: "\u{f007} Artists",
             borders: "ALL",
             border_symbols: Rounded,
             pane: Split(size: "100%", direction: Vertical, panes: [(pane: Pane(Artists), size: "100%")]),
         ),
         (
-            name: " Albums",
+            name: "\u{f00a} Albums",
             borders: "ALL",
             border_symbols: Rounded,
             pane: Split(size: "100%", direction: Vertical, panes: [(pane: Pane(Albums), size: "100%")]),
         ),
         (
-            name: " Search",
+            name: "\u{f002} Search",
             borders: "ALL",
             border_symbols: Rounded,
             pane: Split(size: "100%", direction: Vertical, panes: [(pane: Pane(Search), size: "100%")]),
         ),
         (
-            name: " Playlists",
+            name: "\u{f03a} Playlists",
             borders: "ALL",
             border_symbols: Rounded,
             pane: Split(size: "100%", direction: Vertical, panes: [(pane: Pane(Playlists), size: "100%")]),
         ),
         (
-            name: " Lyrics",
+            name: "\u{f036} Lyrics",
             borders: "ALL",
             border_symbols: Rounded,
             pane: Split(size: "100%", direction: Vertical, panes: [(pane: Pane(Lyrics), size: "100%")]),

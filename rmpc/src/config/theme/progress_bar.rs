@@ -24,6 +24,8 @@ pub struct ProgressBarConfig {
     /// Whether to use only the track symbol and style when the progress is
     /// empty (0%).
     pub use_track_when_empty: bool,
+    /// Optional per-cell gradient (from, to) across the elapsed fill.
+    pub elapsed_gradient: Option<(Color, Color)>,
 }
 
 #[derive(Debug, Serialize, Deserialize, PartialEq, Eq)]
@@ -34,6 +36,7 @@ pub struct ProgressBarConfigFile {
     pub(super) elapsed_style: Option<StyleFile>,
     pub(super) thumb_style: Option<StyleFile>,
     pub(super) use_track_when_empty: bool,
+    pub(super) elapsed_gradient: Option<(String, String)>,
 }
 
 impl Default for ProgressBarConfigFile {
@@ -58,6 +61,7 @@ impl Default for ProgressBarConfigFile {
             }),
             track_style: None,
             use_track_when_empty: true,
+            elapsed_gradient: None,
         }
     }
 }
@@ -82,12 +86,29 @@ impl ProgressBarConfigFile {
         let track = std::mem::take(&mut self.symbols[3]);
         let end = std::mem::take(&mut self.symbols[4]);
 
+        let elapsed_gradient = match self.elapsed_gradient.take() {
+            Some((from, to)) => {
+                let from = Some(StyleFile { fg: Some(from), bg: None, modifiers: None })
+                    .to_config_or(None, None)?
+                    .fg;
+                let to = Some(StyleFile { fg: Some(to), bg: None, modifiers: None })
+                    .to_config_or(None, None)?
+                    .fg;
+                match (from, to) {
+                    (Some(a), Some(b)) => Some((a, b)),
+                    _ => None,
+                }
+            }
+            None => None,
+        };
+
         Ok(ProgressBarConfig {
             symbols: [start, elapsed, thumb, track, end],
             elapsed_style: self.elapsed_style.to_config_or(Some(Color::Blue), None)?,
             thumb_style: self.thumb_style.to_config_or(Some(Color::Blue), None)?,
             track_style: self.track_style.to_config_or(Some(Color::Black), None)?,
             use_track_when_empty: self.use_track_when_empty,
+            elapsed_gradient,
         })
     }
 }
