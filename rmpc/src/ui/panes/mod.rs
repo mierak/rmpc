@@ -8,6 +8,7 @@ use anyhow::{Context, Result};
 use cava::CavaPane;
 use directories::DirectoriesPane;
 use either::Either;
+use gradient_art::GradientArtPane;
 use header::HeaderPane;
 use itertools::Itertools;
 use lyrics::LyricsPane;
@@ -74,6 +75,7 @@ pub mod album_art;
 pub mod cava;
 pub mod directories;
 pub mod empty;
+pub mod gradient_art;
 #[cfg(debug_assertions)]
 pub mod frame_count;
 pub mod header;
@@ -104,6 +106,7 @@ pub enum Panes<'pane_ref, 'pane> {
     Playlists(&'pane_ref mut PlaylistsPane),
     Search(&'pane_ref mut SearchPane),
     AlbumArt(&'pane_ref mut AlbumArtPane),
+    GradientArt(&'pane_ref mut GradientArtPane),
     Lyrics(&'pane_ref mut LyricsPane),
     ProgressBar(&'pane_ref mut ProgressBarPane),
     Header(&'pane_ref mut HeaderPane),
@@ -134,6 +137,7 @@ pub struct PaneContainer<'panes> {
     pub playlists: PlaylistsPane,
     pub search: SearchPane,
     pub album_art: AlbumArtPane,
+    pub gradient_art: GradientArtPane,
     pub lyrics: LyricsPane,
     pub progress_bar: ProgressBarPane,
     pub header: HeaderPane,
@@ -265,6 +269,7 @@ impl<'panes> PaneContainer<'panes> {
             playlists: PlaylistsPane::new(ctx),
             search: SearchPane::new(ctx),
             album_art: AlbumArtPane::new(ctx),
+            gradient_art: GradientArtPane::new(),
             lyrics: LyricsPane::new(ctx),
             progress_bar: ProgressBarPane::new(),
             header: HeaderPane::new(),
@@ -326,6 +331,7 @@ impl<'panes> PaneContainer<'panes> {
             PaneType::Playlists => Ok(Panes::Playlists(&mut self.playlists)),
             PaneType::Search => Ok(Panes::Search(&mut self.search)),
             PaneType::AlbumArt => Ok(Panes::AlbumArt(&mut self.album_art)),
+            PaneType::GradientArt => Ok(Panes::GradientArt(&mut self.gradient_art)),
             PaneType::Lyrics => Ok(Panes::Lyrics(&mut self.lyrics)),
             PaneType::ProgressBar => Ok(Panes::ProgressBar(&mut self.progress_bar)),
             PaneType::Header => Ok(Panes::Header(&mut self.header)),
@@ -371,6 +377,7 @@ macro_rules! pane_call {
             Panes::Playlists(s) => s.$fn($($param),+),
             Panes::Search(s) => s.$fn($($param),+),
             Panes::AlbumArt(s) => s.$fn($($param),+),
+            Panes::GradientArt(s) => s.$fn($($param),+),
             Panes::Lyrics(s) => s.$fn($($param),+),
             Panes::ProgressBar(s) => s.$fn($($param),+),
             Panes::Header(s) => s.$fn($($param),+),

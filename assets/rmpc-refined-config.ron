@@ -52,7 +52,7 @@
                                     border_symbols: Rounded,
                                     border_title: [(kind: Text(" Now Playing "))],
                                     border_title_alignment: Left,
-                                    pane: Pane(AlbumArt),
+                                    pane: Pane(GradientArt),
                                 ),
                                 (
                                     size: "8",
