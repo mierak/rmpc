@@ -511,4 +511,30 @@ mod tests {
                 .unwrap_or_else(|e| panic!("failed to convert {name}: {e}"));
         }
     }
+
+    #[test]
+    fn refined_config_parses_and_tabs_convert() {
+        use crate::config::theme::{UiConfig, UiConfigFile};
+        let assets = PathBuf::from(std::env::var("CARGO_MANIFEST_DIR").unwrap())
+            .parent()
+            .unwrap()
+            .join("assets");
+
+        // The refined theme supplies the component library + border sets.
+        let theme_raw =
+            std::fs::read_to_string(assets.join("themes").join("rmpc-refined.ron")).unwrap();
+        let theme_file: UiConfigFile = ron::de::from_str(&theme_raw).unwrap();
+        let theme: UiConfig = theme_file.try_into().unwrap();
+
+        // The refined config must parse and its tab/pane layout must convert
+        // (this validates pane placement, sizes and border symbols).
+        let cfg_raw = std::fs::read_to_string(assets.join("rmpc-refined-config.ron"))
+            .unwrap_or_else(|e| panic!("failed to read refined config: {e}"));
+        let cfg: ConfigFile = ron::de::from_str(&cfg_raw)
+            .unwrap_or_else(|e| panic!("failed to parse refined config: {e}"));
+        cfg.tabs
+            .clone()
+            .convert(&theme.components, &theme.border_symbol_sets)
+            .unwrap_or_else(|e| panic!("failed to convert refined tabs: {e}"));
+    }
 }
