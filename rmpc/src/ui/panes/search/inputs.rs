@@ -432,6 +432,15 @@ pub(super) enum SearchMode {
     NotRegex,
 }
 
+#[derive(Debug, Default, PartialEq, Clone, Copy)]
+pub(super) enum SearchTag {
+    #[default]
+    Any,
+    Title,
+    Artist,
+    Album,
+}
+
 #[derive(Debug, Default, Clone, Copy, IntoStaticStr, VariantNames, FromRepr)]
 pub(super) enum LikedMode {
     #[default]
