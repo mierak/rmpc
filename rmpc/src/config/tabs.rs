@@ -184,6 +184,7 @@ pub enum PaneTypeFile {
     Search,
     AlbumArt,
     GradientArt,
+    PlaybackControls,
     Lyrics,
     ProgressBar,
     Volume {
@@ -233,6 +234,7 @@ pub enum PaneType {
     Search,
     AlbumArt,
     GradientArt,
+    PlaybackControls,
     Lyrics,
     ProgressBar,
     Volume {
@@ -259,8 +261,11 @@ pub const PANES_ALLOWED_IN_BOTH_TAB_AND_LAYOUT: [PaneTypeDiscriminants; 2] =
     [PaneTypeDiscriminants::Property, PaneTypeDiscriminants::Empty];
 
 #[cfg(debug_assertions)]
-pub const UNFOCUSABLE_TABS: [PaneTypeDiscriminants; 12] = [
+ pub const UNFOCUSABLE_TABS: [PaneTypeDiscriminants; 14] = [
+ pub const UNFOCUSABLE_TABS: [PaneTypeDiscriminants; 13] = [
     PaneTypeDiscriminants::AlbumArt,
+    PaneTypeDiscriminants::GradientArt,
+    PaneTypeDiscriminants::PlaybackControls,
     PaneTypeDiscriminants::Lyrics,
     PaneTypeDiscriminants::ProgressBar,
     PaneTypeDiscriminants::Volume,
@@ -275,8 +280,11 @@ pub const UNFOCUSABLE_TABS: [PaneTypeDiscriminants; 12] = [
 ];
 
 #[cfg(not(debug_assertions))]
-pub const UNFOCUSABLE_TABS: [PaneTypeDiscriminants; 11] = [
+ pub const UNFOCUSABLE_TABS: [PaneTypeDiscriminants; 14] = [
+ pub const UNFOCUSABLE_TABS: [PaneTypeDiscriminants; 13] = [
     PaneTypeDiscriminants::AlbumArt,
+    PaneTypeDiscriminants::GradientArt,
+    PaneTypeDiscriminants::PlaybackControls,
     PaneTypeDiscriminants::Lyrics,
     PaneTypeDiscriminants::ProgressBar,
     PaneTypeDiscriminants::Volume,
@@ -322,6 +330,7 @@ impl TryFrom<PaneTypeFile> for PaneType {
             PaneTypeFile::Search => PaneType::Search,
             PaneTypeFile::AlbumArt => PaneType::AlbumArt,
             PaneTypeFile::GradientArt => PaneType::GradientArt,
+            PaneTypeFile::PlaybackControls => PaneType::PlaybackControls,
             PaneTypeFile::Lyrics => PaneType::Lyrics,
             PaneTypeFile::ProgressBar => PaneType::ProgressBar,
             PaneTypeFile::Volume { kind } => PaneType::Volume {
