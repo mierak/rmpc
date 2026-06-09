@@ -55,7 +55,7 @@ impl AlbumArtFacade {
     pub fn new(ctx: &Ctx) -> Self {
         let config = ctx.config.as_ref();
         let image_backend = match config.album_art.method {
-            ImageMethod::Kitty => ImageBackend::Kitty(Kitty),
+            ImageMethod::Kitty => ImageBackend::Kitty(Kitty::new()),
             ImageMethod::UeberzugWayland => ImageBackend::Ueberzug(Ueberzug::new(Layer::Wayland)),
             ImageMethod::UeberzugX11 => ImageBackend::Ueberzug(Ueberzug::new(Layer::X11)),
             ImageMethod::Iterm2 => ImageBackend::Iterm2(Iterm2),
