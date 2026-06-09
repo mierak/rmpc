@@ -176,29 +176,16 @@
             ),
             (
                 size: "3",
+                borders: "ALL",
+                border_symbols: Rounded,
+                border_title: [(kind: Text(" ")), (kind: Property(Status(QueueLength()))), (kind: Text(" songs / ")), (kind: Property(Status(QueueTimeTotal()))), (kind: Text(" total time "))],
+                border_title_alignment: Right,
                 pane: Split(
                     direction: Horizontal,
                     panes: [
-                        (
-                            size: "12",
-                            borders: "ALL",
-                            border_symbols: Inherited(parent: Rounded, top_right: "┬", bottom_right: "┴"),
-                            pane: Component("input_mode")
-                        ),
-                        (
-                            size: "100%",
-                            borders: "TOP | BOTTOM | RIGHT",
-                            border_symbols: Rounded,
-                            border_title: [(kind: Text(" ")), (kind: Property(Status(QueueLength()))), (kind: Text(" songs / ")), (kind: Property(Status(QueueTimeTotal()))), (kind: Text(" total time "))],
-                            border_title_alignment: Right,
-                            pane: Split(
-                                direction: Horizontal,
-                                panes: [
-                                    (size: "13", pane: Pane(PlaybackControls)),
-                                    (size: "100%", pane: Component("progress_bar")),
-                                ]
-                            ),
-                        ),
+                        (size: "10", pane: Component("input_mode")),
+                        (size: "13", pane: Pane(PlaybackControls)),
+                        (size: "100%", pane: Component("progress_bar")),
                     ]
                 ),
             ),
@@ -272,8 +259,16 @@
         "input_mode": Pane(Property(
             content: [
                 (kind: Transform(Replace(content: (kind: Property(Status(InputMode()))), replacements: [
-                    (match: "Normal", replace: (kind: Text(" NORMAL "), style: (fg: "#090b0f", bg: "#45cdd4", modifiers: "Bold"))),
-                    (match: "Insert", replace: (kind: Text(" INSERT "), style: (fg: "#090b0f", bg: "#7ccd8e", modifiers: "Bold"))),
+                    (match: "Normal", replace: (kind: Group([
+                        (kind: Text("\u{e0b6}"), style: (fg: "#45cdd4")),
+                        (kind: Text("NORMAL"), style: (fg: "#090b0f", bg: "#45cdd4", modifiers: "Bold")),
+                        (kind: Text("\u{e0b4}"), style: (fg: "#45cdd4")),
+                    ]))),
+                    (match: "Insert", replace: (kind: Group([
+                        (kind: Text("\u{e0b6}"), style: (fg: "#7ccd8e")),
+                        (kind: Text("INSERT"), style: (fg: "#090b0f", bg: "#7ccd8e", modifiers: "Bold")),
+                        (kind: Text("\u{e0b4}"), style: (fg: "#7ccd8e")),
+                    ]))),
                 ])))
             ], align: Center
         )),
