@@ -1,9 +1,5 @@
 use anyhow::Result;
-use ratatui::{
-    Frame,
-    layout::Rect,
-    style::{Color, Style},
-};
+use ratatui::{Frame, layout::Rect, style::Style};
 use rmpc_mpd::{commands::State, mpd_client::MpdClient};
 
 use super::Pane;
@@ -54,29 +50,16 @@ impl Pane for PlaybackControlsPane {
         let toggle_glyph = if ctx.status.state == State::Play { PAUSE } else { PLAY };
         let muted: Style = ctx.config.theme.tab_bar.inactive_style;
         let active: Style = ctx.config.theme.tab_bar.active_style;
-        let accent = active.bg.unwrap_or(Color::Cyan);
-        let surround = ctx.config.theme.background_color.unwrap_or_default();
-        let cap = Style::default().fg(accent).bg(surround);
         let start_x = area.x + (area.width - CLUSTER_W) / 2;
         let mid_y = area.y + area.height / 2;
-        let circle_x = start_x + 3;
+        let square_x = start_x + 3;
         let next_x = start_x + 10;
-        // Big circular play/pause: a filled accent disc spanning the full box
-        // height (its rounded top/bottom reach the box borders — children render
-        // after the split border, so it pops out), clearly larger than prev/next.
+        // Filled accent button on the bar's inner row — reaches the box's inner
+        // top/bottom margins without overflowing the border; larger than prev/next.
         let buf = frame.buffer_mut();
         buf.set_string(start_x, mid_y, PREV, muted);
-        if mid_y >= 1 {
-            let top_y = mid_y - 1;
-            let bot_y = mid_y + 1;
-            buf.set_string(circle_x, top_y, "\u{259f}\u{2588}\u{2588}\u{2588}\u{2599}", cap);
-            buf.set_string(circle_x, mid_y, format!("  {toggle_glyph}  "), active);
-            buf.set_string(circle_x, bot_y, "\u{259c}\u{2588}\u{2588}\u{2588}\u{259b}", cap);
-            self.toggle = Some(Rect::new(circle_x, top_y, 5, 3));
-        } else {
-            buf.set_string(circle_x, mid_y, format!("  {toggle_glyph}  "), active);
-            self.toggle = Some(Rect::new(circle_x, mid_y, 5, 1));
-        }
+        buf.set_string(square_x, mid_y, format!("  {toggle_glyph}  "), active);
+        self.toggle = Some(Rect::new(square_x, mid_y, 5, 1));
         buf.set_string(next_x, mid_y, NEXT, muted);
         self.prev = Some(Rect::new(start_x, mid_y, 1, 1));
         self.next = Some(Rect::new(next_x, mid_y, 1, 1));
