@@ -18,7 +18,7 @@ use super::{
     gradient_art::{paint_cover, seed_of},
 };
 use crate::{
-    config::{keys::CommonAction, tabs::PaneType},
+    config::{album_art::ImageMethod, keys::CommonAction, tabs::PaneType},
     ctx::Ctx,
     shared::{
         keys::ActionEvent,
@@ -26,10 +26,12 @@ use crate::{
         mpd_client_ext::MpdClientExt,
         mpd_query::MpdQueryResult,
     },
+    ui::{UiEvent, image::facade::AlbumArtFacade},
 };
 
 const INIT: &str = "albums_grid_init";
 const COVERS: &str = "albums_grid_covers";
+const SEL_COVER: &str = "albums_grid_sel_cover";
 
 // card geometry (cells)
 const CARD_W: u16 = 18;
@@ -43,7 +45,7 @@ const CARD_H: u16 = COVER_H + 2; // cover + title row + spacing row
 /// half-block gradient, seeded by the album name), laid out in a grid that
 /// reflows to the pane width. Arrow keys / hjkl move the selection, Enter
 /// enqueues the album.
-#[derive(Debug, Default)]
+#[derive(Debug)]
 pub struct AlbumsGridPane {
     albums: Vec<String>,
     selected: usize,
@@ -52,12 +54,40 @@ pub struct AlbumsGridPane {
     rows_visible: usize,
     area: Rect,
     covers: HashMap<String, RgbaImage>,
+    /// Facade used to render the *selected* album's cover crisply via the
+    /// terminal's image protocol (kitty/sixel/iterm/ueberzug). Other cards stay
+    /// half-block. Only driven when `crisp` is set.
+    album_art: AlbumArtFacade,
+    crisp: bool,
+    has_cover: bool,
+    shown_album: Option<String>,
     initialized: bool,
 }
 
 impl AlbumsGridPane {
-    pub fn new() -> Self {
-        Self::default()
+    pub fn new(ctx: &Ctx) -> Self {
+        let crisp = matches!(
+            ctx.config.album_art.method,
+            ImageMethod::Kitty
+                | ImageMethod::Iterm2
+                | ImageMethod::Sixel
+                | ImageMethod::UeberzugWayland
+                | ImageMethod::UeberzugX11
+        );
+        Self {
+            albums: Vec::new(),
+            selected: 0,
+            scroll_row: 0,
+            cols: 1,
+            rows_visible: 1,
+            area: Rect::default(),
+            covers: HashMap::new(),
+            album_art: AlbumArtFacade::new(ctx),
+            crisp,
+            has_cover: false,
+            shown_album: None,
+            initialized: false,
+        }
     }
 
     fn enqueue_selected(&self, ctx: &Ctx) {
@@ -123,6 +153,47 @@ impl AlbumsGridPane {
             },
         );
     }
+
+    /// Cover rect of the currently-selected card, if it is visible.
+    fn selected_cover_rect(&self) -> Option<Rect> {
+        let cols = self.cols.max(1);
+        let row = self.selected / cols;
+        if row < self.scroll_row || row >= self.scroll_row + self.rows_visible.max(1) {
+            return None;
+        }
+        let col = self.selected % cols;
+        let cx = self.area.x + 1 + (col as u16) * (CARD_W + GAP_X);
+        let cy = self.area.y + 1 + ((row - self.scroll_row) as u16) * CARD_H;
+        Some(Rect::new(cx, cy, CARD_W, COVER_H))
+    }
+
+    /// Fetch the selected album's cover bytes and hand them to the facade.
+    fn fetch_selected_cover(&mut self, ctx: &Ctx) {
+        if !self.crisp {
+            return;
+        }
+        let Some(album) = self.albums.get(self.selected).cloned() else {
+            return;
+        };
+        if self.shown_album.as_ref() == Some(&album) {
+            return;
+        }
+        self.shown_album = Some(album.clone());
+        let order = ctx.config.album_art.order;
+        ctx.query().id(SEL_COVER).replace_id(SEL_COVER).target(PaneType::AlbumsGrid).query(
+            move |client| {
+                let cover = (|| -> Result<Option<Vec<u8>>> {
+                    let Some(song) = client.find_one(&[Filter::new(Tag::Album, album.as_str())])?
+                    else {
+                        return Ok(None);
+                    };
+                    Ok(client.find_album_art(&song.file, order)?)
+                })()
+                .unwrap_or(None);
+                Ok(MpdQueryResult::AlbumArt(cover))
+            },
+        );
+    }
 }
 
 impl Pane for AlbumsGridPane {
@@ -174,14 +245,21 @@ impl Pane for AlbumsGridPane {
             let cx = area.x + pad_x + (col as u16) * (CARD_W + GAP_X);
             let cy = area.y + pad_y + ((row - self.scroll_row) as u16) * CARD_H;
 
+            let selected = i == self.selected;
             let cover_area = Rect::new(cx, cy, CARD_W, COVER_H);
-            if let Some(img) = self.covers.get(name) {
+            if selected && self.crisp && self.has_cover {
+                // leave blank — the facade paints the crisp cover here; the buffer
+                // cells stay unchanged frame-to-frame so the image persists
+                let blank = Style::default().bg(theme.background_color.unwrap_or_default());
+                for yy in 0..COVER_H {
+                    buf.set_string(cx, cy + yy, " ".repeat(CARD_W as usize), blank);
+                }
+            } else if let Some(img) = self.covers.get(name) {
                 paint_image_cover(buf, cover_area, img);
             } else {
                 paint_cover(buf, cover_area, seed_of(name));
             }
 
-            let selected = i == self.selected;
             let style = if selected { sel_style } else { normal };
             // pad the label to the card width so the selection highlight reads as a bar
             let mut label: String = name.chars().take(CARD_W as usize).collect();
@@ -190,6 +268,11 @@ impl Pane for AlbumsGridPane {
                 label.push_str(&" ".repeat(CARD_W as usize - w));
             }
             buf.set_string(cx, cy + COVER_H, &label, style);
+        }
+        if self.crisp
+            && let Some(rect) = self.selected_cover_rect()
+        {
+            self.album_art.set_size(rect);
         }
         Ok(())
     }
@@ -204,6 +287,7 @@ impl Pane for AlbumsGridPane {
             );
             self.initialized = true;
         }
+        self.fetch_selected_cover(ctx);
         Ok(())
     }
 
@@ -221,6 +305,7 @@ impl Pane for AlbumsGridPane {
                     self.selected = self.albums.len().saturating_sub(1);
                 }
                 self.fetch_covers(ctx);
+                self.fetch_selected_cover(ctx);
                 ctx.render()?;
             }
             (COVERS, MpdQueryResult::Any(any)) => {
@@ -232,9 +317,40 @@ impl Pane for AlbumsGridPane {
                     ctx.render()?;
                 }
             }
+            (SEL_COVER, MpdQueryResult::AlbumArt(Some(bytes))) => {
+                self.has_cover = true;
+                self.album_art.show(bytes, ctx)?;
+            }
+            (SEL_COVER, MpdQueryResult::AlbumArt(None)) => {
+                self.has_cover = false;
+                self.album_art.hide(ctx)?;
+                ctx.render()?;
+            }
             _ => {}
         }
         Ok(())
+    }
+
+    fn on_event(&mut self, event: &mut UiEvent, is_visible: bool, ctx: &Ctx) -> Result<()> {
+        match event {
+            UiEvent::ImageEncoded { data } if is_visible => {
+                self.album_art.display(std::mem::take(data), ctx)?;
+            }
+            UiEvent::Displayed if is_visible && self.crisp && self.has_cover => {
+                self.album_art.show_current(ctx)?;
+            }
+            UiEvent::Exit => {
+                self.album_art.cleanup()?;
+            }
+            _ => {}
+        }
+        Ok(())
+    }
+
+    fn on_hide(&mut self, ctx: &Ctx) -> Result<()> {
+        self.shown_album = None;
+        self.has_cover = false;
+        self.album_art.hide(ctx)
     }
 
     fn handle_mouse_event(&mut self, event: MouseEvent, ctx: &Ctx) -> Result<()> {
@@ -242,12 +358,14 @@ impl Pane for AlbumsGridPane {
             MouseEventKind::LeftClick => {
                 if let Some(idx) = self.card_at(event.x, event.y) {
                     self.selected = idx;
+                    self.fetch_selected_cover(ctx);
                     ctx.render()?;
                 }
             }
             MouseEventKind::DoubleClick => {
                 if let Some(idx) = self.card_at(event.x, event.y) {
                     self.selected = idx;
+                    self.fetch_selected_cover(ctx);
                     self.enqueue_selected(ctx);
                     ctx.render()?;
                 }
@@ -283,6 +401,7 @@ impl Pane for AlbumsGridPane {
             CommonAction::Confirm => self.enqueue_selected(ctx),
             _ => return Ok(()),
         }
+        self.fetch_selected_cover(ctx);
         ctx.render()?;
         Ok(())
     }
