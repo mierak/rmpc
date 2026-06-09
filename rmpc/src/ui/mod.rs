@@ -169,6 +169,7 @@ impl<'ui> Ui<'ui> {
 
         self.layout.for_each_pane_custom_data(
             self.area,
+            None,
             &mut *frame,
             &mut |pane, pane_area, block, block_area, bg_color, frame| {
                 match self.panes.get_mut(&pane.pane, ctx)? {
