@@ -129,7 +129,29 @@ pub struct UiConfigFile {
 }
 
 impl Default for UiConfigFile {
+    /// The default UI/theme is the "Refined" design, parsed from the embedded
+    /// `assets/example_theme.ron`. A thread-local guard returns the bare
+    /// hand-built default on re-entry so serde's container `default` (invoked
+    /// while parsing that file) does not recurse.
     fn default() -> Self {
+        thread_local! {
+            static PARSING: std::cell::Cell<bool> = const { std::cell::Cell::new(false) };
+        }
+        if PARSING.with(std::cell::Cell::get) {
+            return Self::bare_default();
+        }
+        PARSING.with(|p| p.set(true));
+        let parsed = ron::de::from_str::<UiConfigFile>(include_str!(concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/../assets/example_theme.ron"
+        )));
+        PARSING.with(|p| p.set(false));
+        parsed.expect("embedded example_theme.ron must deserialize")
+    }
+}
+
+impl UiConfigFile {
+    pub(crate) fn bare_default() -> Self {
         Self {
             layout: PaneOrSplitFile::default(),
             default_album_art_path: None,
