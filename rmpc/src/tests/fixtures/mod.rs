@@ -30,9 +30,7 @@ use crate::{
 /// (Refined) default, which would change expected formatting output. This
 /// builds a `Config` from the hand-built bare defaults.
 fn bare_config() -> Config {
-    let ui = UiConfigFile::bare_default()
-        .try_into()
-        .expect("bare UiConfig should convert");
+    let ui = UiConfigFile::bare_default().try_into().expect("bare UiConfig should convert");
     ConfigFile::bare_default()
         .into_config(ui, None, None, true)
         .expect("bare Config should be valid")

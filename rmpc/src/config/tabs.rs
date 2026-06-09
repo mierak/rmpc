@@ -185,6 +185,7 @@ pub enum PaneTypeFile {
     AlbumArt,
     GradientArt,
     PlaybackControls,
+    AlbumsGrid,
     Lyrics,
     ProgressBar,
     Volume {
@@ -235,6 +236,7 @@ pub enum PaneType {
     AlbumArt,
     GradientArt,
     PlaybackControls,
+    AlbumsGrid,
     Lyrics,
     ProgressBar,
     Volume {
@@ -331,6 +333,7 @@ impl TryFrom<PaneTypeFile> for PaneType {
             PaneTypeFile::AlbumArt => PaneType::AlbumArt,
             PaneTypeFile::GradientArt => PaneType::GradientArt,
             PaneTypeFile::PlaybackControls => PaneType::PlaybackControls,
+            PaneTypeFile::AlbumsGrid => PaneType::AlbumsGrid,
             PaneTypeFile::Lyrics => PaneType::Lyrics,
             PaneTypeFile::ProgressBar => PaneType::ProgressBar,
             PaneTypeFile::Volume { kind } => PaneType::Volume {
