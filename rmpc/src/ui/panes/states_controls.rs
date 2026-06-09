@@ -22,6 +22,7 @@ const CONSUME: &str = "\u{f014}";
 const SINGLE: &str = "\u{f0e2}";
 
 const GAP: u16 = 2;
+const RIGHT_PAD: u16 = 2; // align toggles' right edge with the volume bar/% line above
 const CLUSTER_W: u16 = 4 + 3 * GAP; // 4 glyphs + 3 gaps
 
 /// Clickable repeat / random / consume / single toggles for the header.
@@ -46,7 +47,7 @@ impl Pane for StatesControlsPane {
     fn render(&mut self, frame: &mut Frame, area: Rect, ctx: &Ctx) -> Result<()> {
         self.area = area;
         self.rects = [None; 4];
-        if area.width < CLUSTER_W || area.height == 0 {
+        if area.width < CLUSTER_W + RIGHT_PAD || area.height == 0 {
             return Ok(());
         }
         let st = &ctx.status;
@@ -61,8 +62,8 @@ impl Pane for StatesControlsPane {
             (SINGLE, !matches!(st.single, OnOffOneshot::Off)),
         ];
 
-        // right-align the cluster within the area
-        let start_x = area.x + area.width.saturating_sub(CLUSTER_W);
+        // right-align the cluster within the area, leaving a small right margin
+        let start_x = area.x + area.width.saturating_sub(CLUSTER_W + RIGHT_PAD);
         let y = area.y + area.height / 2;
         let buf = frame.buffer_mut();
         for (i, (glyph, active)) in glyphs.iter().enumerate() {
