@@ -265,37 +265,7 @@
                 ),
                 (
                     size: "12",
-                    pane: Pane(Property(content: [
-                        (kind: Text(" ")),
-                        (kind: Property(Status(RepeatV2(
-                            on_label: "\u{f01e}", off_label: "\u{f01e}",
-                            on_style: (fg: "#f0b96b", modifiers: "Bold"),
-                            off_style: (fg: "#4e9397", modifiers: "Dim"),
-                        )))),
-                        (kind: Text("  ")),
-                        (kind: Property(Status(RandomV2(
-                            on_label: "\u{f074}", off_label: "\u{f074}",
-                            on_style: (fg: "#f0b96b", modifiers: "Bold"),
-                            off_style: (fg: "#4e9397", modifiers: "Dim"),
-                        )))),
-                        (kind: Text("  ")),
-                        (kind: Property(Status(ConsumeV2(
-                            on_label: "\u{f014}", off_label: "\u{f014}", oneshot_label: "\u{f014}",
-                            on_style: (fg: "#f0b96b", modifiers: "Bold"),
-                            off_style: (fg: "#4e9397", modifiers: "Dim"),
-                            oneshot_style: (fg: "#e06c75", modifiers: "Dim"),
-                        )))),
-                        (kind: Text("  ")),
-                        (kind: Property(Status(SingleV2(
-                            on_label: "\u{f0e2}", off_label: "\u{f0e2}", oneshot_label: "\u{f0e2}",
-                            on_style: (fg: "#f0b96b", modifiers: "Bold"),
-                            off_style: (fg: "#4e9397", modifiers: "Dim"),
-                            oneshot_style: (fg: "#e06c75", modifiers: "Bold"),
-                        )))),
-                        (kind: Text(" ")),
-                        ],
-                        align: Right
-                    ))
+                    pane: Pane(StatesControls),
                 )
             ]
         ),
