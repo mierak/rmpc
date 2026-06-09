@@ -1,5 +1,9 @@
 use anyhow::Result;
-use ratatui::{Frame, layout::Rect, style::Style};
+use ratatui::{
+    Frame,
+    layout::Rect,
+    style::{Color, Style},
+};
 use rmpc_mpd::{commands::State, mpd_client::MpdClient};
 
 use super::Pane;
@@ -37,7 +41,7 @@ const NEXT: &str = "\u{f051}"; // step-forward
 const PLAY: &str = "\u{f04b}"; // play
 const PAUSE: &str = "\u{f04c}"; // pause
 
-const CLUSTER_W: u16 = 9; // prev(1) gap(2) pill(3) gap(2) next(1)
+const CLUSTER_W: u16 = 11; // prev(1) gap(2) [cap + pill(3) + cap = 5] gap(2) next(1)
 
 impl Pane for PlaybackControlsPane {
     fn render(&mut self, frame: &mut Frame, area: Rect, ctx: &Ctx) -> Result<()> {
@@ -52,19 +56,25 @@ impl Pane for PlaybackControlsPane {
         let toggle_glyph = if ctx.status.state == State::Play { PAUSE } else { PLAY };
         let active: Style = ctx.config.theme.tab_bar.active_style;
         let muted: Style = ctx.config.theme.tab_bar.inactive_style;
+        let accent = active.bg.unwrap_or(Color::Cyan);
+        let surround = ctx.config.theme.background_color.unwrap_or_default();
+        let cap = Style::default().fg(accent).bg(surround);
 
         let start_x = area.x + (area.width - CLUSTER_W) / 2;
         let y = area.y + area.height / 2;
         let pill_x = start_x + 3;
-        let next_x = pill_x + 5;
+        let next_x = start_x + 10;
 
         let buf = frame.buffer_mut();
         buf.set_string(start_x, y, PREV, muted);
-        buf.set_string(pill_x, y, format!(" {toggle_glyph} "), active);
+        // rounded pill: left cap + filled glyph + right cap (sub-character rounding)
+        buf.set_string(pill_x, y, "\u{e0b6}", cap);
+        buf.set_string(pill_x + 1, y, format!(" {toggle_glyph} "), active);
+        buf.set_string(pill_x + 4, y, "\u{e0b4}", cap);
         buf.set_string(next_x, y, NEXT, muted);
 
         self.prev = Some(Rect::new(start_x, y, 1, 1));
-        self.toggle = Some(Rect::new(pill_x, y, 3, 1));
+        self.toggle = Some(Rect::new(pill_x, y, 5, 1));
         self.next = Some(Rect::new(next_x, y, 1, 1));
         Ok(())
     }
