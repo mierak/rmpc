@@ -4,6 +4,7 @@ use std::{
 };
 
 use album_art::AlbumArtPane;
+use albums_grid::AlbumsGridPane;
 use anyhow::{Context, Result};
 use cava::CavaPane;
 use directories::DirectoriesPane;
@@ -72,6 +73,7 @@ use crate::{
 };
 
 pub mod album_art;
+pub mod albums_grid;
 pub mod cava;
 pub mod directories;
 pub mod empty;
@@ -108,6 +110,7 @@ pub enum Panes<'pane_ref, 'pane> {
     AlbumArt(&'pane_ref mut AlbumArtPane),
     GradientArt(&'pane_ref mut GradientArtPane),
     PlaybackControls(&'pane_ref mut PlaybackControlsPane),
+    AlbumsGrid(&'pane_ref mut AlbumsGridPane),
     Lyrics(&'pane_ref mut LyricsPane),
     ProgressBar(&'pane_ref mut ProgressBarPane),
     Header(&'pane_ref mut HeaderPane),
@@ -140,6 +143,7 @@ pub struct PaneContainer<'panes> {
     pub album_art: AlbumArtPane,
     pub gradient_art: GradientArtPane,
     pub playback_controls: PlaybackControlsPane,
+    pub albums_grid: AlbumsGridPane,
     pub lyrics: LyricsPane,
     pub progress_bar: ProgressBarPane,
     pub header: HeaderPane,
@@ -273,6 +277,7 @@ impl<'panes> PaneContainer<'panes> {
             album_art: AlbumArtPane::new(ctx),
             gradient_art: GradientArtPane::new(),
             playback_controls: PlaybackControlsPane::new(),
+            albums_grid: AlbumsGridPane::new(),
             lyrics: LyricsPane::new(ctx),
             progress_bar: ProgressBarPane::new(),
             header: HeaderPane::new(),
@@ -327,6 +332,7 @@ impl<'panes> PaneContainer<'panes> {
             PaneType::AlbumArt => Ok(Panes::AlbumArt(&mut self.album_art)),
             PaneType::GradientArt => Ok(Panes::GradientArt(&mut self.gradient_art)),
             PaneType::PlaybackControls => Ok(Panes::PlaybackControls(&mut self.playback_controls)),
+            PaneType::AlbumsGrid => Ok(Panes::AlbumsGrid(&mut self.albums_grid)),
             PaneType::Lyrics => Ok(Panes::Lyrics(&mut self.lyrics)),
             PaneType::ProgressBar => Ok(Panes::ProgressBar(&mut self.progress_bar)),
             PaneType::Header => Ok(Panes::Header(&mut self.header)),
@@ -369,6 +375,7 @@ macro_rules! pane_call {
             Panes::AlbumArt(s) => s.$fn($($param),+),
             Panes::GradientArt(s) => s.$fn($($param),+),
             Panes::PlaybackControls(s) => s.$fn($($param),+),
+            Panes::AlbumsGrid(s) => s.$fn($($param),+),
             Panes::Lyrics(s) => s.$fn($($param),+),
             Panes::ProgressBar(s) => s.$fn($($param),+),
             Panes::Header(s) => s.$fn($($param),+),

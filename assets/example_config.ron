@@ -310,7 +310,8 @@
             name: "\u{f00a} Albums",
             borders: "ALL",
             border_symbols: Rounded,
-            pane: Split(size: "100%", direction: Vertical, panes: [(pane: Pane(Albums), size: "100%")]),
+            border_title: [(kind: Text(" Albums "))],
+            pane: Split(size: "100%", direction: Vertical, panes: [(pane: Pane(AlbumsGrid), size: "100%")]),
         ),
         (
             name: "\u{f002} Search",

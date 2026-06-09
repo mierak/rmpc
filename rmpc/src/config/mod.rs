@@ -470,10 +470,7 @@ mod tests {
     };
 
     fn assets() -> PathBuf {
-        PathBuf::from(std::env::var("CARGO_MANIFEST_DIR").unwrap())
-            .parent()
-            .unwrap()
-            .join("assets")
+        PathBuf::from(std::env::var("CARGO_MANIFEST_DIR").unwrap()).parent().unwrap().join("assets")
     }
 
     /// The embedded `example_theme.ron` is the default UI/theme (loaded by
