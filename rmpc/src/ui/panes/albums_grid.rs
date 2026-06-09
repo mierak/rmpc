@@ -7,6 +7,8 @@ use ratatui::{
     buffer::Buffer,
     layout::Rect,
     style::{Color, Modifier, Style},
+    text::{Line, Span},
+    widgets::{Block, BorderType, List, ListItem, ListState},
 };
 use rmpc_mpd::{
     client::Client,
@@ -56,6 +58,13 @@ struct AlbumEntry {
     year: Option<String>,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+enum AlbumsView {
+    #[default]
+    Grid,
+    List,
+}
+
 /// A responsive grid of generative album covers — the design's Albums screen.
 ///
 /// Each album gets a procedural cover painted with [`paint_cover`] (sub-cell
@@ -79,6 +88,7 @@ pub struct AlbumsGridPane {
     has_cover: bool,
     shown_album: Option<String>,
     initialized: bool,
+    view: AlbumsView,
 }
 
 impl AlbumsGridPane {
@@ -104,6 +114,7 @@ impl AlbumsGridPane {
             has_cover: false,
             shown_album: None,
             initialized: false,
+            view: AlbumsView::default(),
         }
     }
 
@@ -279,12 +290,64 @@ impl AlbumsGridPane {
             },
         );
     }
+
+    fn render_list(&mut self, frame: &mut Frame, area: Rect, ctx: &Ctx) {
+        let theme = &ctx.config.theme;
+        let accent = theme.highlight_border_style.fg.unwrap_or(Color::Cyan);
+        let muted = theme.preview_label_style.fg.unwrap_or(Color::Gray);
+        let text = theme.text_color.unwrap_or(Color::White);
+        let block = Block::bordered()
+            .border_type(BorderType::Rounded)
+            .border_style(ctx.config.as_focused_border_style())
+            .title("\u{f001} Albums")
+            .title_style(Style::default().fg(accent).add_modifier(Modifier::BOLD));
+        let inner = block.inner(area);
+        frame.render_widget(block, area);
+        let items: Vec<ListItem> = self
+            .albums
+            .iter()
+            .enumerate()
+            .map(|(i, e)| {
+                let selected = i == self.selected;
+                let mut spans = vec![
+                    if selected {
+                        Span::styled("\u{258e} ", Style::default().fg(accent))
+                    } else {
+                        Span::raw("  ")
+                    },
+                    Span::styled(
+                        e.name.clone(),
+                        Style::default().fg(text).add_modifier(if selected {
+                            Modifier::BOLD
+                        } else {
+                            Modifier::empty()
+                        }),
+                    ),
+                ];
+                if let Some(a) = &e.artist {
+                    spans.push(Span::styled(format!("   {a}"), Style::default().fg(muted)));
+                }
+                if let Some(y) = &e.year {
+                    spans.push(Span::styled(format!("  ({y})"), Style::default().fg(muted)));
+                }
+                let item = ListItem::new(Line::from(spans));
+                if selected { item.style(theme.current_item_style) } else { item }
+            })
+            .collect();
+        let mut state = ListState::default();
+        state.select(Some(self.selected));
+        frame.render_stateful_widget(List::new(items), inner, &mut state);
+    }
 }
 
 impl Pane for AlbumsGridPane {
     fn render(&mut self, frame: &mut Frame, area: Rect, ctx: &Ctx) -> Result<()> {
         self.area = area;
         if area.width < 6 || area.height < 4 {
+            return Ok(());
+        }
+        if self.view == AlbumsView::List {
+            self.render_list(frame, area, ctx);
             return Ok(());
         }
         let theme = &ctx.config.theme;
@@ -572,6 +635,10 @@ impl Pane for AlbumsGridPane {
             CommonAction::ContextMenu => {
                 self.open_context_menu(ctx);
                 return Ok(());
+            }
+            CommonAction::Select => {
+                self.view =
+                    if self.view == AlbumsView::Grid { AlbumsView::List } else { AlbumsView::Grid };
             }
             _ => return Ok(()),
         }
