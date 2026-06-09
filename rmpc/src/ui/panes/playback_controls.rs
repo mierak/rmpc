@@ -69,9 +69,9 @@ impl Pane for PlaybackControlsPane {
         if mid_y >= 1 {
             let top_y = mid_y - 1;
             let bot_y = mid_y + 1;
-            buf.set_string(circle_x, top_y, "\u{2597}\u{2584}\u{2584}\u{2584}\u{2596}", cap);
+            buf.set_string(circle_x, top_y, "\u{259f}\u{2588}\u{2588}\u{2588}\u{2599}", cap);
             buf.set_string(circle_x, mid_y, format!("  {toggle_glyph}  "), active);
-            buf.set_string(circle_x, bot_y, "\u{259d}\u{2580}\u{2580}\u{2580}\u{2598}", cap);
+            buf.set_string(circle_x, bot_y, "\u{259c}\u{2588}\u{2588}\u{2588}\u{259b}", cap);
             self.toggle = Some(Rect::new(circle_x, top_y, 5, 3));
         } else {
             buf.set_string(circle_x, mid_y, format!("  {toggle_glyph}  "), active);

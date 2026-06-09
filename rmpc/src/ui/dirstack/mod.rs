@@ -173,7 +173,7 @@ impl DirStackItem for DirOrSong {
                     0,
                     if is_current {
                         Span::styled(
-                            "\u{258f}",
+                            "\u{258e}",
                             Style::default().fg(config
                                 .theme
                                 .highlight_border_style
@@ -278,7 +278,7 @@ impl DirStackItem for Song {
             0,
             if is_current {
                 Span::styled(
-                    "\u{258f}",
+                    "\u{258e}",
                     Style::default().fg(config
                         .theme
                         .highlight_border_style
