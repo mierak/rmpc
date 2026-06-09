@@ -164,6 +164,9 @@ impl Pane for DirectoriesPane {
                 self.initialized = false;
                 self.before_show(ctx)?;
             }
+            UiEvent::ImageEncoded { data } if is_visible => {
+                self.album_art.display(std::mem::take(data), ctx)?;
+            }
             UiEvent::Displayed if is_visible && self.crisp && self.has_cover => {
                 self.album_art.show_current(ctx)?;
             }
