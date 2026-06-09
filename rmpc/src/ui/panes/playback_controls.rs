@@ -2,7 +2,7 @@ use anyhow::Result;
 use ratatui::{
     Frame,
     layout::Rect,
-    style::{Color, Modifier, Style},
+    style::{Color, Style},
 };
 use rmpc_mpd::{commands::State, mpd_client::MpdClient};
 
@@ -38,9 +38,9 @@ impl PlaybackControlsPane {
 // glyph constants (Nerd Font / media controls)
 const PREV: &str = "\u{f048}"; // step-backward
 const NEXT: &str = "\u{f051}"; // step-forward
-const PLAY: &str = "\u{f144}"; // play-circle
-const PAUSE: &str = "\u{f28b}"; // pause-circle
-const CLUSTER_W: u16 = 7; // prev(1) gap(2) circle(1) gap(2) next(1)
+const PLAY: &str = "\u{f04b}"; // play
+const PAUSE: &str = "\u{f04c}"; // pause
+const CLUSTER_W: u16 = 11; // prev(1) gap(2) circle(5) gap(2) next(1)
 
 impl Pane for PlaybackControlsPane {
     fn render(&mut self, frame: &mut Frame, area: Rect, ctx: &Ctx) -> Result<()> {
@@ -53,21 +53,33 @@ impl Pane for PlaybackControlsPane {
         }
         let toggle_glyph = if ctx.status.state == State::Play { PAUSE } else { PLAY };
         let muted: Style = ctx.config.theme.tab_bar.inactive_style;
-        let accent = ctx.config.theme.tab_bar.active_style.bg.unwrap_or(Color::Cyan);
-        let toggle_style = Style::default().fg(accent).add_modifier(Modifier::BOLD);
+        let active: Style = ctx.config.theme.tab_bar.active_style;
+        let accent = active.bg.unwrap_or(Color::Cyan);
+        let surround = ctx.config.theme.background_color.unwrap_or_default();
+        let cap = Style::default().fg(accent).bg(surround);
         let start_x = area.x + (area.width - CLUSTER_W) / 2;
-        let y = area.y + area.height / 2;
+        let mid_y = area.y + area.height / 2;
         let circle_x = start_x + 3;
-        let next_x = start_x + 6;
-        // Circular play/pause (a single circled glyph) in bold accent — the focal
-        // control beside the muted prev/next step glyphs.
+        let next_x = start_x + 10;
+        // Big circular play/pause: a filled accent disc spanning the full box
+        // height (its rounded top/bottom reach the box borders — children render
+        // after the split border, so it pops out), clearly larger than prev/next.
         let buf = frame.buffer_mut();
-        buf.set_string(start_x, y, PREV, muted);
-        buf.set_string(circle_x, y, toggle_glyph, toggle_style);
-        buf.set_string(next_x, y, NEXT, muted);
-        self.prev = Some(Rect::new(start_x, y, 1, 1));
-        self.toggle = Some(Rect::new(circle_x, y, 1, 1));
-        self.next = Some(Rect::new(next_x, y, 1, 1));
+        buf.set_string(start_x, mid_y, PREV, muted);
+        if mid_y >= 1 {
+            let top_y = mid_y - 1;
+            let bot_y = mid_y + 1;
+            buf.set_string(circle_x, top_y, "\u{2597}\u{2584}\u{2584}\u{2584}\u{2596}", cap);
+            buf.set_string(circle_x, mid_y, format!("  {toggle_glyph}  "), active);
+            buf.set_string(circle_x, bot_y, "\u{259d}\u{2580}\u{2580}\u{2580}\u{2598}", cap);
+            self.toggle = Some(Rect::new(circle_x, top_y, 5, 3));
+        } else {
+            buf.set_string(circle_x, mid_y, format!("  {toggle_glyph}  "), active);
+            self.toggle = Some(Rect::new(circle_x, mid_y, 5, 1));
+        }
+        buf.set_string(next_x, mid_y, NEXT, muted);
+        self.prev = Some(Rect::new(start_x, mid_y, 1, 1));
+        self.next = Some(Rect::new(next_x, mid_y, 1, 1));
         Ok(())
     }
 
