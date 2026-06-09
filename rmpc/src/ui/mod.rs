@@ -994,6 +994,7 @@ impl<'ui> Ui<'ui> {
                 Panes::AlbumArtists(p) => p.on_event(&mut event, visible, ctx),
                 Panes::AlbumArt(p) => p.on_event(&mut event, visible, ctx),
                 Panes::GradientArt(p) => p.on_event(&mut event, visible, ctx),
+                Panes::PlaybackControls(p) => p.on_event(&mut event, visible, ctx),
                 Panes::Lyrics(p) => p.on_event(&mut event, visible, ctx),
                 Panes::ProgressBar(p) => p.on_event(&mut event, visible, ctx),
                 Panes::Header(p) => p.on_event(&mut event, visible, ctx),
@@ -1043,6 +1044,7 @@ impl<'ui> Ui<'ui> {
                     Panes::AlbumArtists(p) => p.on_query_finished(id, data, visible, ctx),
                     Panes::AlbumArt(p) => p.on_query_finished(id, data, visible, ctx),
                     Panes::GradientArt(p) => p.on_query_finished(id, data, visible, ctx),
+                    Panes::PlaybackControls(p) => p.on_query_finished(id, data, visible, ctx),
                     Panes::Lyrics(p) => p.on_query_finished(id, data, visible, ctx),
                     Panes::ProgressBar(p) => p.on_query_finished(id, data, visible, ctx),
                     Panes::Header(p) => p.on_query_finished(id, data, visible, ctx),
@@ -1101,9 +1103,11 @@ impl<'ui> Ui<'ui> {
 #[derive(Debug)]
 pub struct ModalWrapper(pub Box<dyn Modal>);
 
-// SAFETY: see the type-level docs — modals never leave the main event-loop thread.
+// SAFETY: see the type-level docs — modals never leave the main event-loop
+// thread.
 unsafe impl Send for ModalWrapper {}
-// SAFETY: see the type-level docs — modals never leave the main event-loop thread.
+// SAFETY: see the type-level docs — modals never leave the main event-loop
+// thread.
 unsafe impl Sync for ModalWrapper {}
 
 #[derive(Debug)]

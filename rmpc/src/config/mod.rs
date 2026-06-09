@@ -505,10 +505,9 @@ mod tests {
             let path = base.join(name);
             let raw = std::fs::read_to_string(&path)
                 .unwrap_or_else(|e| panic!("failed to read {name}: {e}"));
-            let file: UiConfigFile = ron::de::from_str(&raw)
-                .unwrap_or_else(|e| panic!("failed to parse {name}: {e}"));
-            UiConfig::try_from(file)
-                .unwrap_or_else(|e| panic!("failed to convert {name}: {e}"));
+            let file: UiConfigFile =
+                ron::de::from_str(&raw).unwrap_or_else(|e| panic!("failed to parse {name}: {e}"));
+            UiConfig::try_from(file).unwrap_or_else(|e| panic!("failed to convert {name}: {e}"));
         }
     }
 

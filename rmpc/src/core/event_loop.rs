@@ -468,9 +468,10 @@ fn main_task<B: Backend + std::io::Write>(
                                 })
                                 .build();
 
-                            if let Err(err) =
-                                ui.on_ui_app_event(UiAppEvent::Modal(crate::ui::ModalWrapper(Box::new(modal))), &mut ctx)
-                            {
+                            if let Err(err) = ui.on_ui_app_event(
+                                UiAppEvent::Modal(crate::ui::ModalWrapper(Box::new(modal))),
+                                &mut ctx,
+                            ) {
                                 log::error!(error:? = err; "UI failed to handle modal event");
                             }
                         }

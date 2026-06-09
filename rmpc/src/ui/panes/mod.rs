@@ -12,6 +12,7 @@ use gradient_art::GradientArtPane;
 use header::HeaderPane;
 use itertools::Itertools;
 use lyrics::LyricsPane;
+use playback_controls::PlaybackControlsPane;
 use playlists::PlaylistsPane;
 use progress_bar::ProgressBarPane;
 use property::PropertyPane;
@@ -74,13 +75,14 @@ pub mod album_art;
 pub mod cava;
 pub mod directories;
 pub mod empty;
-pub mod gradient_art;
 #[cfg(debug_assertions)]
 pub mod frame_count;
+pub mod gradient_art;
 pub mod header;
 #[cfg(debug_assertions)]
 pub mod logs;
 pub mod lyrics;
+pub mod playback_controls;
 pub mod playlists;
 pub mod progress_bar;
 pub mod property;
@@ -105,6 +107,7 @@ pub enum Panes<'pane_ref, 'pane> {
     Search(&'pane_ref mut SearchPane),
     AlbumArt(&'pane_ref mut AlbumArtPane),
     GradientArt(&'pane_ref mut GradientArtPane),
+    PlaybackControls(&'pane_ref mut PlaybackControlsPane),
     Lyrics(&'pane_ref mut LyricsPane),
     ProgressBar(&'pane_ref mut ProgressBarPane),
     Header(&'pane_ref mut HeaderPane),
@@ -136,6 +139,7 @@ pub struct PaneContainer<'panes> {
     pub search: SearchPane,
     pub album_art: AlbumArtPane,
     pub gradient_art: GradientArtPane,
+    pub playback_controls: PlaybackControlsPane,
     pub lyrics: LyricsPane,
     pub progress_bar: ProgressBarPane,
     pub header: HeaderPane,
@@ -268,6 +272,7 @@ impl<'panes> PaneContainer<'panes> {
             search: SearchPane::new(ctx),
             album_art: AlbumArtPane::new(ctx),
             gradient_art: GradientArtPane::new(),
+            playback_controls: PlaybackControlsPane::new(),
             lyrics: LyricsPane::new(ctx),
             progress_bar: ProgressBarPane::new(),
             header: HeaderPane::new(),
@@ -321,6 +326,7 @@ impl<'panes> PaneContainer<'panes> {
             PaneType::Search => Ok(Panes::Search(&mut self.search)),
             PaneType::AlbumArt => Ok(Panes::AlbumArt(&mut self.album_art)),
             PaneType::GradientArt => Ok(Panes::GradientArt(&mut self.gradient_art)),
+            PaneType::PlaybackControls => Ok(Panes::PlaybackControls(&mut self.playback_controls)),
             PaneType::Lyrics => Ok(Panes::Lyrics(&mut self.lyrics)),
             PaneType::ProgressBar => Ok(Panes::ProgressBar(&mut self.progress_bar)),
             PaneType::Header => Ok(Panes::Header(&mut self.header)),
@@ -362,6 +368,7 @@ macro_rules! pane_call {
             Panes::Search(s) => s.$fn($($param),+),
             Panes::AlbumArt(s) => s.$fn($($param),+),
             Panes::GradientArt(s) => s.$fn($($param),+),
+            Panes::PlaybackControls(s) => s.$fn($($param),+),
             Panes::Lyrics(s) => s.$fn($($param),+),
             Panes::ProgressBar(s) => s.$fn($($param),+),
             Panes::Header(s) => s.$fn($($param),+),
