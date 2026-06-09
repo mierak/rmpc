@@ -4,10 +4,10 @@ use anyhow::Result;
 use enum_map::EnumMap;
 use itertools::Itertools;
 use ratatui::{
-    layout::{Constraint, Layout, Rect},
+    layout::{Alignment, Constraint, Layout, Rect},
     style::{Color, Modifier, Style},
     text::Span,
-    widgets::{Block, BorderType, Borders, List, ListItem, ListState, Padding},
+    widgets::{Block, BorderType, List, ListState, Padding},
 };
 use rmpc_mpd::{
     client::Client,
@@ -67,7 +67,6 @@ use crate::{
             select_modal::SelectModal,
         },
         panes::search::inputs::{ActionResult, InputGroups, InputType, SearchTag, TextboxInput},
-        song_ext::SongExt as _,
         widgets::browser::BrowserArea,
     },
 };
@@ -1094,133 +1093,110 @@ impl Pane for SearchPane {
         area: ratatui::prelude::Rect,
         ctx: &Ctx,
     ) -> anyhow::Result<()> {
-        let widths = &ctx.config.theme.column_widths;
-        let [previous_area, current_area_init, preview_area] = *Layout::horizontal([
-            Constraint::Percentage(widths[0]),
-            Constraint::Percentage(widths[1]),
-            Constraint::Percentage(widths[2]),
-        ])
-        .split(area) else {
+        if area.width < 20 || area.height < 6 {
+            return Ok(());
+        }
+        let accent = ctx.config.theme.highlight_border_style.fg.unwrap_or(Color::Cyan);
+        let text_muted = ctx.config.theme.borders_style.fg.unwrap_or(Color::Gray);
+        let [search_section, results_area] =
+            *Layout::vertical([Constraint::Length(3), Constraint::Fill(1)]).split(area)
+        else {
             return Ok(());
         };
-
-        frame.render_widget(
-            Block::default().borders(Borders::RIGHT).border_style(ctx.config.theme.borders_style),
-            previous_area,
-        );
-        frame.render_widget(
-            Block::default().borders(Borders::RIGHT).border_style(ctx.config.theme.borders_style),
-            current_area_init,
-        );
-        let previous_area = Rect {
-            x: previous_area.x,
-            y: previous_area.y,
-            width: previous_area.width.saturating_sub(1),
-            height: previous_area.height,
+        let [input_row, chip_row, _pad] = *Layout::vertical([
+            Constraint::Length(1),
+            Constraint::Length(1),
+            Constraint::Length(1),
+        ])
+        .split(search_section) else {
+            return Ok(());
         };
-        let current_area = Rect {
-            x: current_area_init.x,
-            y: current_area_init.y,
-            width: current_area_init.width.saturating_sub(1),
-            height: current_area_init.height,
+        // Search icon
+        let icon =
+            Span::styled("\u{f002}  ", Style::default().fg(accent).add_modifier(Modifier::BOLD));
+        frame.render_widget(icon, input_row);
+        // Inputs area (next to icon) — the actual search text fields
+        let input_rect = Rect {
+            x: input_row.x + 4,
+            y: input_row.y,
+            width: input_row.width.saturating_sub(4),
+            height: 1,
         };
-
+        self.inputs.render(input_rect, frame.buffer_mut(), ctx);
+        // Match count (right side of search bar)
+        let count = format!("{} matches", self.songs_dir.items.len());
+        if input_row.width > count.len() as u16 + 4 {
+            let count_x = input_row.x + input_row.width.saturating_sub(count.len() as u16 + 1);
+            frame.buffer_mut().set_string(
+                count_x,
+                input_row.y,
+                &count,
+                Style::default().fg(text_muted),
+            );
+        }
+        // --- Filter chips row ---
+        let chips = [
+            (SearchTag::Title, "Title"),
+            (SearchTag::Artist, "Artist"),
+            (SearchTag::Album, "Album"),
+            (SearchTag::Any, "Any"),
+        ];
+        let chip_layout = Layout::horizontal([Constraint::Fill(1); 4]).split(chip_row);
+        let areas: &[Rect; 4] =
+            chip_layout.as_ref().try_into().expect("chip_layout should have 4 rects");
+        self.chip_areas = *areas;
+        let sel_fg = ctx.config.as_text_style().fg.unwrap_or(Color::White);
+        for (i, (tag, label)) in chips.iter().enumerate() {
+            let chip_rect = Rect {
+                x: chip_layout[i].x + 1,
+                y: chip_layout[i].y,
+                width: chip_layout[i].width.saturating_sub(2),
+                height: 1,
+            };
+            let is_active = self.search_tag == *tag;
+            let style = if is_active {
+                Style::default().fg(sel_fg).bg(accent).add_modifier(Modifier::BOLD)
+            } else {
+                Style::default().fg(accent)
+            };
+            let chip_block =
+                Block::bordered().border_type(BorderType::Rounded).border_style(style).style(style);
+            frame.render_widget(chip_block, chip_layout[i]);
+            frame.render_widget(Span::styled(*label, style), chip_rect);
+        }
         match self.phase {
             Phase::Search => {
-                let accent = ctx.config.theme.highlight_border_style.fg.unwrap_or(Color::Cyan);
-
-                // Split off a chip row below the search inputs
-                let areas = Layout::vertical([Constraint::Fill(1), Constraint::Length(1)])
-                    .split(current_area);
-                let search_area = areas[0];
-                let chip_area = areas[1];
-
-                // Wrap search inputs in an accent border
-                let search_block = Block::default()
-                    .borders(Borders::LEFT)
-                    .border_style(Style::default().fg(accent))
-                    .border_type(BorderType::Thick);
-                let inner_search = search_block.inner(search_area);
-                frame.render_widget(search_block, search_area);
-
-                self.column_areas[BrowserArea::Current] = current_area;
-                self.inputs.render(inner_search, frame.buffer_mut(), ctx);
-
-                // Render filter chips
-                let chips = [
-                    ("Title", SearchTag::Title),
-                    ("Artist", SearchTag::Artist),
-                    ("Album", SearchTag::Album),
-                    ("Any", SearchTag::Any),
-                ];
-                let chip_layout = Layout::horizontal([Constraint::Fill(1); 4]).split(chip_area);
-                let areas: &[Rect; 4] =
-                    chip_layout.as_ref().try_into().expect("chip_layout should have 4 rects");
-                self.chip_areas = *areas;
-                let sel_fg = ctx.config.as_text_style().fg.unwrap_or(Color::White);
-                for (i, (label, tag)) in chips.iter().enumerate() {
-                    let is_active = self.search_tag == *tag;
-                    let style = if is_active {
-                        Style::default().fg(sel_fg).bg(accent).add_modifier(Modifier::BOLD)
-                    } else {
-                        Style::default().fg(accent)
-                    };
-                    let chip_block = Block::bordered()
-                        .border_type(BorderType::Rounded)
-                        .border_style(style)
-                        .style(style);
-                    frame.render_widget(chip_block, chip_layout[i]);
-                    let label_span = Span::styled(*label, style);
-                    // Center the label in the chip area
-                    let label_area = Rect {
-                        x: chip_layout[i].x + 1,
-                        y: chip_layout[i].y,
-                        width: chip_layout[i].width.saturating_sub(2),
-                        height: chip_layout[i].height,
-                    };
-                    frame.render_widget(label_span, label_area);
-                }
-
-                // Render only the part of the preview that is actually supposed to be shown
+                // --- Results panel ---
+                let results_block = Block::bordered()
+                    .border_type(BorderType::Rounded)
+                    .border_style(ctx.config.theme.borders_style)
+                    .title("\u{f002}  Results")
+                    .title_alignment(Alignment::Left)
+                    .title_style(Style::default().fg(accent).add_modifier(Modifier::BOLD));
+                let inner = results_block.inner(results_area);
+                frame.render_widget(results_block, results_area);
                 let offset = self.songs_dir.state.offset();
                 let items = self.songs_dir.to_list_items_range(
-                    offset..offset + previous_area.height as usize,
+                    offset..offset + inner.height as usize,
                     ctx.config.theme.browser_song_format.0.as_slice(),
                     ctx,
                 );
-                let preview = List::new(items).style(ctx.config.as_text_style());
-                frame.render_widget(preview, preview_area);
+                let preview = List::new(items)
+                    .style(ctx.config.as_text_style())
+                    .highlight_style(ctx.config.theme.current_item_style);
+                frame.render_stateful_widget(
+                    preview,
+                    inner,
+                    self.songs_dir.state.as_render_state_ref(),
+                );
             }
             Phase::BrowseResults => {
-                self.render_song_column(frame, current_area, ctx);
-                self.inputs.render(previous_area, frame.buffer_mut(), ctx);
-                if let Some(song) = self.songs_dir.selected() {
-                    let preview = song.to_preview(
-                        ctx.config.theme.preview_label_style,
-                        ctx.config.theme.preview_metadata_group_style,
-                        ctx,
-                    );
-                    let mut result = Vec::new();
-                    for group in preview {
-                        if let Some(name) = group.name {
-                            let mut item = ListItem::new(name);
-                            if let Some(style) = group.header_style {
-                                item = item.style(style);
-                            }
-                            result.push(item);
-                        }
-                        result.extend(group.items.clone());
-                        result.push(ListItem::new(Span::raw("")));
-                    }
-                    let preview = List::new(result).style(ctx.config.as_text_style());
-                    frame.render_widget(preview, preview_area);
-                }
+                // Single-column detail view
+                self.render_song_column(frame, results_area, ctx);
             }
         }
-
-        self.column_areas[BrowserArea::Previous] = previous_area;
-        self.column_areas[BrowserArea::Preview] = preview_area;
-
+        self.column_areas[BrowserArea::Current] = search_section;
+        self.column_areas[BrowserArea::Preview] = results_area;
         Ok(())
     }
 
