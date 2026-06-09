@@ -17,6 +17,7 @@ pub enum BrowserArea {
     Current = 1,
     Preview = 2,
     Scrollbar = 3,
+    Cover = 4,
 }
 
 #[derive(Debug)]
@@ -28,6 +29,9 @@ pub struct Browser<T: std::fmt::Debug + DirStackItem + Clone + Send> {
     /// Per-pane override of `theme.column_widths` (e.g. Playlists uses a hidden
     /// parent column + narrow list + wide song preview).
     pub widths: Option<[u16; 3]>,
+    /// When true, the preview column reserves a `Cover` rect for an image
+    /// facade.
+    pub preview_cover: bool,
 }
 impl<T: std::fmt::Debug + DirStackItem + Clone + Send> Browser<T> {
     pub fn new() -> Self {
@@ -37,6 +41,7 @@ impl<T: std::fmt::Debug + DirStackItem + Clone + Send> Browser<T> {
             song_format: None,
             column_titles: None,
             widths: None,
+            preview_cover: false,
         }
     }
 
@@ -92,6 +97,7 @@ where
         };
         // ---- Preview column ----
         self.areas[BrowserArea::Preview] = preview_area;
+        self.areas[BrowserArea::Cover] = Rect::default();
         if cw[2] > 0 {
             let pblock = {
                 let mut b =
@@ -133,6 +139,7 @@ where
                 .map(|s| prop(s, SongProperty::Title))
                 .unwrap_or_default();
             let mut result: Vec<ListItem> = Vec::new();
+            let mut has_song_preview = false;
             match sel_is_file {
                 Some(true) => {
                     if let Some(sel) = state.current().selected() {
@@ -161,6 +168,7 @@ where
                             result.extend(group.items);
                         }
                     }
+                    has_song_preview = true;
                 }
                 Some(false) => {
                     let is_songs = state
@@ -219,6 +227,7 @@ where
                                 Span::styled(dur, Style::default().fg(faint)),
                             ])));
                         }
+                        has_song_preview = true;
                     } else {
                         let items: Vec<ListItem> = state.next_dir_items().map_or(Vec::new(), |p| {
                             p.iter()
@@ -235,8 +244,25 @@ where
                 }
                 None => {}
             }
+            let render_area = if self.preview_cover && has_song_preview {
+                let cover = Rect {
+                    x: inner.x,
+                    y: inner.y,
+                    width: 14.min(inner.width),
+                    height: 7.min(inner.height),
+                };
+                self.areas[BrowserArea::Cover] = cover;
+                Rect {
+                    x: inner.x,
+                    y: inner.y + cover.height,
+                    width: inner.width,
+                    height: inner.height.saturating_sub(cover.height),
+                }
+            } else {
+                inner
+            };
             let preview = List::new(result).style(config.as_text_style());
-            ratatui::widgets::Widget::render(preview, inner, buf);
+            ratatui::widgets::Widget::render(preview, render_area, buf);
         }
         // ---- Previous (parent) column ----
         self.areas[BrowserArea::Previous] = Rect::default();
