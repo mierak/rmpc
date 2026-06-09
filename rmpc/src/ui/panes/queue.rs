@@ -7,7 +7,7 @@ use ratatui::{
     Frame,
     layout::Flex,
     prelude::{Constraint, Layout, Rect},
-    style::Style,
+    style::{Color, Style},
     text::{Line, Span},
     widgets::{Block, Row, TableState},
 };
@@ -425,6 +425,9 @@ impl Pane for QueuePane {
                 }
                 if is_under_cursor && self.highlight_enabled {
                     row.cursor_style = Some(config.theme.current_item_style);
+                }
+                if idx % 2 == 1 {
+                    row.zebra_bg = Some(Color::Rgb(0x1c, 0x21, 0x2a));
                 }
                 let sep = ctx.config.theme.song_table_album_separator;
                 if new_album_indices.contains(&idx)
@@ -1382,10 +1385,14 @@ struct QueueRow {
     cell_style: Option<Style>,
     cursor_style: Option<Style>,
     underlined: bool,
+    zebra_bg: Option<Color>,
 }
 impl QueueRow {
     fn into_row<'a>(self, cells: impl Iterator<Item = Line<'a>>) -> Row<'a> {
         let mut row_style = Style::default();
+        if let Some(bg) = self.zebra_bg {
+            row_style = row_style.bg(bg);
+        }
         if let Some(style) = self.cell_style {
             row_style = row_style.patch(style);
         }
