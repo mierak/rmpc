@@ -25,6 +25,9 @@ pub struct Browser<T: std::fmt::Debug + DirStackItem + Clone + Send> {
     pub areas: EnumMap<BrowserArea, Rect>,
     pub song_format: Option<Vec<Property<SongProperty>>>,
     pub column_titles: Option<[String; 3]>,
+    /// Per-pane override of `theme.column_widths` (e.g. Playlists uses a hidden
+    /// parent column + narrow list + wide song preview).
+    pub widths: Option<[u16; 3]>,
 }
 impl<T: std::fmt::Debug + DirStackItem + Clone + Send> Browser<T> {
     pub fn new() -> Self {
@@ -33,6 +36,7 @@ impl<T: std::fmt::Debug + DirStackItem + Clone + Send> Browser<T> {
             areas: EnumMap::default(),
             song_format: None,
             column_titles: None,
+            widths: None,
         }
     }
 
@@ -42,6 +46,11 @@ impl<T: std::fmt::Debug + DirStackItem + Clone + Send> Browser<T> {
     }
 }
 const MIDDLE_COLUMN_SYMBOLS: symbols::border::Set = symbols::border::Set {
+    top_right: symbols::line::NORMAL.horizontal_down,
+    bottom_right: symbols::line::NORMAL.horizontal_up,
+    ..symbols::border::PLAIN
+};
+const LEFT_COLUMN_SYMBOLS: symbols::border::Set = symbols::border::Set {
     top_right: symbols::line::NORMAL.horizontal_down,
     bottom_right: symbols::line::NORMAL.horizontal_up,
     ..symbols::border::PLAIN
@@ -72,47 +81,49 @@ where
         };
         let column_right_padding: u16 = config.theme.scrollbar.is_some().into();
 
-        let current = state.current().to_list_items(song_format, ctx);
-
-        let w_left = config.theme.column_widths[0].saturating_add(config.theme.column_widths[1]);
-        let w_right = config.theme.column_widths[2];
-        let [mut left_area, mut right_area] =
-            *Layout::horizontal([Constraint::Percentage(w_left), Constraint::Percentage(w_right)])
-                .split(area)
-        else {
+        let current_items = state.current().to_list_items(song_format, ctx);
+        let cw = self.widths.unwrap_or(config.theme.column_widths);
+        let [mut previous_area, mut current_area, mut preview_area] = *Layout::horizontal([
+            Constraint::Percentage(cw[0]),
+            Constraint::Percentage(cw[1]),
+            Constraint::Percentage(cw[2]),
+        ])
+        .split(area) else {
             return;
         };
-
-        // No parent column in focus-left layout
-        self.areas[BrowserArea::Previous] = Rect::default();
-
-        // Render column titles if configured
-        if let Some([t0, _t1, t2]) = &self.column_titles {
+        // Column titles
+        if let Some([t0, t1, t2]) = &self.column_titles {
             let accent = config.theme.highlight_border_style.fg.unwrap_or(Color::Cyan);
             let title_style = Style::default().fg(accent).add_modifier(Modifier::BOLD);
             if area.height > 0 {
-                if w_left > 0 {
+                if cw[0] > 0 {
                     Line::styled(t0.as_str(), title_style)
-                        .render(Rect { height: 1, ..left_area }, buf);
-                    left_area.y += 1;
-                    left_area.height = left_area.height.saturating_sub(1);
+                        .render(Rect { height: 1, ..previous_area }, buf);
+                    previous_area.y += 1;
+                    previous_area.height = previous_area.height.saturating_sub(1);
                 }
-                if w_right > 0 {
+                if cw[1] > 0 {
+                    Line::styled(t1.as_str(), title_style)
+                        .render(Rect { height: 1, ..current_area }, buf);
+                    current_area.y += 1;
+                    current_area.height = current_area.height.saturating_sub(1);
+                }
+                if cw[2] > 0 {
                     Line::styled(t2.as_str(), title_style)
-                        .render(Rect { height: 1, ..right_area }, buf);
-                    right_area.y += 1;
-                    right_area.height = right_area.height.saturating_sub(1);
+                        .render(Rect { height: 1, ..preview_area }, buf);
+                    preview_area.y += 1;
+                    preview_area.height = preview_area.height.saturating_sub(1);
                 }
             }
         }
-
-        self.areas[BrowserArea::Preview] = right_area;
-        if w_right > 0 {
+        // ---- Preview column ----
+        self.areas[BrowserArea::Preview] = preview_area;
+        if cw[2] > 0 {
             let accent = config.theme.highlight_border_style.fg.unwrap_or(Color::Cyan);
             let warm = config.theme.highlighted_item_style.fg.unwrap_or(accent);
             let faint = config.theme.preview_label_style.fg.unwrap_or(Color::Gray);
             let rule = config.theme.borders_style.fg.unwrap_or(Color::DarkGray);
-            let pw = right_area.width as usize;
+            let pw = preview_area.width as usize;
             let prop = |item: &T, sp: SongProperty| {
                 item.format(
                     &[Property {
@@ -131,9 +142,13 @@ where
                 )))
             };
             let sel_is_file = state.current().selected().map(DirStackItem::is_file);
+            let sel_name = state
+                .current()
+                .selected()
+                .map(|s| prop(s, SongProperty::Title))
+                .unwrap_or_default();
             let mut result: Vec<ListItem> = Vec::new();
             match sel_is_file {
-                // A song is selected: show its metadata, framed by a title/artist header.
                 Some(true) => {
                     if let Some(sel) = state.current().selected() {
                         let album = prop(sel, SongProperty::Album);
@@ -162,8 +177,6 @@ where
                         }
                     }
                 }
-                // A directory is selected: if its contents are songs, render an
-                // album-style preview (header + track list); otherwise list contents.
                 Some(false) => {
                     let is_songs = state
                         .next_dir_items()
@@ -172,12 +185,11 @@ where
                         let children: &[T] = state.next_dir_items().map_or(&[], Vec::as_slice);
                         let count = children.len();
                         let first = &children[0];
-                        let album = prop(first, SongProperty::Album);
                         let artist = prop(first, SongProperty::Artist);
                         let genre = prop(first, SongProperty::Other("genre".to_string()));
                         let year = prop(first, SongProperty::Other("date".to_string()));
                         result.push(ListItem::new(Line::from(Span::styled(
-                            if album.is_empty() { "Preview".to_string() } else { album },
+                            if sel_name.is_empty() { "Preview".to_string() } else { sel_name },
                             Style::default().fg(accent).add_modifier(Modifier::BOLD),
                         ))));
                         if !artist.is_empty() {
@@ -199,7 +211,7 @@ where
                             Style::default().fg(faint),
                         ))));
                         result.push(sep());
-                        let rows = (right_area.height as usize).saturating_sub(result.len());
+                        let rows = (preview_area.height as usize).saturating_sub(result.len());
                         for song in children.iter().take(rows) {
                             let track = prop(song, SongProperty::Track);
                             let title_raw = prop(song, SongProperty::Title);
@@ -225,29 +237,70 @@ where
                     } else {
                         let items: Vec<ListItem> = state.next_dir_items().map_or(Vec::new(), |p| {
                             p.iter()
-                                .take(right_area.height as usize)
+                                .take(preview_area.height as usize)
                                 .map(|item| item.to_list_item_simple(ctx))
                                 .collect_vec()
                         });
                         let len = items.len();
                         result = items;
                         if let Some(next) = state.next_mut() {
-                            next.state.set_content_and_viewport_len(len, right_area.height.into());
+                            next.state
+                                .set_content_and_viewport_len(len, preview_area.height.into());
                         }
                     }
                 }
                 None => {}
             }
             let preview = List::new(result).style(config.as_text_style());
-            ratatui::widgets::Widget::render(preview, right_area, buf);
+            ratatui::widgets::Widget::render(preview, preview_area, buf);
         }
-
-        if w_left > 0 {
-            let title = state.current().filter_text(left_area.width.saturating_sub(2), ctx);
-
+        // ---- Previous (parent) column ----
+        self.areas[BrowserArea::Previous] = Rect::default();
+        if cw[0] > 0
+            && let Some(previous) = state.previous_mut()
+        {
+            let items = previous.to_list_items(song_format, ctx);
+            let title = previous.filter_text(previous_area.width, ctx);
+            let prev_state = &mut previous.state;
+            prev_state.set_content_and_viewport_len(items.len(), previous_area.height.into());
+            let previous = List::new(items).style(config.as_text_style());
+            let mut block = if config.theme.draw_borders {
+                Block::default()
+                    .borders(Borders::RIGHT)
+                    .border_style(config.as_border_style())
+                    .padding(Padding::new(0, column_right_padding, 0, 0))
+                    .border_set(LEFT_COLUMN_SYMBOLS)
+            } else {
+                Block::default().padding(Padding::new(1, column_right_padding, 0, 0))
+            };
+            if let Some(title) = title {
+                block = block.title(title);
+            }
+            let inner_block = block.inner(previous_area);
+            self.areas[BrowserArea::Previous] = inner_block;
+            ratatui::widgets::StatefulWidget::render(
+                previous,
+                inner_block,
+                buf,
+                prev_state.as_render_state_ref(),
+            );
+            ratatui::widgets::Widget::render(block, previous_area, buf);
+            if let Some(scrollbar) = config.as_styled_scrollbar()
+                && prev_state.content_len().is_some_and(|l| l > 0)
+            {
+                ratatui::widgets::StatefulWidget::render(
+                    scrollbar,
+                    previous_area.inner(scrollbar_margin),
+                    buf,
+                    prev_state.as_scrollbar_state_ref(),
+                );
+            }
+        }
+        // ---- Current (focused) column ----
+        if cw[1] > 0 {
+            let title = state.current().filter_text(current_area.width.saturating_sub(2), ctx);
             let Dir { items, state, .. } = state.current_mut();
-            state.set_content_and_viewport_len(items.len(), left_area.height.into());
-
+            state.set_content_and_viewport_len(items.len(), current_area.height.into());
             let block = {
                 let mut b = Block::default();
                 if config.theme.draw_borders {
@@ -261,9 +314,8 @@ where
                 }
                 b.padding(Padding::new(0, column_right_padding, 0, 0))
             };
-            let current = List::new(current).style(config.as_text_style());
-
-            let inner_block = block.inner(left_area);
+            let current = List::new(current_items).style(config.as_text_style());
+            let inner_block = block.inner(current_area);
             ratatui::widgets::StatefulWidget::render(
                 current,
                 inner_block,
@@ -271,9 +323,9 @@ where
                 state.as_render_state_ref(),
             );
             self.areas[BrowserArea::Current] = inner_block;
-            let scrollbar_area = left_area.inner(scrollbar_margin);
+            let scrollbar_area = current_area.inner(scrollbar_margin);
             self.areas[BrowserArea::Scrollbar] = scrollbar_area;
-            ratatui::widgets::Widget::render(block, left_area, buf);
+            ratatui::widgets::Widget::render(block, current_area, buf);
             if let Some(scrollbar) = config.as_styled_scrollbar() {
                 ratatui::widgets::StatefulWidget::render(
                     scrollbar,
