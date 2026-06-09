@@ -1,5 +1,12 @@
 use anyhow::{Context, Result};
-use ratatui::{Frame, layout::Position, prelude::Rect, widgets::Widget};
+use ratatui::{
+    Frame,
+    layout::Position,
+    prelude::Rect,
+    style::{Color, Style},
+    text::{Line, Span},
+    widgets::Widget,
+};
 
 use super::Pane;
 use crate::{
@@ -46,7 +53,38 @@ impl TabsPane<'_> {
             .divider("")
             .style(ctx.config.theme.tab_bar.inactive_style)
             .alignment(ratatui::prelude::Alignment::Center)
-            .highlight_style(ctx.config.theme.tab_bar.active_style)
+            // Active styling is baked into the per-tab pill Line in `build_titles`,
+            // so the widget highlight must be a no-op (otherwise it would flatten
+            // the rounded powerline caps with a solid accent background).
+            .highlight_style(Style::default())
+    }
+
+    /// Build pill-shaped tab titles: the active tab is wrapped in rounded
+    /// powerline caps (\u{e0b6}/\u{e0b4}) so it reads as a rounded pill,
+    /// matching the design. Inactive tabs are plain muted labels.
+    fn build_titles(ctx: &Ctx, active_idx: usize) -> Vec<Line<'static>> {
+        let theme = &ctx.config.theme;
+        let active = theme.tab_bar.active_style;
+        let inactive = theme.tab_bar.inactive_style;
+        let accent = active.bg.unwrap_or(Color::Cyan);
+        ctx.config
+            .tabs
+            .names
+            .iter()
+            .enumerate()
+            .map(|(i, name)| {
+                let label = format!(" {name}  {} ", i + 1);
+                if i == active_idx {
+                    Line::from(vec![
+                        Span::styled("\u{e0b6}", Style::default().fg(accent)),
+                        Span::styled(label, active),
+                        Span::styled("\u{e0b4}", Style::default().fg(accent)),
+                    ])
+                } else {
+                    Line::from(vec![Span::styled(format!("  {label} "), inactive)])
+                }
+            })
+            .collect()
     }
 }
 
@@ -66,6 +104,7 @@ impl Pane for TabsPane<'_> {
                 return Ok(());
             };
 
+            self.tabs.titles(Self::build_titles(ctx, selected_tab));
             self.tabs.select(selected_tab);
             self.tabs.render(area, frame.buffer_mut());
         }
