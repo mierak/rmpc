@@ -2,7 +2,7 @@ use std::borrow::Cow;
 
 use itertools::Itertools;
 use ratatui::{
-    style::{Modifier, Style},
+    style::{Color, Modifier, Style},
     text::{Line, Span},
     widgets::{ListItem, ListState, TableState},
 };
@@ -167,6 +167,23 @@ impl DirStackItem for DirOrSong {
                 if let Some(content) = additional_content {
                     value.push_span(Span::raw(content));
                 }
+                // Thin uniform 1-cell accent strip on every row (rendered only on
+                // the selected row, blank otherwise) so text never shifts.
+                value.spans.insert(
+                    0,
+                    if is_current {
+                        Span::styled(
+                            "\u{258f}",
+                            Style::default().fg(config
+                                .theme
+                                .highlight_border_style
+                                .fg
+                                .unwrap_or(Color::Cyan)),
+                        )
+                    } else {
+                        Span::raw(" ")
+                    },
+                );
                 if is_current {
                     ListItem::from(value).style(config.theme.current_item_style)
                 } else if matches_filter {
@@ -257,6 +274,21 @@ impl DirStackItem for Song {
             value.push_span(Span::raw(content));
         }
 
+        value.spans.insert(
+            0,
+            if is_current {
+                Span::styled(
+                    "\u{258f}",
+                    Style::default().fg(config
+                        .theme
+                        .highlight_border_style
+                        .fg
+                        .unwrap_or(Color::Cyan)),
+                )
+            } else {
+                Span::raw(" ")
+            },
+        );
         if is_current {
             ListItem::from(value).style(config.theme.current_item_style)
         } else if matches_filter {
