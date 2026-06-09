@@ -2,7 +2,7 @@ use enum_map::{Enum, EnumMap};
 use itertools::Itertools;
 use ratatui::{
     prelude::*,
-    widgets::{Block, Borders, List, ListItem, ListState, Padding},
+    widgets::{Block, BorderType, List, ListItem, ListState, Padding},
 };
 
 use crate::{
@@ -38,16 +38,6 @@ impl<T: std::fmt::Debug + DirStackItem + Clone + Send> Browser<T> {
         }
     }
 }
-const MIDDLE_COLUMN_SYMBOLS: symbols::border::Set = symbols::border::Set {
-    top_right: symbols::line::NORMAL.horizontal_down,
-    bottom_right: symbols::line::NORMAL.horizontal_up,
-    ..symbols::border::PLAIN
-};
-const LEFT_COLUMN_SYMBOLS: symbols::border::Set = symbols::border::Set {
-    top_right: symbols::line::NORMAL.horizontal_down,
-    bottom_right: symbols::line::NORMAL.horizontal_up,
-    ..symbols::border::PLAIN
-};
 
 impl<T> Browser<T>
 where
@@ -73,47 +63,42 @@ where
 
         let current_items = state.current().to_list_items(song_format, ctx);
         let cw = self.widths.unwrap_or(config.theme.column_widths);
-        let [mut previous_area, mut current_area, mut preview_area] = *Layout::horizontal([
+        let col_titles = self.column_titles.clone();
+        let accent = config.theme.highlight_border_style.fg.unwrap_or(Color::Cyan);
+        let title_style = Style::default().fg(accent).add_modifier(Modifier::BOLD);
+        let focus_border = config.as_focused_border_style();
+        let dim_border = config.as_border_style();
+        let box_title = |idx: usize, fallback: Option<String>| -> Option<String> {
+            col_titles.as_ref().map(|t| t[idx].clone()).filter(|s| !s.is_empty()).or(fallback)
+        };
+        let [previous_area, current_area, preview_area] = *Layout::horizontal([
             Constraint::Percentage(cw[0]),
             Constraint::Percentage(cw[1]),
             Constraint::Percentage(cw[2]),
         ])
+        .spacing(1)
         .split(area) else {
             return;
         };
-        // Column titles
-        if let Some([t0, t1, t2]) = &self.column_titles {
-            let accent = config.theme.highlight_border_style.fg.unwrap_or(Color::Cyan);
-            let title_style = Style::default().fg(accent).add_modifier(Modifier::BOLD);
-            if area.height > 0 {
-                if cw[0] > 0 {
-                    Line::styled(t0.as_str(), title_style)
-                        .render(Rect { height: 1, ..previous_area }, buf);
-                    previous_area.y += 1;
-                    previous_area.height = previous_area.height.saturating_sub(1);
-                }
-                if cw[1] > 0 {
-                    Line::styled(t1.as_str(), title_style)
-                        .render(Rect { height: 1, ..current_area }, buf);
-                    current_area.y += 1;
-                    current_area.height = current_area.height.saturating_sub(1);
-                }
-                if cw[2] > 0 {
-                    Line::styled(t2.as_str(), title_style)
-                        .render(Rect { height: 1, ..preview_area }, buf);
-                    preview_area.y += 1;
-                    preview_area.height = preview_area.height.saturating_sub(1);
-                }
-            }
-        }
         // ---- Preview column ----
         self.areas[BrowserArea::Preview] = preview_area;
         if cw[2] > 0 {
+            let pblock = {
+                let mut b =
+                    Block::bordered().border_type(BorderType::Rounded).border_style(dim_border);
+                if let Some(t) = box_title(2, Some(" Preview".to_string())) {
+                    b = b.title(t).title_style(title_style);
+                }
+                b
+            };
+            let inner = pblock.inner(preview_area);
+            ratatui::widgets::Widget::render(pblock, preview_area, buf);
+            self.areas[BrowserArea::Preview] = inner;
             let accent = config.theme.highlight_border_style.fg.unwrap_or(Color::Cyan);
             let warm = config.theme.highlighted_item_style.fg.unwrap_or(accent);
             let faint = config.theme.preview_label_style.fg.unwrap_or(Color::Gray);
             let rule = config.theme.borders_style.fg.unwrap_or(Color::DarkGray);
-            let pw = preview_area.width as usize;
+            let pw = inner.width as usize;
             let prop = |item: &T, sp: SongProperty| {
                 item.format(
                     &[Property {
@@ -201,7 +186,7 @@ where
                             Style::default().fg(faint),
                         ))));
                         result.push(sep());
-                        let rows = (preview_area.height as usize).saturating_sub(result.len());
+                        let rows = (inner.height as usize).saturating_sub(result.len());
                         for song in children.iter().take(rows) {
                             let track = prop(song, SongProperty::Track);
                             let title_raw = prop(song, SongProperty::Title);
@@ -227,22 +212,21 @@ where
                     } else {
                         let items: Vec<ListItem> = state.next_dir_items().map_or(Vec::new(), |p| {
                             p.iter()
-                                .take(preview_area.height as usize)
+                                .take(inner.height as usize)
                                 .map(|item| item.to_list_item_simple(ctx))
                                 .collect_vec()
                         });
                         let len = items.len();
                         result = items;
                         if let Some(next) = state.next_mut() {
-                            next.state
-                                .set_content_and_viewport_len(len, preview_area.height.into());
+                            next.state.set_content_and_viewport_len(len, inner.height.into());
                         }
                     }
                 }
                 None => {}
             }
             let preview = List::new(result).style(config.as_text_style());
-            ratatui::widgets::Widget::render(preview, preview_area, buf);
+            ratatui::widgets::Widget::render(preview, inner, buf);
         }
         // ---- Previous (parent) column ----
         self.areas[BrowserArea::Previous] = Rect::default();
@@ -255,15 +239,16 @@ where
             prev_state.set_content_and_viewport_len(items.len(), previous_area.height.into());
             let previous = List::new(items).style(config.as_text_style());
             let mut block = if config.theme.draw_borders {
-                Block::default()
-                    .borders(Borders::RIGHT)
-                    .border_style(config.as_border_style())
+                Block::bordered()
+                    .border_type(BorderType::Rounded)
+                    .border_style(dim_border)
                     .padding(Padding::new(0, column_right_padding, 0, 0))
-                    .border_set(LEFT_COLUMN_SYMBOLS)
             } else {
                 Block::default().padding(Padding::new(1, column_right_padding, 0, 0))
             };
-            if let Some(title) = title {
+            if let Some(t) = col_titles.as_ref().map(|x| x[0].clone()).filter(|s| !s.is_empty()) {
+                block = block.title(t).title_style(title_style);
+            } else if let Some(title) = title {
                 block = block.title(title);
             }
             let inner_block = block.inner(previous_area);
@@ -292,17 +277,21 @@ where
             let Dir { items, state, .. } = state.current_mut();
             state.set_content_and_viewport_len(items.len(), current_area.height.into());
             let block = {
-                let mut b = Block::default();
-                if config.theme.draw_borders {
-                    b = b
-                        .borders(Borders::RIGHT)
-                        .border_style(config.as_border_style())
-                        .border_set(MIDDLE_COLUMN_SYMBOLS);
-                }
-                if let Some(title) = title {
+                let mut b = if config.theme.draw_borders {
+                    Block::bordered()
+                        .border_type(BorderType::Rounded)
+                        .border_style(focus_border)
+                        .padding(Padding::new(0, column_right_padding, 0, 0))
+                } else {
+                    Block::default().padding(Padding::new(0, column_right_padding, 0, 0))
+                };
+                if let Some(t) = col_titles.as_ref().map(|x| x[1].clone()).filter(|s| !s.is_empty())
+                {
+                    b = b.title(t).title_style(title_style);
+                } else if let Some(title) = title {
                     b = b.title(title);
                 }
-                b.padding(Padding::new(0, column_right_padding, 0, 0))
+                b
             };
             let current = List::new(current_items).style(config.as_text_style());
             let inner_block = block.inner(current_area);
