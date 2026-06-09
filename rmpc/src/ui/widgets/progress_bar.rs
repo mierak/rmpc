@@ -68,11 +68,8 @@ impl Widget for ProgressBar<'_> {
             if let Some((c0, c1)) = self.elapsed_gradient
                 && style == self.elapsed_style
             {
-                let frac = if filled_cols > 1 {
-                    f32::from(i) / f32::from(filled_cols - 1)
-                } else {
-                    0.0
-                };
+                let frac =
+                    if filled_cols > 1 { f32::from(i) / f32::from(filled_cols - 1) } else { 0.0 };
                 if let Some(c) = lerp_rgb(c0, c1, frac) {
                     style = style.fg(c);
                 }

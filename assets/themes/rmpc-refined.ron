@@ -191,7 +191,13 @@
                             border_symbols: Rounded,
                             border_title: [(kind: Text(" ")), (kind: Property(Status(QueueLength()))), (kind: Text(" songs / ")), (kind: Property(Status(QueueTimeTotal()))), (kind: Text(" total time "))],
                             border_title_alignment: Right,
-                            pane: Component("progress_bar"),
+                            pane: Split(
+                                direction: Horizontal,
+                                panes: [
+                                    (size: "13", pane: Pane(PlaybackControls)),
+                                    (size: "100%", pane: Component("progress_bar")),
+                                ]
+                            ),
                         ),
                     ]
                 ),

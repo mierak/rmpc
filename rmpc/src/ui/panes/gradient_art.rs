@@ -35,9 +35,11 @@ fn lin_to_srgb(c: f32) -> f32 {
     if c <= 0.003_130_8 { c * 12.92 } else { 1.055 * c.powf(1.0 / 2.4) - 0.055 }
 }
 fn to_lin(rgb: [u8; 3]) -> [f32; 3] {
-    [srgb_to_lin(rgb[0] as f32 / 255.0), srgb_to_lin(rgb[1] as f32 / 255.0), srgb_to_lin(
-        rgb[2] as f32 / 255.0,
-    )]
+    [
+        srgb_to_lin(rgb[0] as f32 / 255.0),
+        srgb_to_lin(rgb[1] as f32 / 255.0),
+        srgb_to_lin(rgb[2] as f32 / 255.0),
+    ]
 }
 fn to_color(lin: [f32; 3]) -> Color {
     let enc = |c: f32| (lin_to_srgb(c.clamp(0.0, 1.0)) * 255.0).round() as u8;
@@ -170,9 +172,8 @@ impl Pane for GradientArtPane {
         if area.width == 0 || area.height == 0 {
             return Ok(());
         }
-        let seed = ctx
-            .current_song()
-            .map_or_else(|| seed_of("rmpc-refined"), |song| seed_of(&song.file));
+        let seed =
+            ctx.current_song().map_or_else(|| seed_of("rmpc-refined"), |song| seed_of(&song.file));
         self.paint(frame, area, seed);
         Ok(())
     }
