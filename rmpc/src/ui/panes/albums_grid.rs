@@ -6,7 +6,7 @@ use ratatui::{
     Frame,
     buffer::Buffer,
     layout::Rect,
-    style::{Color, Style},
+    style::{Color, Modifier, Style},
 };
 use rmpc_mpd::{
     client::Client,
@@ -46,7 +46,15 @@ const SEL_COVER: &str = "albums_grid_sel_cover";
 const CARD_W: u16 = 18;
 const GAP_X: u16 = 2;
 const COVER_H: u16 = 8;
-const CARD_H: u16 = COVER_H + 2; // cover + title row + spacing row
+const CARD_H: u16 = COVER_H + 4; // cover + 3 label rows + spacing row
+
+/// Album metadata stored alongside the cover image.
+#[derive(Debug, Clone)]
+struct AlbumEntry {
+    name: String,
+    artist: Option<String>,
+    year: Option<String>,
+}
 
 /// A responsive grid of generative album covers — the design's Albums screen.
 ///
@@ -56,7 +64,7 @@ const CARD_H: u16 = COVER_H + 2; // cover + title row + spacing row
 /// enqueues the album.
 #[derive(Debug)]
 pub struct AlbumsGridPane {
-    albums: Vec<String>,
+    albums: Vec<AlbumEntry>,
     selected: usize,
     scroll_row: usize,
     cols: usize,
@@ -100,7 +108,7 @@ impl AlbumsGridPane {
     }
 
     fn enqueue_selected(&self, ctx: &Ctx) {
-        let Some(name) = self.albums.get(self.selected).cloned() else {
+        let Some(name) = self.albums.get(self.selected).map(|e| e.name.clone()) else {
             return;
         };
         Client::resolve_and_enqueue(
@@ -118,7 +126,7 @@ impl AlbumsGridPane {
     }
 
     fn open_context_menu(&self, ctx: &Ctx) {
-        let Some(name) = self.albums.get(self.selected).cloned() else {
+        let Some(name) = self.albums.get(self.selected).map(|e| e.name.clone()) else {
             return;
         };
         let (n1, n2, n3) = (name.clone(), name.clone(), name);
@@ -191,27 +199,36 @@ impl AlbumsGridPane {
         let (tw, th) = (u32::from(CARD_W), u32::from(COVER_H) * 2);
         ctx.query().id(COVERS).replace_id(COVERS).target(PaneType::AlbumsGrid).query(
             move |client| {
-                let mut out: Vec<(String, Option<RgbaImage>)> = Vec::with_capacity(albums.len());
+                let mut out: Vec<(AlbumEntry, Option<RgbaImage>)> =
+                    Vec::with_capacity(albums.len());
                 for album in albums {
-                    let cover = (|| -> Result<Option<RgbaImage>> {
-                        let Some(song) =
-                            client.find_one(&[Filter::new(Tag::Album, album.as_str())])?
-                        else {
-                            return Ok(None);
-                        };
-                        let Some(bytes) = client.find_album_art(&song.file, order)? else {
-                            return Ok(None);
-                        };
-                        let img = image::load_from_memory(&bytes)?.to_rgba8();
-                        Ok(Some(image::imageops::resize(
-                            &img,
-                            tw,
-                            th,
-                            image::imageops::FilterType::Lanczos3,
-                        )))
-                    })()
-                    .unwrap_or(None);
-                    out.push((album, cover));
+                    let name = album.name.clone();
+                    let (artist, year, cover) =
+                        (|| -> Result<(Option<String>, Option<String>, Option<RgbaImage>)> {
+                            let Some(song) =
+                                client.find_one(&[Filter::new(Tag::Album, name.as_str())])?
+                            else {
+                                return Ok((None, None, None));
+                            };
+                            let artist = song.metadata.get("artist").map(|v| v.first().to_owned());
+                            let year = song.metadata.get("date").map(|v| v.first().to_owned());
+                            let Some(bytes) = client.find_album_art(&song.file, order)? else {
+                                return Ok((artist, year, None));
+                            };
+                            let img = image::load_from_memory(&bytes)?.to_rgba8();
+                            Ok((
+                                artist,
+                                year,
+                                Some(image::imageops::resize(
+                                    &img,
+                                    tw,
+                                    th,
+                                    image::imageops::FilterType::Lanczos3,
+                                )),
+                            ))
+                        })()
+                        .unwrap_or((None, None, None));
+                    out.push((AlbumEntry { name, artist, year }, cover));
                 }
                 Ok(MpdQueryResult::Any(Box::new(out)))
             },
@@ -240,7 +257,7 @@ impl AlbumsGridPane {
         if !self.crisp {
             return;
         }
-        let Some(album) = self.albums.get(self.selected).cloned() else {
+        let Some(album) = self.albums.get(self.selected).map(|e| e.name.clone()) else {
             return;
         };
         if self.shown_album.as_ref() == Some(&album) {
@@ -304,7 +321,7 @@ impl Pane for AlbumsGridPane {
         let sel_style = theme.current_item_style;
         let buf = frame.buffer_mut();
 
-        for (i, name) in self.albums.iter().enumerate() {
+        for (i, entry) in self.albums.iter().enumerate() {
             let row = i / cols;
             let col = i % cols;
             if row < self.scroll_row || row >= self.scroll_row + rows_visible {
@@ -332,27 +349,59 @@ impl Pane for AlbumsGridPane {
                         }
                     }
                 }
-            } else if let Some(img) = self.covers.get(name) {
+            } else if let Some(img) = self.covers.get(&entry.name) {
                 paint_image_cover(buf, cover_area, img);
             } else {
-                paint_cover(buf, cover_area, seed_of(name));
+                paint_cover(buf, cover_area, seed_of(&entry.name));
             }
 
-            let style = if selected { sel_style } else { normal };
             let label_y = cy + COVER_H;
+            // Line 1: album name — bold if selected
             if label_y < area_bottom {
-                let label: String = name.chars().take(CARD_W as usize).collect();
+                let style = if selected { sel_style } else { normal };
+                let label: String = entry.name.chars().take(CARD_W as usize).collect();
                 for (k, ch) in label.chars().enumerate() {
                     if let Some(cell) = buf.cell_mut((cx + k as u16, label_y)) {
                         cell.set_char(ch);
                         cell.set_style(style);
                     }
                 }
-                // pad the rest of the label width so the selection bar reads full-width
                 for k in label.chars().count()..CARD_W as usize {
                     if let Some(cell) = buf.cell_mut((cx + k as u16, label_y)) {
                         cell.set_char(' ');
                         cell.set_style(style);
+                    }
+                }
+            }
+            // Line 2: artist — dimmed
+            let artist_y = label_y + 1;
+            if artist_y < area_bottom
+                && let Some(artist) = &entry.artist
+            {
+                let label: String = artist.chars().take(CARD_W as usize).collect();
+                let dim = Style::default()
+                    .fg(theme.text_color.unwrap_or_default())
+                    .add_modifier(Modifier::DIM);
+                for (k, ch) in label.chars().enumerate() {
+                    if let Some(cell) = buf.cell_mut((cx + k as u16, artist_y)) {
+                        cell.set_char(ch);
+                        cell.set_style(dim);
+                    }
+                }
+            }
+            // Line 3: year — very muted
+            let year_y = artist_y + 1;
+            if year_y < area_bottom
+                && let Some(year) = &entry.year
+            {
+                let label: String = year.chars().take(CARD_W as usize).collect();
+                let muted = Style::default()
+                    .fg(theme.borders_style.fg.unwrap_or(Color::DarkGray))
+                    .add_modifier(Modifier::DIM);
+                for (k, ch) in label.chars().enumerate() {
+                    if let Some(cell) = buf.cell_mut((cx + k as u16, year_y)) {
+                        cell.set_char(ch);
+                        cell.set_style(muted);
                     }
                 }
             }
@@ -388,7 +437,10 @@ impl Pane for AlbumsGridPane {
     ) -> Result<()> {
         match (id, data) {
             (INIT, MpdQueryResult::LsInfo { data, .. }) => {
-                self.albums = data;
+                self.albums = data
+                    .into_iter()
+                    .map(|name| AlbumEntry { name, artist: None, year: None })
+                    .collect();
                 if self.selected >= self.albums.len() {
                     self.selected = self.albums.len().saturating_sub(1);
                 }
@@ -397,10 +449,10 @@ impl Pane for AlbumsGridPane {
                 ctx.render()?;
             }
             (COVERS, MpdQueryResult::Any(any)) => {
-                if let Ok(covers) = any.downcast::<Vec<(String, Option<RgbaImage>)>>() {
+                if let Ok(covers) = any.downcast::<Vec<(AlbumEntry, Option<RgbaImage>)>>() {
                     self.covers = covers
                         .into_iter()
-                        .filter_map(|(name, img)| img.map(|i| (name, i)))
+                        .filter_map(|(entry, img)| img.map(|i| (entry.name, i)))
                         .collect();
                     ctx.render()?;
                 }
