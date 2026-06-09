@@ -5,13 +5,14 @@ use enum_map::EnumMap;
 use itertools::Itertools;
 use ratatui::{
     layout::{Constraint, Layout, Rect},
+    style::{Color, Modifier, Style},
     text::Span,
-    widgets::{Block, Borders, List, ListItem, ListState, Padding},
+    widgets::{Block, BorderType, Borders, List, ListItem, ListState, Padding},
 };
 use rmpc_mpd::{
     client::Client,
     commands::Song,
-    filter::{Filter, FilterKind},
+    filter::{Filter, FilterKind, Tag},
     mpd_client::{MpdClient, MpdCommand, StickerFindOptions},
     proto_client::ProtoClient,
 };
@@ -65,7 +66,7 @@ use crate::{
             },
             select_modal::SelectModal,
         },
-        panes::search::inputs::{ActionResult, InputGroups, InputType, TextboxInput},
+        panes::search::inputs::{ActionResult, InputGroups, InputType, SearchTag, TextboxInput},
         song_ext::SongExt as _,
         widgets::browser::BrowserArea,
     },
@@ -79,8 +80,9 @@ pub struct SearchPane {
     phase: Phase,
     songs_dir: Dir<Song, ListState>,
     column_areas: EnumMap<BrowserArea, Rect>,
+    search_tag: SearchTag,
+    chip_areas: [Rect; 4],
 }
-
 const SEARCH: &str = "search";
 
 impl SearchPane {
@@ -107,6 +109,8 @@ impl SearchPane {
             songs_dir: Dir::default(),
             inputs,
             column_areas: EnumMap::default(),
+            search_tag: SearchTag::Any,
+            chip_areas: [Rect::default(); 4],
         }
     }
 
@@ -199,7 +203,7 @@ impl SearchPane {
 
     fn search(&mut self, ctx: &Ctx) {
         let search_mode = self.inputs.search_mode();
-        let filter = if let Some(custom_query) = self.inputs.custom_query(ctx)
+        let mut filter = if let Some(custom_query) = self.inputs.custom_query(ctx)
             && !custom_query.is_empty()
         {
             vec![Filter::new(String::new(), "").with_type(FilterKind::CustomQuery(custom_query))]
@@ -222,6 +226,30 @@ impl SearchPane {
                 })
                 .collect_vec()
         };
+
+        if self.search_tag != SearchTag::Any {
+            // Add tag-scoped filters alongside the existing config tag filters.
+            let tag = match self.search_tag {
+                SearchTag::Title => Tag::Title,
+                SearchTag::Artist => Tag::Artist,
+                SearchTag::Album => Tag::Album,
+                SearchTag::Any => unreachable!(),
+            };
+            let tag_filters: Vec<_> = self
+                .inputs
+                .inputs
+                .iter()
+                .filter_map(|input| match &input {
+                    InputType::Textbox(TextboxInput { buffer_id, .. }) => {
+                        let value = ctx.input.value(*buffer_id).trim().to_owned();
+                        (!value.is_empty())
+                            .then(|| Filter::new(tag.clone(), value).with_type(search_mode.into()))
+                    }
+                    _ => None,
+                })
+                .collect();
+            filter.extend(tag_filters);
+        }
 
         let stickers_supported = ctx.stickers_supported.into();
         let fold_case = self.inputs.fold_case();
@@ -1099,8 +1127,59 @@ impl Pane for SearchPane {
 
         match self.phase {
             Phase::Search => {
+                let accent = ctx.config.theme.highlight_border_style.fg.unwrap_or(Color::Cyan);
+
+                // Split off a chip row below the search inputs
+                let areas = Layout::vertical([Constraint::Fill(1), Constraint::Length(1)])
+                    .split(current_area);
+                let search_area = areas[0];
+                let chip_area = areas[1];
+
+                // Wrap search inputs in an accent border
+                let search_block = Block::default()
+                    .borders(Borders::LEFT)
+                    .border_style(Style::default().fg(accent))
+                    .border_type(BorderType::Thick);
+                let inner_search = search_block.inner(search_area);
+                frame.render_widget(search_block, search_area);
+
                 self.column_areas[BrowserArea::Current] = current_area;
-                self.inputs.render(current_area, frame.buffer_mut(), ctx);
+                self.inputs.render(inner_search, frame.buffer_mut(), ctx);
+
+                // Render filter chips
+                let chips = [
+                    ("Title", SearchTag::Title),
+                    ("Artist", SearchTag::Artist),
+                    ("Album", SearchTag::Album),
+                    ("Any", SearchTag::Any),
+                ];
+                let chip_layout = Layout::horizontal([Constraint::Fill(1); 4]).split(chip_area);
+                let areas: &[Rect; 4] =
+                    chip_layout.as_ref().try_into().expect("chip_layout should have 4 rects");
+                self.chip_areas = *areas;
+                let sel_fg = ctx.config.as_text_style().fg.unwrap_or(Color::White);
+                for (i, (label, tag)) in chips.iter().enumerate() {
+                    let is_active = self.search_tag == *tag;
+                    let style = if is_active {
+                        Style::default().fg(sel_fg).bg(accent).add_modifier(Modifier::BOLD)
+                    } else {
+                        Style::default().fg(accent)
+                    };
+                    let chip_block = Block::bordered()
+                        .border_type(BorderType::Rounded)
+                        .border_style(style)
+                        .style(style);
+                    frame.render_widget(chip_block, chip_layout[i]);
+                    let label_span = Span::styled(*label, style);
+                    // Center the label in the chip area
+                    let label_area = Rect {
+                        x: chip_layout[i].x + 1,
+                        y: chip_layout[i].y,
+                        width: chip_layout[i].width.saturating_sub(2),
+                        height: chip_layout[i].height,
+                    };
+                    frame.render_widget(label_span, label_area);
+                }
 
                 // Render only the part of the preview that is actually supposed to be shown
                 let offset = self.songs_dir.state.offset();
@@ -1188,6 +1267,21 @@ impl Pane for SearchPane {
     fn handle_mouse_event(&mut self, event: MouseEvent, ctx: &Ctx) -> Result<()> {
         if self.handle_scrollbar_interaction(event, ctx)? {
             return Ok(());
+        }
+
+        // Handle filter chip clicks in search phase
+        if matches!(self.phase, Phase::Search) && matches!(event.kind, MouseEventKind::LeftClick) {
+            let pos: ratatui::layout::Position = event.into();
+            for (i, area) in self.chip_areas.iter().enumerate() {
+                if area.contains(pos) {
+                    let chips =
+                        [SearchTag::Title, SearchTag::Artist, SearchTag::Album, SearchTag::Any];
+                    self.search_tag = chips[i];
+                    self.search(ctx);
+                    ctx.render()?;
+                    return Ok(());
+                }
+            }
         }
 
         match event.kind {

@@ -6,7 +6,7 @@ use ratatui::{
 };
 
 use crate::{
-    config::theme::properties::{Property, SongProperty},
+    config::theme::properties::{Property, PropertyKindOrText, SongProperty},
     ctx::Ctx,
     ui::dirstack::{Dir, DirStack, DirStackItem},
 };
@@ -120,6 +120,31 @@ where
             {
                 let previews = current.to_file_preview(ctx);
                 let mut result = Vec::new();
+                let accent = config.theme.highlight_border_style.fg.unwrap_or(Color::Cyan);
+                let album = current.format(
+                    &[Property {
+                        kind: PropertyKindOrText::Property(SongProperty::Album),
+                        style: None,
+                        default: None,
+                    }],
+                    "",
+                    ctx,
+                );
+                let artist = current.format(
+                    &[Property {
+                        kind: PropertyKindOrText::Property(SongProperty::Artist),
+                        style: None,
+                        default: None,
+                    }],
+                    "",
+                    ctx,
+                );
+                result.push(ListItem::new(Line::from(vec![
+                    Span::styled(album, Style::default().fg(accent).add_modifier(Modifier::BOLD)),
+                    Span::styled(" — ", Style::default().add_modifier(Modifier::DIM)),
+                    Span::styled(artist, Style::default().fg(accent)),
+                ])));
+                result.push(ListItem::new(Span::raw("")));
                 for group in previews {
                     if let Some(name) = group.name {
                         let mut item = ListItem::new(name);
