@@ -2,7 +2,7 @@ use std::borrow::Cow;
 
 use itertools::Itertools;
 use ratatui::{
-    style::{Color, Modifier, Style},
+    style::{Modifier, Style},
     text::{Line, Span},
     widgets::{ListItem, ListState, TableState},
 };
@@ -168,8 +168,6 @@ impl DirStackItem for DirOrSong {
                     value.push_span(Span::raw(content));
                 }
                 if is_current {
-                    let accent = config.theme.highlight_border_style.fg.unwrap_or(Color::Cyan);
-                    value.spans.insert(0, Span::styled("│ ", Style::default().fg(accent)));
                     ListItem::from(value).style(config.theme.current_item_style)
                 } else if matches_filter {
                     ListItem::from(value).style(config.theme.highlighted_item_style)
@@ -260,8 +258,6 @@ impl DirStackItem for Song {
         }
 
         if is_current {
-            let accent = config.theme.highlight_border_style.fg.unwrap_or(Color::Cyan);
-            value.spans.insert(0, Span::styled("│ ", Style::default().fg(accent)));
             ListItem::from(value).style(config.theme.current_item_style)
         } else if matches_filter {
             ListItem::from(value).style(config.theme.highlighted_item_style)

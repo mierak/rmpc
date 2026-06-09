@@ -7,7 +7,7 @@ use ratatui::{
     Frame,
     layout::Flex,
     prelude::{Constraint, Layout, Rect},
-    style::{Color, Style},
+    style::Style,
     text::{Line, Span},
     widgets::{Block, Row, TableState},
 };
@@ -386,12 +386,6 @@ impl Pane for QueuePane {
                     if is_marked && i == 0 {
                         max_len = max_len.saturating_sub(marker_symbol_len);
                     }
-
-                    // Subtract 2 cells to make space for the accent strip (│ ) in
-                    // the first column when the song is currently playing.
-                    if is_currently_playing_song && i == 0 {
-                        max_len = max_len.saturating_sub(2);
-                    }
                     let format = &formats[i];
 
                     let mut line = if let Some(speed) = format.scroll_speed {
@@ -420,18 +414,8 @@ impl Pane for QueuePane {
                         let marker_style =
                             dirstack::marker_style(ctx, is_under_cursor, matches_filter);
                         let marker_span = Span::styled(&config.theme.symbols.marker, marker_style);
-
                         line.spans.splice(..0, std::iter::once(marker_span));
                     }
-
-                    // Prepend the accent strip (│ ) before any marker to indicate
-                    // the currently playing song in the first column.
-                    if is_currently_playing_song && i == 0 {
-                        let accent = config.theme.highlight_border_style.fg.unwrap_or(Color::Cyan);
-                        let accent_span = Span::styled("│ ", Style::default().fg(accent));
-                        line.spans.splice(..0, std::iter::once(accent_span));
-                    }
-
                     line
                 });
 
@@ -442,7 +426,6 @@ impl Pane for QueuePane {
                 if is_under_cursor && self.highlight_enabled {
                     row.cursor_style = Some(config.theme.current_item_style);
                 }
-
                 let sep = ctx.config.theme.song_table_album_separator;
                 if new_album_indices.contains(&idx)
                     && matches!(sep, AlbumSeparator::Underline)
@@ -1421,43 +1404,35 @@ struct QueueRow {
     cursor_style: Option<Style>,
     underlined: bool,
 }
-
 impl QueueRow {
     fn into_row<'a>(self, cells: impl Iterator<Item = Line<'a>>) -> Row<'a> {
         let mut row_style = Style::default();
-
         if let Some(style) = self.cell_style {
             row_style = row_style.patch(style);
         }
-
         if let Some(cursor) = self.cursor_style {
             row_style = row_style.patch(cursor);
         }
-
         if self.underlined {
             row_style = row_style.underlined();
         }
-
-        let row = Row::new(
-            cells
-                .map(|mut line| {
-                    if let Some(style) = self.cell_style {
-                        line.style = line.style.patch(style);
-                        for span in &mut line.spans {
-                            span.style = span.style.patch(style);
-                        }
+        let collected: Vec<Line<'a>> = cells
+            .map(|mut line| {
+                if let Some(style) = self.cell_style {
+                    line.style = line.style.patch(style);
+                    for span in &mut line.spans {
+                        span.style = span.style.patch(style);
                     }
-                    if let Some(cursor) = self.cursor_style {
-                        line.style = line.style.patch(cursor);
-                        for span in &mut line.spans {
-                            span.style = span.style.patch(cursor);
-                        }
+                }
+                if let Some(cursor) = self.cursor_style {
+                    line.style = line.style.patch(cursor);
+                    for span in &mut line.spans {
+                        span.style = span.style.patch(cursor);
                     }
-                    line
-                })
-                .collect::<Vec<_>>(),
-        );
-
-        row.style(row_style)
+                }
+                line
+            })
+            .collect();
+        Row::new(collected).style(row_style)
     }
 }
