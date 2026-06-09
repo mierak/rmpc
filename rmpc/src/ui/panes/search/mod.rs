@@ -6,8 +6,7 @@ use itertools::Itertools;
 use ratatui::{
     layout::{Alignment, Constraint, Layout, Rect},
     style::{Color, Modifier, Style},
-    text::Span,
-    widgets::{Block, BorderType, List, ListState, Padding},
+    widgets::{Block, BorderType, List, ListState, Padding, Row, Table, TableState},
 };
 use rmpc_mpd::{
     client::Client,
@@ -67,7 +66,7 @@ use crate::{
             select_modal::SelectModal,
         },
         panes::search::inputs::{ActionResult, InputGroups, InputType, SearchTag, TextboxInput},
-        widgets::browser::BrowserArea,
+        widgets::{browser::BrowserArea, input::Input},
     },
 };
 
@@ -94,10 +93,6 @@ impl SearchPane {
             .initial_fold_case(!config.search.case_sensitive)
             .initial_strip_diacritics(config.search.ignore_diacritics)
             .search_button(config.search.search_button)
-            .text_style(config.as_text_style())
-            .separator_style(config.theme.borders_style)
-            .current_item_style(config.as_text_style().patch(config.theme.current_item_style))
-            .highlight_item_style(config.as_text_style().patch(config.theme.highlighted_item_style))
             .stickers_supported(ctx.stickers_supported.into())
             .strip_diacritics_supported(ctx.mpd_version >= Version::new(0, 25, 0))
             .custom_query(config.search.custom_query)
@@ -202,53 +197,43 @@ impl SearchPane {
 
     fn search(&mut self, ctx: &Ctx) {
         let search_mode = self.inputs.search_mode();
-        let mut filter = if let Some(custom_query) = self.inputs.custom_query(ctx)
+        let filter = if let Some(custom_query) = self.inputs.custom_query(ctx)
             && !custom_query.is_empty()
         {
             vec![Filter::new(String::new(), "").with_type(FilterKind::CustomQuery(custom_query))]
         } else {
-            self.inputs
-                .inputs
-                .iter()
-                .filter_map(|input| match &input {
-                    InputType::Textbox(TextboxInput {
-                        buffer_id, filter_key: Some(key), ..
-                    }) => {
-                        let value = ctx.input.value(*buffer_id).trim().to_owned();
-                        if !value.is_empty() && !key.is_empty() {
-                            Some(Filter::new(key.to_owned(), value).with_type(search_mode.into()))
-                        } else {
-                            None
-                        }
+            let query = self.inputs.query_value(ctx);
+            if query.is_empty() {
+                vec![]
+            } else {
+                match self.search_tag {
+                    SearchTag::Any => {
+                        self.inputs
+                            .inputs
+                            .iter()
+                            .filter_map(|input| match input {
+                                InputType::Textbox(TextboxInput {
+                                    filter_key: Some(key), ..
+                                }) if !key.is_empty() => Some(
+                                    Filter::new(key.clone(), query.clone())
+                                        .with_type(search_mode.into()),
+                                ),
+                                _ => None,
+                            })
+                            .collect_vec()
                     }
-                    _ => None,
-                })
-                .collect_vec()
+                    SearchTag::Title => {
+                        vec![Filter::new(Tag::Title, query).with_type(search_mode.into())]
+                    }
+                    SearchTag::Artist => {
+                        vec![Filter::new(Tag::Artist, query).with_type(search_mode.into())]
+                    }
+                    SearchTag::Album => {
+                        vec![Filter::new(Tag::Album, query).with_type(search_mode.into())]
+                    }
+                }
+            }
         };
-
-        if self.search_tag != SearchTag::Any {
-            // Add tag-scoped filters alongside the existing config tag filters.
-            let tag = match self.search_tag {
-                SearchTag::Title => Tag::Title,
-                SearchTag::Artist => Tag::Artist,
-                SearchTag::Album => Tag::Album,
-                SearchTag::Any => unreachable!(),
-            };
-            let tag_filters: Vec<_> = self
-                .inputs
-                .inputs
-                .iter()
-                .filter_map(|input| match &input {
-                    InputType::Textbox(TextboxInput { buffer_id, .. }) => {
-                        let value = ctx.input.value(*buffer_id).trim().to_owned();
-                        (!value.is_empty())
-                            .then(|| Filter::new(tag.clone(), value).with_type(search_mode.into()))
-                    }
-                    _ => None,
-                })
-                .collect();
-            filter.extend(tag_filters);
-        }
 
         let stickers_supported = ctx.stickers_supported.into();
         let fold_case = self.inputs.fold_case();
@@ -1066,66 +1051,72 @@ impl Pane for SearchPane {
         else {
             return Ok(());
         };
-        let [input_row, chip_row, _pad] = *Layout::vertical([
-            Constraint::Length(1),
-            Constraint::Length(1),
-            Constraint::Length(1),
-        ])
-        .split(search_section) else {
-            return Ok(());
-        };
-        // Search icon
-        let icon =
-            Span::styled("\u{f002}  ", Style::default().fg(accent).add_modifier(Modifier::BOLD));
-        frame.render_widget(icon, input_row);
-        // Inputs area (next to icon) — the actual search text fields
-        let input_rect = Rect {
-            x: input_row.x + 4,
-            y: input_row.y,
-            width: input_row.width.saturating_sub(4),
-            height: 1,
-        };
-        self.inputs.render(input_rect, frame.buffer_mut(), ctx);
-        // Match count (right side of search bar)
-        let count = format!("{} matches", self.songs_dir.items.len());
-        if input_row.width > count.len() as u16 + 4 {
-            let count_x = input_row.x + input_row.width.saturating_sub(count.len() as u16 + 1);
-            frame.buffer_mut().set_string(
-                count_x,
-                input_row.y,
-                &count,
-                Style::default().fg(text_muted),
-            );
-        }
-        // --- Filter chips row ---
+        // Search bar = one rounded panel with a single content row:
+        //   <icon> <query+cursor> ............ <N matches>  [Title][Artist][Album][Any]
+        let bar_block = Block::bordered()
+            .border_type(BorderType::Rounded)
+            .border_style(ctx.config.theme.borders_style);
+        let bar_inner = bar_block.inner(search_section);
+        frame.render_widget(bar_block, search_section);
+        let row_y = bar_inner.y;
+        let surround = ctx.config.theme.background_color.unwrap_or_default();
+        // Chip geometry (right-aligned). Each pill occupies label_len + 4 cells
+        // (rounded cap + space + label + space + rounded cap); 1-cell gap between.
         let chips = [
             (SearchTag::Title, "Title"),
             (SearchTag::Artist, "Artist"),
             (SearchTag::Album, "Album"),
             (SearchTag::Any, "Any"),
         ];
-        let chip_layout = Layout::horizontal([Constraint::Fill(1); 4]).split(chip_row);
-        let areas: &[Rect; 4] =
-            chip_layout.as_ref().try_into().expect("chip_layout should have 4 rects");
-        self.chip_areas = *areas;
-        let sel_fg = ctx.config.as_text_style().fg.unwrap_or(Color::White);
+        let pill_w = |label: &str| label.chars().count() as u16 + 4;
+        let total_chip_w: u16 =
+            chips.iter().map(|(_, l)| pill_w(l) + 1).sum::<u16>().saturating_sub(1);
+        let chips_start_x = bar_inner.x + bar_inner.width.saturating_sub(total_chip_w + 1);
+        // Match count, left of the chips.
+        let count = format!("{} matches", self.songs_dir.items.len());
+        let count_w = count.chars().count() as u16;
+        let count_x = chips_start_x.saturating_sub(count_w + 2);
+        // Query input, between the icon and the match count.
+        let query_x = bar_inner.x + 3;
+        let query_w = count_x.saturating_sub(query_x).saturating_sub(1);
+        if query_w > 0
+            && let Some(buf_id) = self.inputs.query_buffer_id()
+        {
+            let is_active = ctx.input.is_active(buf_id);
+            let widget = Input::builder()
+                .ctx(ctx)
+                .buffer_id(buf_id)
+                .borderless(true)
+                .label("")
+                .placeholder("Search…")
+                .input_style(ctx.config.as_text_style())
+                .focused(is_active)
+                .build();
+            frame.render_widget(widget, Rect { x: query_x, y: row_y, width: query_w, height: 1 });
+        }
+        let buf = frame.buffer_mut();
+        buf.set_string(
+            bar_inner.x + 1,
+            row_y,
+            "\u{f002} ",
+            Style::default().fg(accent).add_modifier(Modifier::BOLD),
+        );
+        buf.set_string(count_x, row_y, &count, Style::default().fg(text_muted));
+        let mut cx = chips_start_x;
         for (i, (tag, label)) in chips.iter().enumerate() {
-            let chip_rect = Rect {
-                x: chip_layout[i].x + 1,
-                y: chip_layout[i].y,
-                width: chip_layout[i].width.saturating_sub(2),
-                height: 1,
-            };
-            let is_active = self.search_tag == *tag;
-            let style = if is_active {
-                Style::default().fg(sel_fg).bg(accent).add_modifier(Modifier::BOLD)
+            let w = pill_w(label);
+            let active = self.search_tag == *tag;
+            if active {
+                let cap = Style::default().fg(accent).bg(surround);
+                let body = Style::default().fg(surround).bg(accent).add_modifier(Modifier::BOLD);
+                buf.set_string(cx, row_y, "\u{e0b6}", cap);
+                buf.set_string(cx + 1, row_y, format!(" {label} "), body);
+                buf.set_string(cx + w - 1, row_y, "\u{e0b4}", cap);
             } else {
-                Style::default().fg(accent)
-            };
-            let chip_block =
-                Block::bordered().border_type(BorderType::Rounded).border_style(style).style(style);
-            frame.render_widget(chip_block, chip_layout[i]);
-            frame.render_widget(Span::styled(*label, style), chip_rect);
+                buf.set_string(cx, row_y, format!(" {label}  "), Style::default().fg(text_muted));
+            }
+            self.chip_areas[i] = Rect::new(cx, row_y, w, 1);
+            cx += w + 1;
         }
         match self.phase {
             Phase::Search => {
@@ -1138,20 +1129,56 @@ impl Pane for SearchPane {
                     .title_style(Style::default().fg(accent).add_modifier(Modifier::BOLD));
                 let inner = results_block.inner(results_area);
                 frame.render_widget(results_block, results_area);
+                self.songs_dir.state.set_content_and_viewport_len(
+                    self.songs_dir.items.len(),
+                    inner.height as usize,
+                );
+                if !self.songs_dir.items.is_empty() && self.songs_dir.state.get_selected().is_none()
+                {
+                    self.songs_dir.state.select(Some(0), 0);
+                }
+                let rows: Vec<Row> = self
+                    .songs_dir
+                    .items
+                    .iter()
+                    .map(|song| {
+                        let title = song
+                            .metadata
+                            .get("title")
+                            .map_or_else(|| song.file.clone(), |t| t.first().to_owned());
+                        let artist = song
+                            .metadata
+                            .get("artist")
+                            .map(|a| a.first().to_owned())
+                            .unwrap_or_default();
+                        let album = song
+                            .metadata
+                            .get("album")
+                            .map(|a| a.first().to_owned())
+                            .unwrap_or_default();
+                        let duration = song
+                            .duration
+                            .map(|d| {
+                                let secs = d.as_secs();
+                                format!("{:02}:{:02}", secs / 60, secs % 60)
+                            })
+                            .unwrap_or_default();
+                        Row::new([title, artist, album, duration])
+                    })
+                    .collect();
+                let selected = self.songs_dir.state.get_selected();
                 let offset = self.songs_dir.state.offset();
-                let items = self.songs_dir.to_list_items_range(
-                    offset..offset + inner.height as usize,
-                    ctx.config.theme.browser_song_format.0.as_slice(),
-                    ctx,
-                );
-                let preview = List::new(items)
+                let mut table_state = TableState::new().with_selected(selected).with_offset(offset);
+                let widths = [
+                    Constraint::Percentage(40),
+                    Constraint::Percentage(28),
+                    Constraint::Percentage(22),
+                    Constraint::Percentage(10),
+                ];
+                let table = Table::new(rows, widths)
                     .style(ctx.config.as_text_style())
-                    .highlight_style(ctx.config.theme.current_item_style);
-                frame.render_stateful_widget(
-                    preview,
-                    inner,
-                    self.songs_dir.state.as_render_state_ref(),
-                );
+                    .row_highlight_style(ctx.config.theme.current_item_style);
+                frame.render_stateful_widget(table, inner, &mut table_state);
             }
             Phase::BrowseResults => {
                 // Single-column detail view
