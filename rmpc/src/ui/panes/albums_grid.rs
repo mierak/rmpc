@@ -1,5 +1,13 @@
+use std::collections::HashMap;
+
 use anyhow::{Context, Result};
-use ratatui::{Frame, layout::Rect, style::Style};
+use image::RgbaImage;
+use ratatui::{
+    Frame,
+    buffer::Buffer,
+    layout::Rect,
+    style::{Color, Style},
+};
 use rmpc_mpd::{
     filter::{Filter, Tag},
     mpd_client::MpdClient,
@@ -15,11 +23,13 @@ use crate::{
     shared::{
         keys::ActionEvent,
         mouse_event::{MouseEvent, MouseEventKind},
+        mpd_client_ext::MpdClientExt,
         mpd_query::MpdQueryResult,
     },
 };
 
 const INIT: &str = "albums_grid_init";
+const COVERS: &str = "albums_grid_covers";
 
 // card geometry (cells)
 const CARD_W: u16 = 18;
@@ -41,6 +51,7 @@ pub struct AlbumsGridPane {
     cols: usize,
     rows_visible: usize,
     area: Rect,
+    covers: HashMap<String, RgbaImage>,
     initialized: bool,
 }
 
@@ -75,6 +86,42 @@ impl AlbumsGridPane {
         let row = self.scroll_row + (rel_y / CARD_H) as usize;
         let idx = row * self.cols.max(1) + col;
         (idx < self.albums.len()).then_some(idx)
+    }
+
+    /// Fetch a real cover for every album: a representative song's album art,
+    /// decoded and downscaled to the card's sub-pixel size on the client
+    /// thread.
+    fn fetch_covers(&self, ctx: &Ctx) {
+        let albums = self.albums.clone();
+        let order = ctx.config.album_art.order;
+        let (tw, th) = (u32::from(CARD_W), u32::from(COVER_H) * 2);
+        ctx.query().id(COVERS).replace_id(COVERS).target(PaneType::AlbumsGrid).query(
+            move |client| {
+                let mut out: Vec<(String, Option<RgbaImage>)> = Vec::with_capacity(albums.len());
+                for album in albums {
+                    let cover = (|| -> Result<Option<RgbaImage>> {
+                        let Some(song) =
+                            client.find_one(&[Filter::new(Tag::Album, album.as_str())])?
+                        else {
+                            return Ok(None);
+                        };
+                        let Some(bytes) = client.find_album_art(&song.file, order)? else {
+                            return Ok(None);
+                        };
+                        let img = image::load_from_memory(&bytes)?.to_rgba8();
+                        Ok(Some(image::imageops::resize(
+                            &img,
+                            tw,
+                            th,
+                            image::imageops::FilterType::Lanczos3,
+                        )))
+                    })()
+                    .unwrap_or(None);
+                    out.push((album, cover));
+                }
+                Ok(MpdQueryResult::Any(Box::new(out)))
+            },
+        );
     }
 }
 
@@ -127,7 +174,12 @@ impl Pane for AlbumsGridPane {
             let cx = area.x + pad_x + (col as u16) * (CARD_W + GAP_X);
             let cy = area.y + pad_y + ((row - self.scroll_row) as u16) * CARD_H;
 
-            paint_cover(buf, Rect::new(cx, cy, CARD_W, COVER_H), seed_of(name));
+            let cover_area = Rect::new(cx, cy, CARD_W, COVER_H);
+            if let Some(img) = self.covers.get(name) {
+                paint_image_cover(buf, cover_area, img);
+            } else {
+                paint_cover(buf, cover_area, seed_of(name));
+            }
 
             let selected = i == self.selected;
             let style = if selected { sel_style } else { normal };
@@ -162,12 +214,25 @@ impl Pane for AlbumsGridPane {
         _is_visible: bool,
         ctx: &Ctx,
     ) -> Result<()> {
-        if let (INIT, MpdQueryResult::LsInfo { data, .. }) = (id, data) {
-            self.albums = data;
-            if self.selected >= self.albums.len() {
-                self.selected = self.albums.len().saturating_sub(1);
+        match (id, data) {
+            (INIT, MpdQueryResult::LsInfo { data, .. }) => {
+                self.albums = data;
+                if self.selected >= self.albums.len() {
+                    self.selected = self.albums.len().saturating_sub(1);
+                }
+                self.fetch_covers(ctx);
+                ctx.render()?;
             }
-            ctx.render()?;
+            (COVERS, MpdQueryResult::Any(any)) => {
+                if let Ok(covers) = any.downcast::<Vec<(String, Option<RgbaImage>)>>() {
+                    self.covers = covers
+                        .into_iter()
+                        .filter_map(|(name, img)| img.map(|i| (name, i)))
+                        .collect();
+                    ctx.render()?;
+                }
+            }
+            _ => {}
         }
         Ok(())
     }
@@ -220,5 +285,27 @@ impl Pane for AlbumsGridPane {
         }
         ctx.render()?;
         Ok(())
+    }
+}
+
+/// Paint a decoded cover thumbnail into `area` as upper-half-block cells
+/// (fg = top sub-pixel, bg = bottom), the same sub-cell technique as the
+/// gradient covers but driven by real image pixels.
+fn paint_image_cover(buf: &mut Buffer, area: Rect, img: &RgbaImage) {
+    let (iw, ih) = (img.width(), img.height());
+    if iw == 0 || ih == 0 {
+        return;
+    }
+    for ry in 0..area.height {
+        for cx in 0..area.width {
+            let px = u32::from(cx).min(iw - 1);
+            let top = img.get_pixel(px, u32::from(ry * 2).min(ih - 1));
+            let bot = img.get_pixel(px, u32::from(ry * 2 + 1).min(ih - 1));
+            if let Some(cell) = buf.cell_mut((area.x + cx, area.y + ry)) {
+                cell.set_symbol("\u{2580}");
+                cell.set_fg(Color::Rgb(top[0], top[1], top[2]));
+                cell.set_bg(Color::Rgb(bot[0], bot[1], bot[2]));
+            }
+        }
     }
 }
