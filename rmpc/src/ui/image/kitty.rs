@@ -1,4 +1,8 @@
-use std::{io::Write, time::Instant};
+use std::{
+    io::Write,
+    sync::atomic::{AtomicU32, Ordering},
+    time::Instant,
+};
 
 use anyhow::{Context, Result};
 use base64::Engine;
@@ -24,8 +28,19 @@ use crate::{
     try_skip,
 };
 
+/// Unique kitty image id per backend instance so multiple simultaneous
+/// album-art surfaces (e.g. the grid cover and the now-playing cover) never
+/// clobber each other's image (which showed stale / out-of-context covers).
+static NEXT_KITTY_ID: AtomicU32 = AtomicU32::new(1);
 #[derive(Debug)]
-pub struct Kitty;
+pub struct Kitty {
+    id: u32,
+}
+impl Kitty {
+    pub fn new() -> Self {
+        Self { id: NEXT_KITTY_ID.fetch_add(1, Ordering::Relaxed) }
+    }
+}
 
 impl Backend for Kitty {
     type EncodedData = Data;
@@ -37,37 +52,32 @@ impl Backend for Kitty {
         bg_color: Option<crossterm::style::Color>,
     ) -> Result<()> {
         super::clear_area(w, bg_color, area)?;
-        tmux_write!(w, "\x1b_Ga=d,d=A,q=2\x1b\\")?;
+        tmux_write!(w, "\x1b_Ga=d,d=i,i={id},q=2\x1b\\", id = self.id)?;
 
         Ok(())
     }
 
     fn display(&mut self, w: &mut impl Write, data: Self::EncodedData, ctx: &Ctx) -> Result<()> {
+        let bg = ctx.config.theme.background_color.map(|c| c.into_crossterm());
         match data {
             Data::ImageData(data) => {
                 try_skip!(
-                    transfer_image_data(w, &data.content, data.img_width, data.img_height),
+                    transfer_image_data(w, &data.content, data.img_width, data.img_height, self.id),
                     "Failed to transfer image data"
                 );
-
                 try_skip!(
-                    create_unicode_placeholder_grid(
-                        w,
-                        ctx.config.theme.background_color.map(|c| c.into_crossterm()),
-                        data.aligned_area
-                    ),
+                    create_unicode_placeholder_grid(w, bg, data.aligned_area, self.id),
                     "Failed to create unicode placeholders"
                 );
             }
             Data::AnimationData(data) => {
                 let aligned_area = data.aligned_area;
-                try_skip!(transfer_animation_data(w, data), "Failed to transfer animation data");
                 try_skip!(
-                    create_unicode_placeholder_grid(
-                        w,
-                        ctx.config.theme.background_color.map(|c| c.into_crossterm()),
-                        aligned_area
-                    ),
+                    transfer_animation_data(w, data, self.id),
+                    "Failed to transfer animation data"
+                );
+                try_skip!(
+                    create_unicode_placeholder_grid(w, bg, aligned_area, self.id),
                     "Failed to create unicode placeholders"
                 );
             }
@@ -136,13 +146,14 @@ fn create_unicode_placeholder_grid(
     w: &mut impl Write,
     bg_color: Option<crossterm::style::Color>,
     area: Rect,
+    id: u32,
 ) -> Result<()> {
     let colors = Colors { background: bg_color, foreground: None };
     let mut buf = Vec::with_capacity(area.width as usize * area.height as usize * 2);
     execute!(buf, SetColors(colors))?;
     for y in 0..area.height {
         csi_move!(buf, area.left(), area.top() + y)?;
-        write!(buf, "\x1b[38;5;1m")?;
+        write!(buf, "\x1b[38;5;{id}m")?;
 
         for x in 0..area.width {
             write!(buf, "{DELIM}{row}{col}", row = GRID[y as usize], col = GRID[x as usize])?;
@@ -156,7 +167,7 @@ fn create_unicode_placeholder_grid(
     Ok(())
 }
 
-fn transfer_animation_data(w: &mut impl Write, data: AnimationData) -> Result<()> {
+fn transfer_animation_data(w: &mut impl Write, data: AnimationData, id: u32) -> Result<()> {
     let start_time = Instant::now();
     let AnimationData { frames, is_compressed, img_width, img_height, aligned_area } = data;
 
@@ -176,7 +187,7 @@ fn transfer_animation_data(w: &mut impl Write, data: AnimationData) -> Result<()
     // Create image and transfer first frame
     tmux_write!(
         w,
-        "\x1b_Gi=1,f=32,U=1,a=T,t=d,m={m},z={delay},q=2,s={img_width},v={img_height},c={cols},r={rows}{compression};{chunk}\x1b\\",
+        "\x1b_Gi={id},f=32,U=1,a=T,t=d,m={m},z={delay},q=2,s={img_width},v={img_height},c={cols},r={rows}{compression};{chunk}\x1b\\",
         compression = if is_compressed { ",o=z" } else { "" },
         cols = aligned_area.width,
         rows = aligned_area.height
@@ -186,7 +197,7 @@ fn transfer_animation_data(w: &mut impl Write, data: AnimationData) -> Result<()
     while first_frame_iter.peek().is_some() {
         let chunk: String = first_frame_iter.by_ref().take(4096).collect();
         let m = i32::from(first_frame_iter.peek().is_some());
-        tmux_write!(w, "\x1b_Gi=1,m={m};{chunk}\x1b\\")?;
+        tmux_write!(w, "\x1b_Gi={id},m={m};{chunk}\x1b\\")?;
     }
 
     // Transfer rest of the frames, skip first because it was already
@@ -197,19 +208,19 @@ fn transfer_animation_data(w: &mut impl Write, data: AnimationData) -> Result<()
 
         tmux_write!(
             w,
-            "\x1b_Gi=1,a=f,t=d,m={m},z={delay},q=2,s={img_width},v={img_height}{compression};{chunk}\x1b\\",
+            "\x1b_Gi={id},a=f,t=d,m={m},z={delay},q=2,s={img_width},v={img_height}{compression};{chunk}\x1b\\",
             compression = if is_compressed { ",o=z" } else { "" }
         )?;
 
         while frame_iter.peek().is_some() {
             let chunk: String = frame_iter.by_ref().take(4096).collect();
             let m = i32::from(frame_iter.peek().is_some());
-            tmux_write!(w, "\x1b_Ga=f,i=1,m={m};{chunk}\x1b\\")?;
+            tmux_write!(w, "\x1b_Ga=f,i={id},m={m};{chunk}\x1b\\")?;
         }
     }
 
     // Run the animation
-    tmux_write!(w, "\x1b_Ga=a,i=1,s=3\x1b\\")?;
+    tmux_write!(w, "\x1b_Ga=a,i={id},s=3\x1b\\")?;
     log::debug!(duration:? = start_time.elapsed(); "Transfer finished");
 
     Ok(())
@@ -220,15 +231,15 @@ fn transfer_image_data(
     content: &str,
     img_width: u32,
     img_height: u32,
+    id: u32,
 ) -> Result<()> {
     let start_time = Instant::now();
     log::debug!(bytes = content.len(), img_width, img_height; "Transferring compressed image data");
     let mut iter = content.chars().peekable();
-
     let first: String = iter.by_ref().take(4096).collect();
     tmux_write!(
         w,
-        "\x1b_Gi=1,f=32,U=1,t=d,a=T,m=1,q=2,o=z,s={img_width},v={img_height};{first}\x1b\\"
+        "\x1b_Gi={id},f=32,U=1,t=d,a=T,m=1,q=2,o=z,s={img_width},v={img_height};{first}\x1b\\"
     )?;
 
     while iter.peek().is_some() {
