@@ -277,7 +277,7 @@ impl<'panes> PaneContainer<'panes> {
             album_art: AlbumArtPane::new(ctx),
             gradient_art: GradientArtPane::new(),
             playback_controls: PlaybackControlsPane::new(),
-            albums_grid: AlbumsGridPane::new(),
+            albums_grid: AlbumsGridPane::new(ctx),
             lyrics: LyricsPane::new(ctx),
             progress_bar: ProgressBarPane::new(),
             header: HeaderPane::new(),
