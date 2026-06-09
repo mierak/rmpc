@@ -28,7 +28,7 @@ use crate::{
 #[derive(Debug)]
 pub struct DirectoriesPane {
     stack: DirStack<DirOrSong, ListState>,
-    browser: Browser<DirOrSong>,
+    pub(crate) browser: Browser<DirOrSong>,
     initialized: bool,
 }
 

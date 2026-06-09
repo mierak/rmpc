@@ -35,7 +35,7 @@ pub struct TagBrowserPane {
     stack: DirStack<DirOrSong, ListState>,
     tags: Vec<BrowserTagConfig>,
     target_pane: PaneType,
-    browser: Browser<DirOrSong>,
+    pub(crate) browser: Browser<DirOrSong>,
     initialized: bool,
 }
 

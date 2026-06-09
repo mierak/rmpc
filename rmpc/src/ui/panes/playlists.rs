@@ -42,7 +42,7 @@ mod tests;
 #[derive(Debug)]
 pub struct PlaylistsPane {
     stack: DirStack<DirOrSong, ListState>,
-    browser: Browser<DirOrSong>,
+    pub(crate) browser: Browser<DirOrSong>,
     initialized: bool,
 }
 
