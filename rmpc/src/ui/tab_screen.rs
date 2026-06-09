@@ -46,8 +46,12 @@ pub struct TabScreen {
 
 impl TabScreen {
     pub fn new(panes: SizedPaneOrSplit) -> Result<Self> {
-        let focused =
-            panes.panes_iter().next().context("Tab needs at least one pane to be valid!")?.id;
+        let focused = panes
+            .panes_iter()
+            .find(|p| p.is_focusable())
+            .or_else(|| panes.panes_iter().next())
+            .context("Tab needs at least one pane to be valid!")?
+            .id;
         Ok(Self { panes, focused, initialized: false, pane_data: HashMap::default() })
     }
 
@@ -70,6 +74,7 @@ impl TabScreen {
         let focused = self.panes.panes_iter().find(|pane| pane.id == self.focused);
         self.panes.for_each_pane_custom_data(
             area,
+            Some(self.focused),
             frame,
             &mut |pane, area, block, block_area, bg_color, frame| {
                 let pane_data = self

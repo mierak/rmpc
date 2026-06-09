@@ -891,6 +891,7 @@ impl SizedPaneOrSplit {
     ) -> Result<()> {
         self.for_each_pane_custom_data(
             area,
+            None,
             (),
             &mut |pane, pane_area, block, block_area, background_color, ()| {
                 pane_callback(pane, pane_area, block, block_area, background_color)?;
@@ -904,6 +905,7 @@ impl SizedPaneOrSplit {
     pub fn for_each_pane_custom_data<T>(
         &self,
         area: Rect,
+        focused: Option<crate::shared::id::Id>,
         mut custom_data: T,
         pane_callback: &mut impl FnMut(
             &ConfigPane,
@@ -959,7 +961,15 @@ impl SizedPaneOrSplit {
                     };
                     let constraints =
                         panes.iter().map(|pane| pane.size.into_constraint(parent_other_size));
-                    let border_style = border_style.unwrap_or_else(|| ctx.config.as_border_style());
+                    let contains_focus = focused
+                        .is_some_and(|fid| configured_panes.panes_iter().any(|p| p.id == fid));
+                    let border_style = border_style.unwrap_or_else(|| {
+                        if contains_focus {
+                            ctx.config.as_focused_border_style()
+                        } else {
+                            ctx.config.as_border_style()
+                        }
+                    });
                     let mut block = Block::default()
                         .borders(*borders)
                         .border_style(border_style)
