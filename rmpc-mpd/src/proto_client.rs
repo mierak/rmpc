@@ -261,7 +261,7 @@ impl<T: SocketClient> ProtoClient for T {
             return Ok(MpdLine::Ok);
         }
         if line.starts_with("ACK") {
-            log::error!(line = line.as_str().trim(); "Read MPD line with error");
+            log::debug!("Read MPD line with error: '{}'", line.as_str().trim());
             return Err(MpdError::Mpd(MpdFailureResponse::from_str(&line)?));
         }
         line.pop(); // pop the new line

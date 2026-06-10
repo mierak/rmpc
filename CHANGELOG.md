@@ -51,6 +51,7 @@ All notable changes to this project will be documented in this file.
 
 ### Fixed
 
+- Benign error log when reading a sticker that does not exist
 - Theme hot reload not working when it was set using the `theme.ron` form
 - Issue with Iterm2 image protocol not rendering images sometimes
 - Moved `Update` and `Rescan` back to `u` and `U` respectively because they were conflicting with other
