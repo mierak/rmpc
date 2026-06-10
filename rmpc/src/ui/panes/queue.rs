@@ -386,11 +386,20 @@ impl Pane for QueuePane {
                     if i == 0 {
                         max_len = max_len.saturating_sub(1);
                     }
+                    // Width available to the whole first-column group (markers +
+                    // content) once the strip cell is reserved; padding for the
+                    // manual alignment below is computed against this, not the
+                    // marker-reduced content budget.
+                    let reserved_len = max_len;
                     // We have to subtract marker symbol length from max len in order to make space
                     // for the marker symbol in case we are in the first column of the table and the
                     // song is marked.
                     if is_marked && i == 0 {
                         max_len = max_len.saturating_sub(marker_symbol_len);
+                    }
+                    // ... and the same for the waveform marker on the playing track.
+                    if is_currently_playing_song && i == 0 {
+                        max_len = max_len.saturating_sub(2);
                     }
                     let format = &formats[i];
 
@@ -416,12 +425,10 @@ impl Pane for QueuePane {
                     .unwrap_or_default()
                     .alignment(formats[i].alignment.into());
 
-                    // The now-playing track shows a waveform icon in place of
-                    // the first column's content (design: wave icon in `#`).
+                    // The now-playing track gets a waveform icon next to its
+                    // track number (design: wave marker in the `#` column).
                     if is_currently_playing_song && i == 0 {
-                        let wave: String = "\u{f147d}".chars().take(max_len).collect(); // nf-md-waveform
-                        line = Line::from(Span::styled(wave, Style::default().fg(warm)))
-                            .alignment(formats[i].alignment.into());
+                        line.spans.insert(0, Span::styled("\u{f147d} ", Style::default().fg(warm)));
                     }
 
                     if is_marked && i == 0 {
@@ -429,6 +436,29 @@ impl Pane for QueuePane {
                             dirstack::marker_style(ctx, is_under_cursor, matches_filter);
                         let marker_span = Span::styled(&config.theme.symbols.marker, marker_style);
                         line.spans.splice(..0, std::iter::once(marker_span));
+                    }
+
+                    // Apply the first column's alignment manually inside the
+                    // reserved width and keep the line itself left-aligned: the
+                    // selection strip is inserted at span 0 by `into_row`, and
+                    // with ratatui alignment it would drift with the content
+                    // width (wave icon vs 1-3 digit track numbers) instead of
+                    // sitting at the column's left edge on every row.
+                    if i == 0 {
+                        let pad = reserved_len.saturating_sub(line.width());
+                        if pad > 0 {
+                            let pad = match Into::<ratatui::layout::Alignment>::into(
+                                formats[i].alignment,
+                            ) {
+                                ratatui::layout::Alignment::Right => pad,
+                                ratatui::layout::Alignment::Center => pad / 2,
+                                ratatui::layout::Alignment::Left => 0,
+                            };
+                            if pad > 0 {
+                                line.spans.insert(0, Span::raw(" ".repeat(pad)));
+                            }
+                        }
+                        line = line.left_aligned();
                     }
                     line
                 });
