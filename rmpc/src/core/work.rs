@@ -61,7 +61,7 @@ fn handle_work_request(
             let metadata = LrcIndex::index_single(&path)?;
             Ok(WorkDone::SingleLrcIndexed { path, metadata })
         }
-        WorkRequest::ResizeImage(fn_once) => Ok(WorkDone::ImageResized { data: fn_once() }),
+        WorkRequest::ResizeImage(id, fn_once) => Ok(WorkDone::ImageResized { id, data: fn_once() }),
         WorkRequest::SearchYt { query, kind, limit, interactive, position } => {
             if ytdlp.is_none() {
                 anyhow::bail!("Youtube support requires 'cache_dir' to be configured")

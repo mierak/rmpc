@@ -115,10 +115,10 @@ impl Pane for AlbumArtPane {
             UiEvent::Exit => {
                 self.album_art.cleanup()?;
             }
-            UiEvent::ImageEncoded { data } if is_visible => {
+            UiEvent::ImageEncoded { id, data } if *id == self.album_art.id() => {
                 self.album_art.display(std::mem::take(data), ctx)?;
             }
-            UiEvent::ImageEncodeFailed { err } if is_visible => {
+            UiEvent::ImageEncodeFailed { id, err } if *id == self.album_art.id() => {
                 self.album_art.image_processing_failed(err, ctx)?;
             }
             _ => {}
