@@ -17,6 +17,8 @@
     format_tag_separator: " | ",
     browser_column_widths: [20, 38, 42],
     background_color: "#0c0f14",
+    panel_background_color: "#14171d",
+    alternate_row_background_color: "#191e25",
     text_color: "#e5e8ed",
     header_background_color: None,
     modal_background_color: "#14171d",
@@ -153,18 +155,21 @@
                     panes: [
                         (
                             size: "35",
+                            background_color: "#14171d",
                             borders: "LEFT | TOP | BOTTOM",
                             border_symbols: Inherited(parent: Rounded, bottom_left: "├"),
                             pane: Component("header_left")
                         ),
                         (
                             size: "100%",
+                            background_color: "#14171d",
                             borders: "ALL",
                             border_symbols: Inherited(parent: Rounded, top_left: "┬", top_right: "┬", bottom_left: "┴", bottom_right: "┴"),
                             pane: Component("header_center")
                         ),
                         (
                             size: "35",
+                            background_color: "#14171d",
                             borders: "RIGHT | TOP | BOTTOM",
                             border_symbols: Inherited(parent: Rounded, bottom_right: "┤"),
                             pane: Component("header_right")
@@ -174,6 +179,7 @@
             ),
             (
                 pane: Pane(Tabs),
+                background_color: "#14171d",
                 borders: "RIGHT | LEFT | BOTTOM",
                 border_symbols: Rounded,
                 size: "2",
@@ -184,6 +190,7 @@
             ),
             (
                 size: "3",
+                background_color: "#14171d",
                 borders: "ALL",
                 border_symbols: Rounded,
                 border_title: [(kind: Text(" ")), (kind: Property(Status(QueueLength()))), (kind: Text(" songs / ")), (kind: Property(Status(QueueTimeTotal()))), (kind: Text(" total time "))],

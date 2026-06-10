@@ -360,6 +360,8 @@ impl Pane for QueuePane {
             .map(|range| range.end.saturating_sub(1))
             .collect();
         let current_song_id = ctx.current_song().map(|s| s.id);
+        let accent = config.theme.highlight_border_style.fg.unwrap_or(Color::Cyan);
+        let warm = config.theme.highlighted_item_style.fg.unwrap_or(accent);
         let marked = std::mem::take(self.queue.marked_mut());
         let filter = ctx.input.value(self.queue.filter_buffer_id);
         let selected_idx = self.queue.selected_idx();
@@ -414,6 +416,14 @@ impl Pane for QueuePane {
                     .unwrap_or_default()
                     .alignment(formats[i].alignment.into());
 
+                    // The now-playing track shows a waveform icon in place of
+                    // the first column's content (design: wave icon in `#`).
+                    if is_currently_playing_song && i == 0 {
+                        let wave: String = "\u{f147d}".chars().take(max_len).collect(); // nf-md-waveform
+                        line = Line::from(Span::styled(wave, Style::default().fg(warm)))
+                            .alignment(formats[i].alignment.into());
+                    }
+
                     if is_marked && i == 0 {
                         let marker_style =
                             dirstack::marker_style(ctx, is_under_cursor, matches_filter);
@@ -431,10 +441,17 @@ impl Pane for QueuePane {
                     row.cursor_style = Some(config.theme.current_item_style);
                 }
                 if idx % 2 == 1 {
-                    row.zebra_bg = Some(Color::Rgb(0x1c, 0x21, 0x2a));
+                    row.zebra_bg = config.theme.alternate_row_background_color;
                 }
-                row.strip = (is_under_cursor && self.highlight_enabled)
-                    .then(|| config.theme.highlight_border_style.fg.unwrap_or(Color::Cyan));
+                // Selection strip: accent on the cursor row, warm on the
+                // now-playing track (matches the design's inset strips).
+                row.strip = if is_under_cursor && self.highlight_enabled {
+                    Some(accent)
+                } else if is_currently_playing_song {
+                    Some(warm)
+                } else {
+                    None
+                };
                 let sep = ctx.config.theme.song_table_album_separator;
                 if new_album_indices.contains(&idx)
                     && matches!(sep, AlbumSeparator::Underline)
