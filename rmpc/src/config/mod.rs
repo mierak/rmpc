@@ -483,6 +483,27 @@ mod tests {
         let _ = UiConfig::default();
     }
 
+    /// Every bundled theme in `assets/themes/` (e.g. the Refined light
+    /// variant) must parse and convert against the current schema.
+    #[test]
+    fn bundled_themes_parse_and_convert() {
+        let dir = assets().join("themes");
+        let mut found = 0;
+        for entry in std::fs::read_dir(&dir).unwrap().flatten() {
+            let path = entry.path();
+            if path.extension().is_none_or(|e| e != "ron") {
+                continue;
+            }
+            found += 1;
+            let raw = std::fs::read_to_string(&path).unwrap();
+            let file: UiConfigFile = ron::de::from_str(&raw)
+                .unwrap_or_else(|e| panic!("{} must parse: {e}", path.display()));
+            UiConfig::try_from(file)
+                .unwrap_or_else(|e| panic!("{} must convert: {e}", path.display()));
+        }
+        assert!(found > 0, "no bundled themes found in {}", dir.display());
+    }
+
     /// The embedded `example_config.ron` is the default config (loaded by
     /// `Config::default()`); it must parse and its tab/pane layout must convert
     /// against the default theme.
