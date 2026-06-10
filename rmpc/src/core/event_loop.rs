@@ -478,10 +478,10 @@ fn main_task<B: Backend + std::io::Write>(
 
                         render_wanted = true;
                     }
-                    WorkDone::ImageResized { data } => {
+                    WorkDone::ImageResized { id, data } => {
                         let event = match data {
-                            Ok(data) => UiEvent::ImageEncoded { data },
-                            Err(err) => UiEvent::ImageEncodeFailed { err },
+                            Ok(data) => UiEvent::ImageEncoded { id, data },
+                            Err(err) => UiEvent::ImageEncodeFailed { id, err },
                         };
 
                         if let Err(err) = ui.on_event(event, &mut ctx) {

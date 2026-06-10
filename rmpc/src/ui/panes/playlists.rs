@@ -174,8 +174,11 @@ impl Pane for PlaylistsPane {
                 self.initialized = false;
                 self.before_show(ctx)?;
             }
-            UiEvent::ImageEncoded { data } if is_visible => {
+            UiEvent::ImageEncoded { id, data } if *id == self.album_art.id() => {
                 self.album_art.display(std::mem::take(data), ctx)?;
+            }
+            UiEvent::ImageEncodeFailed { id, err } if *id == self.album_art.id() => {
+                self.album_art.image_processing_failed(err, ctx)?;
             }
             UiEvent::Displayed if is_visible && self.crisp && self.has_cover => {
                 self.album_art.show_current(ctx)?;

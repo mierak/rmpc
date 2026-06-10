@@ -1147,8 +1147,8 @@ pub enum UiEvent {
     Hidden,
     ConfigChanged,
     PlaybackStateChanged,
-    ImageEncoded { data: EncodeData },
-    ImageEncodeFailed { err: anyhow::Error },
+    ImageEncoded { id: u64, data: EncodeData },
+    ImageEncodeFailed { id: u64, err: anyhow::Error },
     DownloadsUpdated,
     DisableQueueHighlight,
 }
