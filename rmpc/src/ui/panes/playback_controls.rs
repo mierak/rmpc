@@ -1,5 +1,9 @@
 use anyhow::Result;
-use ratatui::{Frame, layout::Rect, style::Style};
+use ratatui::{
+    Frame,
+    layout::Rect,
+    style::{Color, Style},
+};
 use rmpc_mpd::{commands::State, mpd_client::MpdClient};
 
 use super::Pane;
@@ -13,10 +17,11 @@ use crate::{
 
 /// A crafted, clickable transport widget: ⏮  ▶/⏸  ⏭.
 ///
-/// The play/pause control is rendered as a filled "pill" using the theme's
-/// tab-bar active style (accent background, dark glyph) so it reads as a real
-/// button; previous/next sit beside it in the muted inactive style. Clicking
-/// any of the three issues the corresponding MPD command.
+/// The play/pause control is rendered as a circular button: rounded powerline
+/// caps (\u{e0b6}/\u{e0b4}) around a single accent-filled cell — the closest a
+/// one-row-high terminal cell grid gets to the design's perfect circle.
+/// Previous/next sit beside it in the muted inactive style. Clicking any of
+/// the three issues the corresponding MPD command.
 #[derive(Debug, Default)]
 pub struct PlaybackControlsPane {
     area: Rect,
@@ -36,7 +41,9 @@ const PREV: &str = "\u{f048}"; // step-backward
 const NEXT: &str = "\u{f051}"; // step-forward
 const PLAY: &str = "\u{f04b}"; // play
 const PAUSE: &str = "\u{f04c}"; // pause
-const CLUSTER_W: u16 = 11; // prev(1) gap(2) circle(5) gap(2) next(1)
+const CAP_L: &str = "\u{e0b6}"; // powerline left half-circle
+const CAP_R: &str = "\u{e0b4}"; // powerline right half-circle
+const CLUSTER_W: u16 = 9; // prev(1) gap(2) circle(3) gap(2) next(1)
 
 impl Pane for PlaybackControlsPane {
     fn render(&mut self, frame: &mut Frame, area: Rect, ctx: &Ctx) -> Result<()> {
@@ -50,16 +57,18 @@ impl Pane for PlaybackControlsPane {
         let toggle_glyph = if ctx.status.state == State::Play { PAUSE } else { PLAY };
         let muted: Style = ctx.config.theme.tab_bar.inactive_style;
         let active: Style = ctx.config.theme.tab_bar.active_style;
+        let accent = active.bg.unwrap_or(Color::Cyan);
         let start_x = area.x + (area.width - CLUSTER_W) / 2;
         let mid_y = area.y + area.height / 2;
-        let square_x = start_x + 3;
-        let next_x = start_x + 10;
-        // Filled accent button on the bar's inner row — reaches the box's inner
-        // top/bottom margins without overflowing the border; larger than prev/next.
+        let circle_x = start_x + 3;
+        let next_x = start_x + 8;
         let buf = frame.buffer_mut();
         buf.set_string(start_x, mid_y, PREV, muted);
-        buf.set_string(square_x, mid_y, format!("  {toggle_glyph}  "), active);
-        self.toggle = Some(Rect::new(square_x, mid_y, 5, 1));
+        // Half-circle caps + one accent cell = a circular button on one row.
+        buf.set_string(circle_x, mid_y, CAP_L, Style::default().fg(accent));
+        buf.set_string(circle_x + 1, mid_y, toggle_glyph, active);
+        buf.set_string(circle_x + 2, mid_y, CAP_R, Style::default().fg(accent));
+        self.toggle = Some(Rect::new(circle_x, mid_y, 3, 1));
         buf.set_string(next_x, mid_y, NEXT, muted);
         self.prev = Some(Rect::new(start_x, mid_y, 1, 1));
         self.next = Some(Rect::new(next_x, mid_y, 1, 1));

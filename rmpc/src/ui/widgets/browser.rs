@@ -89,10 +89,16 @@ where
         self.areas[BrowserArea::Preview] = preview_area;
         self.areas[BrowserArea::Cover] = Rect::default();
         if cw[2] > 0 {
+            if let Some(panel_bg) = config.theme.panel_background_color {
+                buf.set_style(preview_area, Style::default().bg(panel_bg));
+            }
             let pblock = {
-                let mut b =
-                    Block::bordered().border_type(BorderType::Rounded).border_style(dim_border);
-                if let Some(t) = box_title(2, Some(" Preview".to_string())) {
+                let mut b = if config.theme.draw_borders {
+                    Block::bordered().border_type(BorderType::Rounded).border_style(dim_border)
+                } else {
+                    Block::default().padding(Padding::new(1, 0, 0, 0))
+                };
+                if let Some(t) = box_title(2, Some(" \u{f05a} Preview ".to_string())) {
                     b = b.title(t).title_style(title_style);
                 }
                 b
@@ -259,6 +265,9 @@ where
         if cw[0] > 0
             && let Some(previous) = state.previous_mut()
         {
+            if let Some(panel_bg) = config.theme.panel_background_color {
+                buf.set_style(previous_area, Style::default().bg(panel_bg));
+            }
             let items = previous.to_list_items(song_format, ctx);
             let title = previous.filter_text(previous_area.width, ctx);
             let prev_state = &mut previous.state;
@@ -299,6 +308,9 @@ where
         }
         // ---- Current (focused) column ----
         if cw[1] > 0 {
+            if let Some(panel_bg) = config.theme.panel_background_color {
+                buf.set_style(current_area, Style::default().bg(panel_bg));
+            }
             let title = state.current().filter_text(current_area.width.saturating_sub(2), ctx);
             let Dir { items, state, .. } = state.current_mut();
             state.set_content_and_viewport_len(items.len(), current_area.height.into());
@@ -311,11 +323,12 @@ where
                 } else {
                     Block::default().padding(Padding::new(0, column_right_padding, 0, 0))
                 };
-                if let Some(t) = col_titles.as_ref().map(|x| x[1].clone()).filter(|s| !s.is_empty())
+                if let Some(title) = title {
+                    b = b.title(title);
+                } else if let Some(t) =
+                    col_titles.as_ref().map(|x| x[1].clone()).filter(|s| !s.is_empty())
                 {
                     b = b.title(t).title_style(title_style);
-                } else if let Some(title) = title {
-                    b = b.title(title);
                 }
                 b
             };

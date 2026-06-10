@@ -49,6 +49,10 @@ const DEFAULT_ART: &[u8; 58599] = include_bytes!("../../../../assets/default.jpg
 pub struct UiConfig {
     pub draw_borders: bool,
     pub background_color: Option<Color>,
+    /// Surface color painted inside boxed panes (design `panel`).
+    pub panel_background_color: Option<Color>,
+    /// Zebra background for alternate rows in song tables (design `panelAlt`).
+    pub alternate_row_background_color: Option<Color>,
     pub header_background_color: Option<Color>,
     pub modal_background_color: Option<Color>,
     pub modal_backdrop: bool,
@@ -100,6 +104,8 @@ pub struct UiConfigFile {
     pub(super) browser_column_widths: Vec<u16>,
     pub(super) browser_song_format: SongFormatFile,
     pub(super) background_color: Option<String>,
+    pub(super) panel_background_color: Option<String>,
+    pub(super) alternate_row_background_color: Option<String>,
     pub(super) text_color: Option<String>,
     pub(super) preview_label_style: StyleFile,
     pub(super) preview_metadata_group_style: StyleFile,
@@ -157,6 +163,8 @@ impl UiConfigFile {
             default_album_art_path: None,
             draw_borders: true,
             background_color: None,
+            panel_background_color: None,
+            alternate_row_background_color: None,
             text_color: None,
             header_background_color: None,
             show_song_table_header: false,
@@ -470,6 +478,9 @@ impl TryFrom<UiConfigFile> for UiConfig {
             components,
             cava: value.cava.into_config(bg_color)?,
             background_color: bg_color,
+            panel_background_color: StringColor(value.panel_background_color).to_color()?,
+            alternate_row_background_color: StringColor(value.alternate_row_background_color)
+                .to_color()?,
             draw_borders: value.draw_borders,
             format_tag_separator: value.format_tag_separator,
             multiple_tag_resolution_strategy: value.multiple_tag_resolution_strategy,
