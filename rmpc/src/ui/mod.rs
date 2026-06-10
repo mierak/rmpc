@@ -172,6 +172,15 @@ impl<'ui> Ui<'ui> {
             None,
             &mut *frame,
             &mut |pane, pane_area, block, block_area, bg_color, frame| {
+                // Paint the pane background BEFORE the pane renders its content,
+                // otherwise the fill would flatten any background the content
+                // painted itself (e.g. the active tab pill or button fills).
+                if let Some(bg_color) = bg_color {
+                    frame.render_widget(
+                        Block::default().style(Style::default().bg(bg_color)),
+                        pane_area,
+                    );
+                }
                 match self.panes.get_mut(&pane.pane, ctx)? {
                     Panes::TabContent => {
                         active_tab_call!(self, ctx, render(frame, pane_area, ctx))?;
@@ -179,12 +188,6 @@ impl<'ui> Ui<'ui> {
                     mut pane_instance => {
                         pane_call!(pane_instance, render(frame, pane_area, ctx))?;
                     }
-                }
-                if let Some(bg_color) = bg_color {
-                    frame.render_widget(
-                        Block::default().style(Style::default().bg(bg_color)),
-                        pane_area,
-                    );
                 }
                 let border_style =
                     pane.border_style.unwrap_or_else(|| ctx.config.as_border_style());

@@ -296,13 +296,7 @@ impl AlbumsGridPane {
         let accent = theme.highlight_border_style.fg.unwrap_or(Color::Cyan);
         let muted = theme.preview_label_style.fg.unwrap_or(Color::Gray);
         let text = theme.text_color.unwrap_or(Color::White);
-        let block = Block::bordered()
-            .border_type(BorderType::Rounded)
-            .border_style(ctx.config.as_focused_border_style())
-            .title("\u{f001} Albums")
-            .title_style(Style::default().fg(accent).add_modifier(Modifier::BOLD));
-        let inner = block.inner(area);
-        frame.render_widget(block, area);
+        let inner = area;
         let items: Vec<ListItem> = self
             .albums
             .iter()
@@ -342,14 +336,27 @@ impl AlbumsGridPane {
 
 impl Pane for AlbumsGridPane {
     fn render(&mut self, frame: &mut Frame, area: Rect, ctx: &Ctx) -> Result<()> {
-        self.area = area;
         if area.width < 6 || area.height < 4 {
             return Ok(());
         }
+        // One boxed panel shared by both views (grid and list).
+        let accent = ctx.config.theme.highlight_border_style.fg.unwrap_or(Color::Cyan);
+        if let Some(panel_bg) = ctx.config.theme.panel_background_color {
+            frame.render_widget(Block::default().style(Style::default().bg(panel_bg)), area);
+        }
+        let block = Block::bordered()
+            .border_type(BorderType::Rounded)
+            .border_style(ctx.config.as_focused_border_style())
+            .title(" \u{f001} Albums ")
+            .title_style(Style::default().fg(accent).add_modifier(Modifier::BOLD));
+        let inner = block.inner(area);
+        frame.render_widget(block, area);
+        self.area = inner;
         if self.view == AlbumsView::List {
-            self.render_list(frame, area, ctx);
+            self.render_list(frame, inner, ctx);
             return Ok(());
         }
+        let area = inner;
         let theme = &ctx.config.theme;
         let (pad_x, pad_y) = (1u16, 1u16);
         let inner_w = area.width.saturating_sub(pad_x * 2);
@@ -403,7 +410,10 @@ impl Pane for AlbumsGridPane {
             if selected && self.crisp && self.has_cover {
                 // leave blank — the facade paints the crisp cover here; the buffer
                 // cells stay unchanged frame-to-frame so the image persists
-                let blank = Style::default().bg(theme.background_color.unwrap_or_default());
+                let blank = Style::default().bg(theme
+                    .panel_background_color
+                    .or(theme.background_color)
+                    .unwrap_or_default());
                 for yy in 0..cover_h {
                     for xx in 0..CARD_W {
                         if let Some(cell) = buf.cell_mut((cx + xx, cy + yy)) {

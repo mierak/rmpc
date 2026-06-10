@@ -189,14 +189,16 @@
                             panes: [
                                 (
                                     size: "100%",
+                                    background_color: "#14171d",
                                     borders: "LEFT | RIGHT | TOP",
                                     border_symbols: Rounded,
-                                    border_title: [(kind: Text("\u{f001}  Now Playing "))],
+                                    border_title: [(kind: Text(" \u{f001} Now Playing "))],
                                     border_title_alignment: Left,
                                     pane: Pane(AlbumArt),
                                 ),
                                 (
                                     size: "8",
+                                    background_color: "#14171d",
                                     borders: "LEFT | RIGHT | BOTTOM",
                                     border_symbols: Inherited(parent: Rounded, top_left: "├", top_right: "┤"),
                                     pane: Split(
@@ -273,9 +275,10 @@
                             panes: [
                                 (
                                     size: "70%",
+                                    background_color: "#14171d",
                                     borders: "ALL",
                                     border_symbols: Rounded,
-                                    border_title: [(kind: Text("\u{f0cb}  Queue "))],
+                                    border_title: [(kind: Text(" \u{f0cb} Queue "))],
                                     border_title_alignment: Left,
                                     pane: Split(
                                         direction: Vertical,
@@ -305,9 +308,10 @@
                                 ),
                                 (
                                     size: "30%",
+                                    background_color: "#14171d",
                                     borders: "ALL",
                                     border_symbols: Rounded,
-                                    border_title: [(kind: Text("\u{f080}  Visualizer "))],
+                                    border_title: [(kind: Text(" \u{f080} Visualizer "))],
                                     border_title_alignment: Left,
                                     pane: Pane(Cava),
                                 ),
@@ -319,10 +323,6 @@
         ),
         (
             name: "\u{f07b} Directories",
-            borders: "ALL",
-            border_symbols: Rounded,
-            border_title: [(kind: Text(" Directories "))],
-            border_title_alignment: Left,
             pane: Split(size: "100%", direction: Vertical, panes: [(pane: Pane(Directories), size: "100%")]),
         ),
         (
@@ -330,42 +330,31 @@
             pane: Split(size: "100%", direction: Vertical, panes: [(
                 pane: Pane(Artists),
                 size: "100%",
-                borders: "ALL",
-                border_symbols: Rounded,
-                border_title: [(kind: Text(" Artists "))],
-                border_title_alignment: Left,
             )]),
         ),
         (
             name: "\u{f00a} Albums",
-            borders: "ALL",
-            border_symbols: Rounded,
-            border_title: [(kind: Text(" Albums "))],
             pane: Split(size: "100%", direction: Vertical, panes: [(pane: Pane(AlbumsGrid), size: "100%")]),
         ),
         (
             name: "\u{f002} Search",
-            borders: "ALL",
-            border_symbols: Rounded,
-            border_title: [(kind: Text(" Search "))],
-            border_title_alignment: Left,
             pane: Split(size: "100%", direction: Vertical, panes: [(pane: Pane(Search), size: "100%")]),
         ),
         (
             name: "\u{f03a} Playlists",
-            borders: "ALL",
-            border_symbols: Rounded,
-            border_title: [(kind: Text(" Playlists "))],
-            border_title_alignment: Left,
             pane: Split(size: "100%", direction: Vertical, panes: [(pane: Pane(Playlists), size: "100%")]),
         ),
         (
             name: "\u{f036} Lyrics",
-            borders: "ALL",
-            border_symbols: Rounded,
-            border_title: [(kind: Text(" Lyrics "))],
-            border_title_alignment: Left,
-            pane: Split(size: "100%", direction: Vertical, panes: [(pane: Pane(Lyrics), size: "100%")]),
+            pane: Split(size: "100%", direction: Vertical, panes: [(
+                pane: Pane(Lyrics),
+                size: "100%",
+                background_color: "#14171d",
+                borders: "ALL",
+                border_symbols: Rounded,
+                border_title: [(kind: Text(" \u{f036} Lyrics "))],
+                border_title_alignment: Left,
+            )]),
         ),
     ],
 )

@@ -6,7 +6,8 @@ use itertools::Itertools;
 use ratatui::{
     layout::{Alignment, Constraint, Layout, Rect},
     style::{Color, Modifier, Style},
-    widgets::{Block, BorderType, List, ListState, Padding, Row, Table, TableState},
+    text::{Line, Span},
+    widgets::{Block, BorderType, Cell, List, ListState, Padding, Row, Table, TableState},
 };
 use rmpc_mpd::{
     client::Client,
@@ -151,14 +152,31 @@ impl SearchPane {
     ) {
         let config = &ctx.config;
         let column_right_padding: u16 = config.theme.scrollbar.is_some().into();
-        let title = self.songs_dir.filter_text(area.width, ctx);
+        let title = self.songs_dir.filter_text(area.width.saturating_sub(2), ctx);
 
+        if let Some(panel_bg) = config.theme.panel_background_color {
+            frame.render_widget(Block::default().style(Style::default().bg(panel_bg)), area);
+        }
+        let accent = config.theme.highlight_border_style.fg.unwrap_or(Color::Cyan);
+        let input_focused = self.inputs.query_buffer_id().is_some_and(|id| ctx.input.is_active(id));
+        let border_style = if input_focused {
+            config.theme.borders_style
+        } else {
+            config.as_focused_border_style()
+        };
         let block = {
-            let mut b = Block::default();
+            let mut b = Block::bordered()
+                .border_type(BorderType::Rounded)
+                .border_style(border_style)
+                .padding(Padding::new(0, column_right_padding, 0, 0));
             if let Some(title) = title {
                 b = b.title(title);
+            } else {
+                b = b
+                    .title(" \u{f002} Results ")
+                    .title_style(Style::default().fg(accent).add_modifier(Modifier::BOLD));
             }
-            b.padding(Padding::new(0, column_right_padding, 0, 0))
+            b
         };
         let current = List::new(
             self.songs_dir.to_list_items(ctx.config.theme.browser_song_format.0.as_slice(), ctx),
@@ -1088,15 +1106,30 @@ impl Pane for SearchPane {
         else {
             return Ok(());
         };
+        let input_focused = self.inputs.query_buffer_id().is_some_and(|id| ctx.input.is_active(id));
+        if let Some(panel_bg) = ctx.config.theme.panel_background_color {
+            frame.render_widget(
+                Block::default().style(Style::default().bg(panel_bg)),
+                search_section,
+            );
+        }
         // Search bar = one rounded panel with a single content row:
         //   <icon> <query+cursor> ............ <N matches>  [Title][Artist][Album][Any]
-        let bar_block = Block::bordered()
-            .border_type(BorderType::Rounded)
-            .border_style(ctx.config.theme.borders_style);
+        let bar_block =
+            Block::bordered().border_type(BorderType::Rounded).border_style(if input_focused {
+                ctx.config.as_focused_border_style()
+            } else {
+                ctx.config.theme.borders_style
+            });
         let bar_inner = bar_block.inner(search_section);
         frame.render_widget(bar_block, search_section);
         let row_y = bar_inner.y;
-        let surround = ctx.config.theme.background_color.unwrap_or_default();
+        let surround = ctx
+            .config
+            .theme
+            .panel_background_color
+            .or(ctx.config.theme.background_color)
+            .unwrap_or_default();
         // Chip geometry (right-aligned). Each pill occupies label_len + 4 cells
         // (rounded cap + space + label + space + rounded cap); 1-cell gap between.
         let chips = [
@@ -1158,10 +1191,20 @@ impl Pane for SearchPane {
         match self.phase {
             Phase::Search => {
                 // --- Results panel ---
+                if let Some(panel_bg) = ctx.config.theme.panel_background_color {
+                    frame.render_widget(
+                        Block::default().style(Style::default().bg(panel_bg)),
+                        results_area,
+                    );
+                }
                 let results_block = Block::bordered()
                     .border_type(BorderType::Rounded)
-                    .border_style(ctx.config.theme.borders_style)
-                    .title("\u{f002}  Results")
+                    .border_style(if input_focused {
+                        ctx.config.theme.borders_style
+                    } else {
+                        ctx.config.as_focused_border_style()
+                    })
+                    .title(" \u{f002} Results ")
                     .title_alignment(Alignment::Left)
                     .title_style(Style::default().fg(accent).add_modifier(Modifier::BOLD));
                 let inner = results_block.inner(results_area);
@@ -1174,11 +1217,16 @@ impl Pane for SearchPane {
                 {
                     self.songs_dir.state.select(Some(0), 0);
                 }
+                let selected = self.songs_dir.state.get_selected();
+                let playing_file = ctx.current_song().map(|song| song.file.clone());
+                let warm = ctx.config.theme.highlighted_item_style.fg.unwrap_or(accent);
+                let zebra = ctx.config.theme.alternate_row_background_color;
                 let rows: Vec<Row> = self
                     .songs_dir
                     .items
                     .iter()
-                    .map(|song| {
+                    .enumerate()
+                    .map(|(idx, song)| {
                         let title = song
                             .metadata
                             .get("title")
@@ -1200,10 +1248,34 @@ impl Pane for SearchPane {
                                 format!("{:02}:{:02}", secs / 60, secs % 60)
                             })
                             .unwrap_or_default();
-                        Row::new([title, artist, album, duration])
+                        // Uniform 1-cell strip on the first column: accent on the
+                        // cursor row, warm on the now-playing track (matches Queue).
+                        let is_playing = playing_file.as_deref() == Some(song.file.as_str());
+                        let strip = if selected.is_some_and(|s| s == idx) {
+                            Span::styled("\u{258e}", Style::default().fg(accent))
+                        } else if is_playing {
+                            Span::styled("\u{258e}", Style::default().fg(warm))
+                        } else {
+                            Span::raw(" ")
+                        };
+                        let mut row_style = Style::default();
+                        if idx % 2 == 1
+                            && let Some(zebra) = zebra
+                        {
+                            row_style = row_style.bg(zebra);
+                        }
+                        if is_playing {
+                            row_style = row_style.patch(ctx.config.theme.highlighted_item_style);
+                        }
+                        Row::new([
+                            Cell::from(Line::from(vec![strip, Span::raw(title)])),
+                            Cell::from(artist),
+                            Cell::from(album),
+                            Cell::from(duration),
+                        ])
+                        .style(row_style)
                     })
                     .collect();
-                let selected = self.songs_dir.state.get_selected();
                 let offset = self.songs_dir.state.offset();
                 let mut table_state = TableState::new().with_selected(selected).with_offset(offset);
                 let widths = [
