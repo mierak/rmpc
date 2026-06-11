@@ -169,8 +169,18 @@ impl<'ui> Ui<'ui> {
 
         self.layout.for_each_pane_custom_data(
             self.area,
+            None,
             &mut *frame,
             &mut |pane, pane_area, block, block_area, bg_color, frame| {
+                // Paint the pane background BEFORE the pane renders its content,
+                // otherwise the fill would flatten any background the content
+                // painted itself (e.g. the active tab pill or button fills).
+                if let Some(bg_color) = bg_color {
+                    frame.render_widget(
+                        Block::default().style(Style::default().bg(bg_color)),
+                        pane_area,
+                    );
+                }
                 match self.panes.get_mut(&pane.pane, ctx)? {
                     Panes::TabContent => {
                         active_tab_call!(self, ctx, render(frame, pane_area, ctx))?;
@@ -178,12 +188,6 @@ impl<'ui> Ui<'ui> {
                     mut pane_instance => {
                         pane_call!(pane_instance, render(frame, pane_area, ctx))?;
                     }
-                }
-                if let Some(bg_color) = bg_color {
-                    frame.render_widget(
-                        Block::default().style(Style::default().bg(bg_color)),
-                        pane_area,
-                    );
                 }
                 let border_style =
                     pane.border_style.unwrap_or_else(|| ctx.config.as_border_style());
@@ -850,6 +854,7 @@ impl<'ui> Ui<'ui> {
     pub fn on_ui_app_event(&mut self, event: UiAppEvent, ctx: &mut Ctx) -> Result<()> {
         match event {
             UiAppEvent::Modal(modal) => {
+                let modal = modal.0;
                 let existing_modal = modal.replacement_id().and_then(|id| {
                     self.modals
                         .iter_mut()
@@ -992,6 +997,10 @@ impl<'ui> Ui<'ui> {
                 Panes::Search(p) => p.on_event(&mut event, visible, ctx),
                 Panes::AlbumArtists(p) => p.on_event(&mut event, visible, ctx),
                 Panes::AlbumArt(p) => p.on_event(&mut event, visible, ctx),
+                Panes::GradientArt(p) => p.on_event(&mut event, visible, ctx),
+                Panes::PlaybackControls(p) => p.on_event(&mut event, visible, ctx),
+                Panes::AlbumsGrid(p) => p.on_event(&mut event, visible, ctx),
+                Panes::StatesControls(p) => p.on_event(&mut event, visible, ctx),
                 Panes::Lyrics(p) => p.on_event(&mut event, visible, ctx),
                 Panes::ProgressBar(p) => p.on_event(&mut event, visible, ctx),
                 Panes::Header(p) => p.on_event(&mut event, visible, ctx),
@@ -1040,6 +1049,10 @@ impl<'ui> Ui<'ui> {
                     Panes::Search(p) => p.on_query_finished(id, data, visible, ctx),
                     Panes::AlbumArtists(p) => p.on_query_finished(id, data, visible, ctx),
                     Panes::AlbumArt(p) => p.on_query_finished(id, data, visible, ctx),
+                    Panes::GradientArt(p) => p.on_query_finished(id, data, visible, ctx),
+                    Panes::PlaybackControls(p) => p.on_query_finished(id, data, visible, ctx),
+                    Panes::AlbumsGrid(p) => p.on_query_finished(id, data, visible, ctx),
+                    Panes::StatesControls(p) => p.on_query_finished(id, data, visible, ctx),
                     Panes::Lyrics(p) => p.on_query_finished(id, data, visible, ctx),
                     Panes::ProgressBar(p) => p.on_query_finished(id, data, visible, ctx),
                     Panes::Header(p) => p.on_query_finished(id, data, visible, ctx),
@@ -1083,9 +1096,31 @@ impl<'ui> Ui<'ui> {
     }
 }
 
+/// Wrapper around a boxed [`Modal`] that asserts `Send + Sync`.
+///
+/// # Safety
+/// Modals are constructed and consumed exclusively on the single "main"
+/// event-loop thread (see `core::event_loop`). [`Ctx`] — which owns the only
+/// `app_event_sender` used to emit `UiAppEvent::Modal` — is moved into that
+/// thread and is never `Clone`d elsewhere, so a boxed modal is merely routed
+/// through the app-event channel back to the same thread it originated on and
+/// never actually migrates across threads. ratatui's `Block` (held transitively
+/// through `ButtonGroup`) carries a non-`Send`/`Sync` `Arc<dyn CellEffect>`
+/// shadow since ratatui 0.30.1, but because the value stays on one thread this
+/// is sound.
+#[derive(Debug)]
+pub struct ModalWrapper(pub Box<dyn Modal>);
+
+// SAFETY: see the type-level docs — modals never leave the main event-loop
+// thread.
+unsafe impl Send for ModalWrapper {}
+// SAFETY: see the type-level docs — modals never leave the main event-loop
+// thread.
+unsafe impl Sync for ModalWrapper {}
+
 #[derive(Debug)]
 pub enum UiAppEvent {
-    Modal(Box<dyn Modal + Send + Sync>),
+    Modal(ModalWrapper),
     PopModal(Id),
     PopConfigErrorModal,
     ChangeTab(TabName),
@@ -1111,8 +1146,8 @@ pub enum UiEvent {
     Hidden,
     ConfigChanged,
     PlaybackStateChanged,
-    ImageEncoded { data: EncodeData },
-    ImageEncodeFailed { err: anyhow::Error },
+    ImageEncoded { id: u64, data: EncodeData },
+    ImageEncodeFailed { id: u64, err: anyhow::Error },
     DownloadsUpdated,
     DisableQueueHighlight,
 }

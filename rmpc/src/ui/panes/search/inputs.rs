@@ -1,20 +1,12 @@
 use bon::bon;
-use ratatui::{
-    buffer::Buffer,
-    layout::{Alignment, Position, Rect},
-    style::Style,
-    widgets::{Block, Borders, Widget},
-};
+use ratatui::layout::{Position, Rect};
 use rmpc_mpd::{filter::FilterKind, mpd_client::StickerFilter};
 use strum::{FromRepr, IntoStaticStr, VariantNames};
 
 use crate::{
     config::{FilterKindFile, Search},
     ctx::Ctx,
-    ui::{
-        input::BufferId,
-        widgets::{button::Button, input::Input},
-    },
+    ui::input::BufferId,
 };
 
 pub const SEARCH_MODE_KEY: &str = "search_mode";
@@ -39,11 +31,6 @@ pub(super) struct InputGroups {
     focused_idx: usize,
     pub area: Rect,
 
-    text_style: Style,
-    separator_style: Style,
-    current_item_style: Style,
-    highlight_item_style: Style,
-
     fold_case: bool,
     strip_diacritics: bool,
     search_mode: SearchMode,
@@ -62,10 +49,6 @@ impl InputGroups {
         custom_query: bool,
         stickers_supported: bool,
         strip_diacritics_supported: bool,
-        text_style: Style,
-        separator_style: Style,
-        current_item_style: Style,
-        highlight_item_style: Style,
         ctx: &Ctx,
     ) -> Self {
         let mut inputs = Vec::new();
@@ -73,7 +56,6 @@ impl InputGroups {
             inputs.push(InputType::Textbox(TextboxInput {
                 key: "",
                 filter_key: Some(tag.value.clone()),
-                label: format!(" {:<18}:", tag.label),
                 initial_value: None,
                 buffer_id: BufferId::new(),
             }));
@@ -86,7 +68,6 @@ impl InputGroups {
             inputs.push(InputType::Textbox(TextboxInput {
                 key: CUSTOM_QUERY_KEY,
                 filter_key: None,
-                label: format!(" {:<18}:", "Query"),
                 initial_value: None,
                 buffer_id,
             }));
@@ -94,57 +75,35 @@ impl InputGroups {
 
         if stickers_supported {
             inputs.push(InputType::Separator);
-            inputs.push(InputType::Spinner(SpinnerInput {
-                key: RATING_MODE_KEY,
-                label: format!(" {:<18}:", "Rating"),
-            }));
+            inputs.push(InputType::Spinner(SpinnerInput { key: RATING_MODE_KEY }));
 
             let buffer_id = BufferId::new();
             ctx.input.create_buffer(buffer_id, Some("0"));
             inputs.push(InputType::Numberbox(TextboxInput {
                 key: RATING_VALUE_KEY,
                 filter_key: None,
-                label: format!(" {:<18}:", "Value"),
                 initial_value: Some("0".to_owned()),
                 buffer_id,
             }));
 
             inputs.push(InputType::Separator);
-            inputs.push(InputType::Spinner(SpinnerInput {
-                key: LIKE_KEY,
-                label: format!(" {:<18}:", "Liked"),
-            }));
+            inputs.push(InputType::Spinner(SpinnerInput { key: LIKE_KEY }));
         }
 
         inputs.push(InputType::Separator);
 
-        inputs.push(InputType::Spinner(SpinnerInput {
-            key: SEARCH_MODE_KEY,
-            label: format!(" {:<18}:", "Search mode"),
-        }));
-        inputs.push(InputType::Spinner(SpinnerInput {
-            key: FOLD_CASE_KEY,
-            label: format!(" {:<18}:", "Case sensitive"),
-        }));
+        inputs.push(InputType::Spinner(SpinnerInput { key: SEARCH_MODE_KEY }));
+        inputs.push(InputType::Spinner(SpinnerInput { key: FOLD_CASE_KEY }));
         if strip_diacritics_supported {
-            inputs.push(InputType::Spinner(SpinnerInput {
-                key: STRIP_DIACRITICS_KEY,
-                label: format!(" {:<18}:", "Ignore diacritics"),
-            }));
+            inputs.push(InputType::Spinner(SpinnerInput { key: STRIP_DIACRITICS_KEY }));
         }
 
         inputs.push(InputType::Separator);
 
-        inputs.push(InputType::Button(ButtonInput {
-            key: RESET_BUTTON_KEY,
-            label: " Reset".to_owned(),
-        }));
+        inputs.push(InputType::Button(ButtonInput { key: RESET_BUTTON_KEY }));
 
         if search_button {
-            inputs.push(InputType::Button(ButtonInput {
-                key: SEARCH_BUTTON_KEY,
-                label: " Search".to_owned(),
-            }));
+            inputs.push(InputType::Button(ButtonInput { key: SEARCH_BUTTON_KEY }));
         }
 
         Self {
@@ -156,11 +115,6 @@ impl InputGroups {
             search_button,
             initial_fold_case,
             initial_strip_diacritics,
-
-            text_style,
-            separator_style,
-            current_item_style,
-            highlight_item_style,
 
             fold_case: initial_fold_case,
             strip_diacritics: initial_strip_diacritics,
@@ -389,6 +343,19 @@ impl InputGroups {
         }
         None
     }
+
+    /// Returns the buffer id of the primary query field (first textbox).
+    pub fn query_buffer_id(&self) -> Option<BufferId> {
+        self.inputs.iter().find_map(|input| match input {
+            InputType::Textbox(tb) => Some(tb.buffer_id),
+            _ => None,
+        })
+    }
+
+    /// Returns the trimmed text of the primary query field.
+    pub fn query_value(&self, ctx: &Ctx) -> String {
+        self.query_buffer_id().map(|id| ctx.input.value(id).trim().to_owned()).unwrap_or_default()
+    }
 }
 
 #[derive(Debug)]
@@ -402,7 +369,6 @@ pub(super) enum InputType {
 
 #[derive(Debug)]
 pub(super) struct TextboxInput {
-    pub label: String,
     pub key: &'static str,
     pub filter_key: Option<String>,
     pub initial_value: Option<String>,
@@ -412,7 +378,6 @@ pub(super) struct TextboxInput {
 #[derive(Debug)]
 pub(super) struct SpinnerInput {
     pub key: &'static str,
-    pub label: String,
 }
 
 #[derive(Debug, Default, PartialEq, VariantNames, Clone, Copy, FromRepr, IntoStaticStr)]
@@ -430,6 +395,15 @@ pub(super) enum SearchMode {
     Regex,
     #[strum(serialize = "Not regex")]
     NotRegex,
+}
+
+#[derive(Debug, Default, PartialEq, Clone, Copy)]
+pub(super) enum SearchTag {
+    #[default]
+    Any,
+    Title,
+    Artist,
+    Album,
 }
 
 #[derive(Debug, Default, Clone, Copy, IntoStaticStr, VariantNames, FromRepr)]
@@ -520,125 +494,4 @@ pub(super) enum ActionResult {
 #[derive(derive_more::Debug)]
 pub(super) struct ButtonInput {
     pub key: &'static str,
-    pub label: String,
-}
-
-impl InputGroups {
-    pub fn render(&mut self, mut area: Rect, buf: &mut Buffer, ctx: &Ctx) {
-        self.area = area;
-        let mut remaining_height = area.height as usize;
-        area.height = 1;
-        for (idx, input) in self.inputs.iter().enumerate() {
-            if remaining_height == 0 {
-                break;
-            }
-
-            let is_focused = idx == self.focused_idx;
-
-            match input {
-                InputType::Textbox(input) => {
-                    let widget = Input::builder()
-                        .ctx(ctx)
-                        .buffer_id(input.buffer_id)
-                        .borderless(true)
-                        .label(&input.label)
-                        .placeholder("<None>")
-                        .focused(is_focused && ctx.input.is_active(input.buffer_id));
-
-                    let widget = if ctx.input.is_active(input.buffer_id) && is_focused {
-                        widget
-                            .label_style(self.highlight_item_style)
-                            .input_style(self.text_style)
-                            .build()
-                    } else if is_focused {
-                        widget
-                            .label_style(self.current_item_style)
-                            .input_style(self.current_item_style)
-                            .build()
-                    } else {
-                        widget.label_style(self.text_style).input_style(self.text_style).build()
-                    };
-
-                    widget.render(area, buf);
-                }
-                InputType::Numberbox(input) => {
-                    let widget = Input::builder()
-                        .ctx(ctx)
-                        .buffer_id(input.buffer_id)
-                        .borderless(true)
-                        .label(&input.label)
-                        .placeholder("<None>")
-                        .focused(is_focused && ctx.input.is_active(input.buffer_id));
-
-                    let widget = if ctx.input.is_active(input.buffer_id) && is_focused {
-                        widget
-                            .label_style(self.highlight_item_style)
-                            .input_style(self.text_style)
-                            .build()
-                    } else if is_focused {
-                        widget
-                            .label_style(self.current_item_style)
-                            .input_style(self.current_item_style)
-                            .build()
-                    } else {
-                        widget.label_style(self.text_style).input_style(self.text_style).build()
-                    };
-
-                    widget.render(area, buf);
-                }
-                InputType::Spinner(input) => {
-                    let text = match input.key {
-                        FOLD_CASE_KEY => {
-                            if self.fold_case {
-                                "No"
-                            } else {
-                                "Yes"
-                            }
-                        }
-                        STRIP_DIACRITICS_KEY => {
-                            if self.strip_diacritics {
-                                "Yes"
-                            } else {
-                                "No"
-                            }
-                        }
-                        SEARCH_MODE_KEY => self.search_mode.into(),
-                        RATING_MODE_KEY => self.rating_mode.into(),
-                        LIKE_KEY => self.liked_mode.into(),
-                        _ => "",
-                    };
-                    let inp = Input::new_static()
-                        .ctx(ctx)
-                        .text(text)
-                        .borderless(true)
-                        .label(&input.label);
-
-                    let inp = if is_focused {
-                        inp.label_style(self.current_item_style)
-                            .input_style(self.current_item_style)
-                            .call()
-                    } else {
-                        inp.label_style(self.text_style).input_style(self.text_style).call()
-                    };
-
-                    inp.render(area, buf);
-                }
-                InputType::Button(input) => {
-                    Button::default()
-                        .label(&input.label)
-                        .label_alignment(Alignment::Left)
-                        .style(if is_focused { self.current_item_style } else { self.text_style })
-                        .render(area, buf);
-                }
-                InputType::Separator => {
-                    Block::default()
-                        .borders(Borders::TOP)
-                        .border_style(self.separator_style)
-                        .render(area, buf);
-                }
-            }
-            area.y += 1;
-            remaining_height = remaining_height.saturating_sub(1);
-        }
-    }
 }

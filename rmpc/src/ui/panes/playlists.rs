@@ -14,7 +14,7 @@ use rmpc_mpd::{
 use super::Pane;
 use crate::{
     MpdQueryResult,
-    config::tabs::PaneType,
+    config::{album_art::ImageMethod, tabs::PaneType},
     ctx::Ctx,
     shared::{
         cmp::StringCompare,
@@ -22,7 +22,7 @@ use crate::{
         keys::ActionEvent,
         macros::{modal, status_info},
         mouse_event::MouseEvent,
-        mpd_client_ext::MpdDelete,
+        mpd_client_ext::{MpdClientExt, MpdDelete},
     },
     status_warn,
     ui::{
@@ -30,6 +30,7 @@ use crate::{
         browser::{BrowserPane, MoveDirection},
         dir_or_song::DirOrSong,
         dirstack::{DirStack, DirStackItem},
+        image::facade::AlbumArtFacade,
         input::InputResultEvent,
         modals::{info_list_modal::InfoListModal, input_modal::InputModal},
         widgets::browser::{Browser, BrowserArea},
@@ -42,25 +43,84 @@ mod tests;
 #[derive(Debug)]
 pub struct PlaylistsPane {
     stack: DirStack<DirOrSong, ListState>,
-    browser: Browser<DirOrSong>,
+    pub(crate) browser: Browser<DirOrSong>,
     initialized: bool,
+    album_art: AlbumArtFacade,
+    crisp: bool,
+    has_cover: bool,
+    shown_cover: Option<String>,
 }
 
 const INIT: &str = "init";
 const REINIT: &str = "reinit";
 const FETCH_DATA: &str = "fetch_data";
 const PLAYLIST_INFO: &str = "preview";
+const PREVIEW_COVER: &str = "playlists_preview_cover";
 
 impl PlaylistsPane {
-    pub fn new(_ctx: &Ctx) -> Self {
-        Self { stack: DirStack::default(), browser: Browser::new(), initialized: false }
+    pub fn new(ctx: &Ctx) -> Self {
+        let crisp = matches!(
+            ctx.config.album_art.method,
+            ImageMethod::Kitty
+                | ImageMethod::Iterm2
+                | ImageMethod::Sixel
+                | ImageMethod::UeberzugWayland
+                | ImageMethod::UeberzugX11
+        );
+        let mut browser = Browser::new();
+        browser.preview_cover = crisp;
+        Self {
+            stack: DirStack::default(),
+            browser,
+            initialized: false,
+            album_art: AlbumArtFacade::new(ctx),
+            crisp,
+            has_cover: false,
+            shown_cover: None,
+        }
+    }
+
+    fn fetch_selected_cover(&mut self, ctx: &Ctx) {
+        if !self.crisp {
+            return;
+        }
+        let Some(item) = self.stack.current().selected() else {
+            return;
+        };
+        let key = item.as_path().to_owned();
+        if self.shown_cover.as_ref() == Some(&key) {
+            return;
+        }
+        self.shown_cover = Some(key);
+        let order = ctx.config.album_art.order;
+        let item = item.clone();
+        ctx.query().id(PREVIEW_COVER).replace_id(PREVIEW_COVER).target(PaneType::Playlists).query(
+            move |client| {
+                let cover = match &item {
+                    DirOrSong::Song(song) => client.find_album_art(&song.file, order)?,
+                    DirOrSong::Dir { name, .. } => {
+                        match client.list_playlist_info(name.as_str(), None)?.into_iter().next() {
+                            Some(song) => client.find_album_art(&song.file, order)?,
+                            None => None,
+                        }
+                    }
+                };
+                Ok(MpdQueryResult::AlbumArt(cover))
+            },
+        );
     }
 }
 
 impl Pane for PlaylistsPane {
     fn render(&mut self, frame: &mut Frame, area: Rect, ctx: &Ctx) -> Result<()> {
         self.browser.render(area, frame.buffer_mut(), &mut self.stack, ctx);
-
+        if self.crisp {
+            let cover_rect = self.browser.areas[BrowserArea::Cover];
+            if cover_rect.width > 0 && cover_rect.height > 0 {
+                self.album_art.set_size(cover_rect);
+            }
+        }
+        self.fetch_selected_cover(ctx);
         Ok(())
     }
 
@@ -85,7 +145,7 @@ impl Pane for PlaylistsPane {
         Ok(())
     }
 
-    fn on_event(&mut self, event: &mut UiEvent, _is_visible: bool, ctx: &Ctx) -> Result<()> {
+    fn on_event(&mut self, event: &mut UiEvent, is_visible: bool, ctx: &Ctx) -> Result<()> {
         match event {
             UiEvent::Database | UiEvent::StoredPlaylist => {
                 let id = match event {
@@ -114,10 +174,28 @@ impl Pane for PlaylistsPane {
                 self.initialized = false;
                 self.before_show(ctx)?;
             }
+            UiEvent::ImageEncoded { id, data } if *id == self.album_art.id() => {
+                self.album_art.display(std::mem::take(data), ctx)?;
+            }
+            UiEvent::ImageEncodeFailed { id, err } if *id == self.album_art.id() => {
+                self.album_art.image_processing_failed(err, ctx)?;
+            }
+            UiEvent::Displayed if is_visible && self.crisp && self.has_cover => {
+                self.album_art.show_current(ctx)?;
+            }
+            UiEvent::Exit => {
+                self.album_art.cleanup()?;
+            }
             _ => {}
         }
 
         Ok(())
+    }
+
+    fn on_hide(&mut self, ctx: &Ctx) -> Result<()> {
+        self.shown_cover = None;
+        self.has_cover = false;
+        self.album_art.hide(ctx)
     }
 
     fn handle_mouse_event(&mut self, event: MouseEvent, ctx: &Ctx) -> Result<()> {
@@ -283,6 +361,15 @@ impl Pane for PlaylistsPane {
                         log::error!(stack:? = self.stack; "Invalid playlist stack state");
                     }
                 }
+            }
+            (PREVIEW_COVER, MpdQueryResult::AlbumArt(Some(bytes))) => {
+                self.has_cover = true;
+                self.album_art.show(bytes, ctx)?;
+            }
+            (PREVIEW_COVER, MpdQueryResult::AlbumArt(None)) => {
+                self.has_cover = false;
+                self.album_art.hide(ctx)?;
+                ctx.render()?;
             }
             _ => {}
         }

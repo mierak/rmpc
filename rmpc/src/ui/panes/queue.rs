@@ -7,7 +7,7 @@ use ratatui::{
     Frame,
     layout::Flex,
     prelude::{Constraint, Layout, Rect},
-    style::Style,
+    style::{Color, Style},
     text::{Line, Span},
     widgets::{Block, Row, TableState},
 };
@@ -360,6 +360,8 @@ impl Pane for QueuePane {
             .map(|range| range.end.saturating_sub(1))
             .collect();
         let current_song_id = ctx.current_song().map(|s| s.id);
+        let accent = config.theme.highlight_border_style.fg.unwrap_or(Color::Cyan);
+        let warm = config.theme.highlighted_item_style.fg.unwrap_or(accent);
         let marked = std::mem::take(self.queue.marked_mut());
         let filter = ctx.input.value(self.queue.filter_buffer_id);
         let selected_idx = self.queue.selected_idx();
@@ -380,11 +382,24 @@ impl Pane for QueuePane {
 
                 let columns = (0..formats.len()).map(|i| {
                     let mut max_len: usize = widths[i].width.into();
+                    // Reserve one cell in the first column for the selection strip.
+                    if i == 0 {
+                        max_len = max_len.saturating_sub(1);
+                    }
+                    // Width available to the whole first-column group (markers +
+                    // content) once the strip cell is reserved; padding for the
+                    // manual alignment below is computed against this, not the
+                    // marker-reduced content budget.
+                    let reserved_len = max_len;
                     // We have to subtract marker symbol length from max len in order to make space
                     // for the marker symbol in case we are in the first column of the table and the
                     // song is marked.
                     if is_marked && i == 0 {
                         max_len = max_len.saturating_sub(marker_symbol_len);
+                    }
+                    // ... and the same for the waveform marker on the playing track.
+                    if is_currently_playing_song && i == 0 {
+                        max_len = max_len.saturating_sub(2);
                     }
                     let format = &formats[i];
 
@@ -410,14 +425,41 @@ impl Pane for QueuePane {
                     .unwrap_or_default()
                     .alignment(formats[i].alignment.into());
 
+                    // The now-playing track gets a waveform icon next to its
+                    // track number (design: wave marker in the `#` column).
+                    if is_currently_playing_song && i == 0 {
+                        line.spans.insert(0, Span::styled("\u{f147d} ", Style::default().fg(warm)));
+                    }
+
                     if is_marked && i == 0 {
                         let marker_style =
                             dirstack::marker_style(ctx, is_under_cursor, matches_filter);
                         let marker_span = Span::styled(&config.theme.symbols.marker, marker_style);
-
                         line.spans.splice(..0, std::iter::once(marker_span));
                     }
 
+                    // Apply the first column's alignment manually inside the
+                    // reserved width and keep the line itself left-aligned: the
+                    // selection strip is inserted at span 0 by `into_row`, and
+                    // with ratatui alignment it would drift with the content
+                    // width (wave icon vs 1-3 digit track numbers) instead of
+                    // sitting at the column's left edge on every row.
+                    if i == 0 {
+                        let pad = reserved_len.saturating_sub(line.width());
+                        if pad > 0 {
+                            let pad = match Into::<ratatui::layout::Alignment>::into(
+                                formats[i].alignment,
+                            ) {
+                                ratatui::layout::Alignment::Right => pad,
+                                ratatui::layout::Alignment::Center => pad / 2,
+                                ratatui::layout::Alignment::Left => 0,
+                            };
+                            if pad > 0 {
+                                line.spans.insert(0, Span::raw(" ".repeat(pad)));
+                            }
+                        }
+                        line = line.left_aligned();
+                    }
                     line
                 });
 
@@ -428,7 +470,18 @@ impl Pane for QueuePane {
                 if is_under_cursor && self.highlight_enabled {
                     row.cursor_style = Some(config.theme.current_item_style);
                 }
-
+                if idx % 2 == 1 {
+                    row.zebra_bg = config.theme.alternate_row_background_color;
+                }
+                // Selection strip: accent on the cursor row, warm on the
+                // now-playing track (matches the design's inset strips).
+                row.strip = if is_under_cursor && self.highlight_enabled {
+                    Some(accent)
+                } else if is_currently_playing_song {
+                    Some(warm)
+                } else {
+                    None
+                };
                 let sep = ctx.config.theme.song_table_album_separator;
                 if new_album_indices.contains(&idx)
                     && matches!(sep, AlbumSeparator::Underline)
@@ -1385,44 +1438,51 @@ struct QueueRow {
     cell_style: Option<Style>,
     cursor_style: Option<Style>,
     underlined: bool,
+    zebra_bg: Option<Color>,
+    strip: Option<Color>,
 }
-
 impl QueueRow {
     fn into_row<'a>(self, cells: impl Iterator<Item = Line<'a>>) -> Row<'a> {
         let mut row_style = Style::default();
-
+        if let Some(bg) = self.zebra_bg {
+            row_style = row_style.bg(bg);
+        }
         if let Some(style) = self.cell_style {
             row_style = row_style.patch(style);
         }
-
         if let Some(cursor) = self.cursor_style {
             row_style = row_style.patch(cursor);
         }
-
         if self.underlined {
             row_style = row_style.underlined();
         }
-
-        let row = Row::new(
-            cells
-                .map(|mut line| {
-                    if let Some(style) = self.cell_style {
-                        line.style = line.style.patch(style);
-                        for span in &mut line.spans {
-                            span.style = span.style.patch(style);
-                        }
+        let mut collected: Vec<Line<'a>> = cells
+            .map(|mut line| {
+                if let Some(style) = self.cell_style {
+                    line.style = line.style.patch(style);
+                    for span in &mut line.spans {
+                        span.style = span.style.patch(style);
                     }
-                    if let Some(cursor) = self.cursor_style {
-                        line.style = line.style.patch(cursor);
-                        for span in &mut line.spans {
-                            span.style = span.style.patch(cursor);
-                        }
+                }
+                if let Some(cursor) = self.cursor_style {
+                    line.style = line.style.patch(cursor);
+                    for span in &mut line.spans {
+                        span.style = span.style.patch(cursor);
                     }
-                    line
-                })
-                .collect::<Vec<_>>(),
-        );
-
-        row.style(row_style)
+                }
+                line
+            })
+            .collect();
+        // Uniform 1-cell selection strip on the first column (accent ▎ on the
+        // cursor row, blank otherwise) so rows stay aligned. Added after style
+        // patching so the accent colour is preserved.
+        if let Some(first) = collected.first_mut() {
+            let strip = match self.strip {
+                Some(c) => Span::styled("\u{258e}", Style::default().fg(c)),
+                None => Span::raw(" "),
+            };
+            first.spans.insert(0, strip);
+        }
+        Row::new(collected).style(row_style)
     }
 }

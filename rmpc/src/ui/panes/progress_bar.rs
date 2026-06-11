@@ -56,6 +56,7 @@ impl Pane for ProgressBarPane {
                     .track_char(&bar_cfg.symbols[3])
                     .end_char(&bar_cfg.symbols[4])
                     .use_track_when_empty(ctx.config.theme.progress_bar.use_track_when_empty)
+                    .maybe_elapsed_gradient(bar_cfg.elapsed_gradient)
                     .value(value)
                     .build();
 

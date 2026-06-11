@@ -35,6 +35,25 @@
         vertical_align: Center,
         horizontal_align: Center,
     ),
+    // Audio visualizer (Queue tab). Requires the `cava` binary installed.
+    // Default: capture the system output monitor via PulseAudio/PipeWire
+    // ("auto" picks the default sink's monitor) — works when MPD plays through
+    // pulse/pipewire, with no MPD-side config.
+    //
+    // If MPD outputs straight to ALSA (or you want the most reliable route),
+    // add a FIFO output to your mpd.conf:
+    //     audio_output {
+    //         type   "fifo"
+    //         name   "rmpc_visualizer"
+    //         path   "/tmp/mpd.fifo"
+    //         format "44100:16:2"
+    //     }
+    // then switch the input below to:
+    //     input: (method: Fifo, source: "/tmp/mpd.fifo", sample_rate: 44100, sample_bits: 16, channels: 2),
+    cava: (
+        framerate: 60,
+        input: (method: Pulse, source: "auto"),
+    ),
     keybinds: (
         global: {
             "q":          Quit,
@@ -61,13 +80,13 @@
             "gt":         NextTab,
             "<S-Tab>":    PreviousTab,
             "gT":         PreviousTab,
-            "1":          SwitchToTab("Queue"),
-            "2":          SwitchToTab("Directories"),
-            "3":          SwitchToTab("Artists"),
-            "4":          SwitchToTab("Album Artists"),
-            "5":          SwitchToTab("Albums"),
-            "6":          SwitchToTab("Playlists"),
-            "7":          SwitchToTab("Search"),
+            "1":          SwitchToTab("\u{f0cb} Queue"),
+            "2":          SwitchToTab("\u{f07b} Directories"),
+            "3":          SwitchToTab("\u{f007} Artists"),
+            "4":          SwitchToTab("\u{f00a} Albums"),
+            "5":          SwitchToTab("\u{f002} Search"),
+            "6":          SwitchToTab("\u{f03a} Playlists"),
+            "7":          SwitchToTab("\u{f036} Lyrics"),
             "u":          Update,
             "U":          Rescan,
             "R":          AddRandom,
@@ -154,10 +173,11 @@
     ),
     tabs: [
         (
-            name: "Queue",
+            name: "\u{f0cb} Queue",
             pane: Split(
                 direction: Horizontal,
                 panes: [
+                    // ---- Now Playing: album art + track metadata ----
                     (
                         size: "35%",
                         pane: Split(
@@ -165,127 +185,172 @@
                             panes: [
                                 (
                                     size: "100%",
+                                    background_color: "#14171d",
                                     borders: "LEFT | RIGHT | TOP",
                                     border_symbols: Rounded,
-                                    pane: Pane(AlbumArt)
+                                    border_title: [(kind: Text(" \u{f001} Now Playing "))],
+                                    border_title_alignment: Left,
+                                    pane: Pane(AlbumArt),
                                 ),
                                 (
-                                    size: "7",
-                                    borders: "ALL",
-                                    border_symbols: Inherited(parent: Rounded, top_left: "├", top_right: "┤",),
-                                    border_title: [(kind: Text(" Lyrics "))],
-                                    border_title_alignment: Right,
-                                    pane: Pane(Lyrics)
+                                    size: "8",
+                                    background_color: "#14171d",
+                                    borders: "LEFT | RIGHT | BOTTOM",
+                                    border_symbols: Inherited(parent: Rounded, top_left: "├", top_right: "┤"),
+                                    pane: Split(
+                                        direction: Vertical,
+                                        panes: [
+                                            (size: "1", pane: Pane(Empty())),
+                                            (
+                                                size: "1",
+                                                pane: Pane(Property(
+                                                    content: [(kind: Property(Song(Title)), style: (modifiers: "Bold"),
+                                                        default: (kind: Text("No Song"), style: (modifiers: "Bold")))],
+                                                    align: Center, scroll_speed: 1,
+                                                )),
+                                            ),
+                                            (
+                                                size: "1",
+                                                pane: Pane(Property(
+                                                    content: [(kind: Property(Song(Artist)), style: (fg: "#45cdd4", modifiers: "Bold"),
+                                                        default: (kind: Text("Unknown Artist"), style: (fg: "#45cdd4", modifiers: "Bold")))],
+                                                    align: Center,
+                                                )),
+                                            ),
+                                            (
+                                                size: "1",
+                                                pane: Pane(Property(
+                                                    content: [
+                                                        (kind: Property(Song(Album)), default: (kind: Text("Unknown Album"))),
+                                                        (kind: Group([
+                                                            (kind: Text("  ·  ")),
+                                                            (kind: Property(Song(Other("date")))),
+                                                        ])),
+                                                    ],
+                                                    align: Center,
+                                                )),
+                                            ),
+                                            (size: "1", pane: Pane(Empty())),
+                                            // ---- TRACK / GENRE / FORMAT stat strip ----
+                                            (
+                                                size: "1",
+                                                pane: Split(
+                                                    direction: Horizontal,
+                                                    panes: [
+                                                        (size: "33%", pane: Pane(Property(content: [(kind: Text("TRACK"), style: (fg: "#5f646b", modifiers: "Bold"))], align: Center))),
+                                                        (size: "34%", pane: Pane(Property(content: [(kind: Text("GENRE"), style: (fg: "#5f646b", modifiers: "Bold"))], align: Center))),
+                                                        (size: "33%", pane: Pane(Property(content: [(kind: Text("FORMAT"), style: (fg: "#5f646b", modifiers: "Bold"))], align: Center))),
+                                                    ],
+                                                ),
+                                            ),
+                                            (
+                                                size: "1",
+                                                pane: Split(
+                                                    direction: Horizontal,
+                                                    panes: [
+                                                        (size: "33%", pane: Pane(Property(content: [(kind: Property(Song(Track)), default: (kind: Text("-")))], align: Center))),
+                                                        (size: "34%", pane: Pane(Property(content: [(kind: Property(Song(Other("genre"))), default: (kind: Text("-")))], align: Center))),
+                                                        (size: "33%", pane: Pane(Property(content: [
+                                                            (kind: Property(Song(FileExtension)), default: (kind: Text("-"))),
+                                                            (kind: Group([(kind: Text(" ")), (kind: Property(Song(Bits()))), (kind: Text("bit"))])),
+                                                        ], align: Center))),
+                                                    ],
+                                                ),
+                                            ),
+                                        ],
+                                    ),
                                 ),
                             ],
                         ),
-                    ), 
+                    ),
+                    // ---- Queue table over Cava visualizer ----
                     (
                         size: "65%",
                         pane: Split(
                             direction: Vertical,
                             panes: [
                                 (
-                                    size: "3",
+                                    size: "70%",
+                                    background_color: "#14171d",
                                     borders: "ALL",
-                                    border_symbols: Inherited(parent: Rounded, bottom_left: "├", bottom_right: "┤",),
+                                    border_symbols: Rounded,
+                                    border_title: [(kind: Text(" \u{f0cb} Queue "))],
+                                    border_title_alignment: Left,
                                     pane: Split(
-                                        direction: Horizontal,
+                                        direction: Vertical,
                                         panes: [
                                             (
                                                 size: "1",
-                                                pane: Pane(Empty())
+                                                pane: Split(
+                                                    direction: Horizontal,
+                                                    panes: [
+                                                        (size: "1", pane: Pane(Empty())),
+                                                        (size: "100%", pane: Pane(QueueHeader())),
+                                                    ],
+                                                ),
                                             ),
                                             (
                                                 size: "100%",
-                                                pane: Pane(QueueHeader())
+                                                pane: Split(
+                                                    direction: Horizontal,
+                                                    panes: [
+                                                        (size: "1", pane: Pane(Empty())),
+                                                        (size: "100%", pane: Pane(Queue)),
+                                                    ],
+                                                ),
                                             ),
-                                        ]
-                                    )
+                                        ],
+                                    ),
                                 ),
                                 (
-                                    size: "100%",
-                                    borders: "LEFT | RIGHT | BOTTOM",
+                                    size: "30%",
+                                    background_color: "#14171d",
+                                    borders: "ALL",
                                     border_symbols: Rounded,
-                                    pane: Split(
-                                        direction: Horizontal,
-                                        panes: [
-                                            (
-                                                size: "1",
-                                                pane: Pane(Empty())
-                                            ),
-                                            (
-                                                size: "100%",
-                                                pane: Pane(Queue)
-                                            ),
-                                        ]
-                                    )
+                                    border_title: [(kind: Text(" \u{f080} Visualizer "))],
+                                    border_title_alignment: Left,
+                                    pane: Pane(Cava),
                                 ),
                             ],
-                        )
+                        ),
                     ),
                 ],
             ),
         ),
         (
-            name: "Directories",
-            borders: "ALL",
-            border_symbols: Rounded,
-            pane: Split(
-                size: "100%",
-                direction: Vertical,
-                panes: [(pane: Pane(Directories), size: "100%", borders: "ALL", border_symbols: Rounded)],
-            )
+            name: "\u{f07b} Directories",
+            pane: Split(size: "100%", direction: Vertical, panes: [(pane: Pane(Directories), size: "100%")]),
         ),
         (
-            name: "Artists",
-            borders: "ALL",
-            border_symbols: Rounded,
-            pane: Split(
+            name: "\u{f007} Artists",
+            pane: Split(size: "100%", direction: Vertical, panes: [(
+                pane: Pane(Artists),
                 size: "100%",
-                direction: Vertical,
-                panes: [(pane: Pane(Artists), size: "100%", borders: "ALL", border_symbols: Rounded)],
-            )
+            )]),
         ),
         (
-            name: "Album Artists",
-            borders: "ALL",
-            border_symbols: Rounded,
-            pane: Split(
-                size: "100%",
-                direction: Vertical,
-                panes: [(pane: Pane(AlbumArtists), size: "100%", borders: "ALL", border_symbols: Rounded)],
-            )
+            name: "\u{f00a} Albums",
+            pane: Split(size: "100%", direction: Vertical, panes: [(pane: Pane(AlbumsGrid), size: "100%")]),
         ),
         (
-            name: "Albums",
-            borders: "ALL",
-            border_symbols: Rounded,
-            pane: Split(
-                size: "100%",
-                direction: Vertical,
-                panes: [(pane: Pane(Albums), size: "100%", borders: "ALL", border_symbols: Rounded)],
-            )
+            name: "\u{f002} Search",
+            pane: Split(size: "100%", direction: Vertical, panes: [(pane: Pane(Search), size: "100%")]),
         ),
         (
-            name: "Playlists",
-            borders: "ALL",
-            border_symbols: Rounded,
-            pane: Split(
-                size: "100%",
-                direction: Vertical,
-                panes: [(pane: Pane(Playlists), size: "100%", borders: "ALL", border_symbols: Rounded)],
-            )
+            name: "\u{f03a} Playlists",
+            pane: Split(size: "100%", direction: Vertical, panes: [(pane: Pane(Playlists), size: "100%")]),
         ),
         (
-            name: "Search",
-            borders: "ALL",
-            border_symbols: Rounded,
-            pane: Split(
+            name: "\u{f036} Lyrics",
+            pane: Split(size: "100%", direction: Vertical, panes: [(
+                pane: Pane(Lyrics),
                 size: "100%",
-                direction: Vertical,
-                panes: [(pane: Pane(Search), size: "100%", borders: "ALL", border_symbols: Rounded)],
-            )
+                background_color: "#14171d",
+                borders: "ALL",
+                border_symbols: Rounded,
+                border_title: [(kind: Text(" \u{f036} Lyrics "))],
+                border_title_alignment: Left,
+            )]),
         ),
     ],
 )

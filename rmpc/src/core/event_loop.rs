@@ -324,7 +324,7 @@ fn main_task<B: Backend + std::io::Write>(
                 }
                 AppEvent::InfoModal { message, title, size, replacement_id: id } => {
                     if let Err(err) = ui.on_ui_app_event(
-                        UiAppEvent::Modal(Box::new(
+                        UiAppEvent::Modal(crate::ui::ModalWrapper(Box::new(
                             InfoModal::builder()
                                 .ctx(&ctx)
                                 .maybe_title(title)
@@ -332,7 +332,7 @@ fn main_task<B: Backend + std::io::Write>(
                                 .maybe_replacement_id(id)
                                 .message(message)
                                 .build(),
-                        )),
+                        ))),
                         &mut ctx,
                     ) {
                         log::error!(error:? = err; "UI failed to handle modal event");
@@ -468,19 +468,20 @@ fn main_task<B: Backend + std::io::Write>(
                                 })
                                 .build();
 
-                            if let Err(err) =
-                                ui.on_ui_app_event(UiAppEvent::Modal(Box::new(modal)), &mut ctx)
-                            {
+                            if let Err(err) = ui.on_ui_app_event(
+                                UiAppEvent::Modal(crate::ui::ModalWrapper(Box::new(modal))),
+                                &mut ctx,
+                            ) {
                                 log::error!(error:? = err; "UI failed to handle modal event");
                             }
                         }
 
                         render_wanted = true;
                     }
-                    WorkDone::ImageResized { data } => {
+                    WorkDone::ImageResized { id, data } => {
                         let event = match data {
-                            Ok(data) => UiEvent::ImageEncoded { data },
-                            Err(err) => UiEvent::ImageEncodeFailed { err },
+                            Ok(data) => UiEvent::ImageEncoded { id, data },
+                            Err(err) => UiEvent::ImageEncodeFailed { id, err },
                         };
 
                         if let Err(err) = ui.on_event(event, &mut ctx) {
