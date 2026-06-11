@@ -17,7 +17,7 @@ use crate::{
         Status,
         Update,
         Volume,
-        list::MpdList,
+        list::{MpdGroupedList, MpdList},
         list_all::ListAll,
         list_playlist::FileList,
         metadata_tag::MetadataTagExt,
@@ -457,6 +457,15 @@ impl MpdClient for TestMpdClient {
     }
 
     fn list_tag(&mut self, _tag: Tag, _filter: Option<&[Filter<'_>]>) -> MpdResult<MpdList> {
+        todo!("Not yet implemented")
+    }
+
+    fn list_tag_grouped(
+        &mut self,
+        _tag: Tag,
+        _group_tags: &[Tag],
+        _filter: Option<&[Filter<'_>]>,
+    ) -> MpdResult<MpdGroupedList> {
         todo!("Not yet implemented")
     }
 

@@ -542,6 +542,7 @@ fn dir(name: &str) -> DirOrSong {
         full_path: name.to_string(),
         last_modified: *NOW,
         playlist: false,
+        metadata: HashMap::new(),
     }
 }
 
