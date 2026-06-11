@@ -334,16 +334,8 @@ impl TryFrom<PaneTypeFile> for PaneType {
                         bail!("At least one level is required for browser panes");
                     }
 
-                    if levels[0].group_by.len() != 1 {
-                        bail!("group_by on the first level must have exactly one tag");
-                    }
-
-                    if levels[0].sort_by.is_some() {
-                        bail!("sort_by is not allowed on the first level");
-                    }
-
-                    if levels[0].format.is_some() {
-                        bail!("format is not allowed on the first level");
+                    if levels[0].group_by.is_empty() {
+                        bail!("group_by on the first level must have at least one entry");
                     }
 
                     PaneType::Browser {

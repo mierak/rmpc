@@ -1,4 +1,4 @@
-use std::str::FromStr;
+use std::{fmt::Write, str::FromStr};
 
 use anyhow::Result;
 use rmpc_shared::version::Version;
@@ -16,7 +16,7 @@ use super::{
         Update,
         Volume,
         decoders::Decoders,
-        list::MpdList,
+        list::{MpdGroupedList, MpdList},
         list_playlist::FileList,
         mpd_config::MpdConfig,
         outputs::Outputs,
@@ -147,6 +147,12 @@ pub trait MpdCommand {
         position: Option<QueuePosition>,
     ) -> MpdResult<()>;
     fn send_list_tag(&mut self, tag: Tag, filter: Option<&[Filter<'_>]>) -> MpdResult<()>;
+    fn send_list_tag_grouped(
+        &mut self,
+        tag: &Tag,
+        group_tags: &[Tag],
+        filter: Option<&[Filter<'_>]>,
+    ) -> MpdResult<()>;
     fn send_shuffle(&mut self, range: Option<SingleOrRange>) -> MpdResult<()>;
     fn send_list_all(&mut self, path: Option<&str>) -> MpdResult<()>;
     fn send_lsinfo(&mut self, path: Option<&str>) -> MpdResult<()>;
@@ -288,6 +294,12 @@ pub trait MpdClient: Sized {
         position: Option<QueuePosition>,
     ) -> MpdResult<()>;
     fn list_tag(&mut self, tag: Tag, filter: Option<&[Filter<'_>]>) -> MpdResult<MpdList>;
+    fn list_tag_grouped(
+        &mut self,
+        tag: Tag,
+        group_tags: &[Tag],
+        filter: Option<&[Filter<'_>]>,
+    ) -> MpdResult<MpdGroupedList>;
     /// Shuffles the current queue.
     fn shuffle(&mut self, range: Option<SingleOrRange>) -> MpdResult<()>;
     // Database
@@ -625,6 +637,28 @@ impl<T: SocketClient> MpdCommand for T {
             self.execute(&format!("list {} \"({})\"", tag.as_str(), filter.to_query_str()))
         } else {
             self.execute(&format!("list {}", tag.as_str()))
+        }
+    }
+
+    fn send_list_tag_grouped(
+        &mut self,
+        tag: &Tag,
+        group_tags: &[Tag],
+        filter: Option<&[Filter<'_>]>,
+    ) -> MpdResult<()> {
+        let groups = group_tags.iter().fold(String::new(), |mut output, value| {
+            let _ = write!(output, " group {}", value.as_str());
+            output
+        });
+        if let Some(filter) = filter {
+            self.execute(&format!(
+                "list {} \"({})\"{}",
+                tag.as_str(),
+                filter.to_query_str(),
+                groups
+            ))
+        } else {
+            self.execute(&format!("list {}{}", tag.as_str(), groups))
         }
     }
 

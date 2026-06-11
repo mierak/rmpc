@@ -28,7 +28,7 @@ use crate::{
         Update,
         Volume,
         decoders::Decoders,
-        list::MpdList,
+        list::{MpdGroupedList, MpdList, RawGroupedPairs},
         list_all::ListAll,
         list_playlist::FileList,
         messages::Messages,
@@ -576,6 +576,16 @@ impl MpdClient for Client<'_> {
 
     fn list_tag(&mut self, tag: Tag, filter: Option<&[Filter<'_>]>) -> MpdResult<MpdList> {
         self.send_list_tag(tag, filter).and_then(|()| self.read_response())
+    }
+
+    fn list_tag_grouped(
+        &mut self,
+        tag: Tag,
+        group_tags: &[Tag],
+        filter: Option<&[Filter<'_>]>,
+    ) -> MpdResult<MpdGroupedList> {
+        self.send_list_tag_grouped(&tag, group_tags, filter)?;
+        self.read_response::<RawGroupedPairs>().map(|raw| raw.into_grouped_list(tag.as_str()))
     }
 
     fn shuffle(&mut self, range: Option<SingleOrRange>) -> MpdResult<()> {

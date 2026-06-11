@@ -4,7 +4,7 @@ use itertools::Itertools;
 use ratatui::{Frame, prelude::Rect, widgets::ListState};
 use rmpc_mpd::{
     client::Client,
-    commands::Song,
+    commands::{Song, list::MpdGroupedList, metadata_tag::MetadataTag},
     filter::{Filter, Tag},
     mpd_client::MpdClient,
 };
@@ -40,6 +40,7 @@ pub struct TagBrowserPane {
 }
 
 const INIT: &str = "init";
+const INIT_GROUPED: &str = "init_grouped";
 const FETCH_SONGS: &str = "fetch_songs";
 
 struct SongGroup {
@@ -207,6 +208,72 @@ impl TagBrowserPane {
         Self::insert_level(&mut self.stack, root_value.into(), data, &self.tags[1..], ctx);
     }
 
+    fn process_grouped_list(&mut self, data: MpdGroupedList, ctx: &Ctx) {
+        let stub_songs: Vec<Song> = data
+            .0
+            .into_iter()
+            .map(|record| Song {
+                id: 0,
+                file: String::new(),
+                duration: None,
+                last_modified: chrono::Utc::now(),
+                added: None,
+                metadata: record
+                    .into_iter()
+                    .filter(|(_, v)| !v.is_empty())
+                    .map(|(k, v)| (k, MetadataTag::Single(v)))
+                    .collect(),
+            })
+            .collect();
+
+        let groups = Self::group_songs_by_tag(stub_songs, &self.tags[0], ctx);
+
+        self.stack = DirStack::new(
+            groups
+                .into_iter()
+                .map(|mut group| {
+                    let metadata = group.songs[0]
+                        .metadata
+                        .iter_mut()
+                        .map(|(k, v)| (k.clone(), v.first().to_string()))
+                        .collect();
+                    DirOrSong::name_display_name_with_metadata(
+                        group.id,
+                        group.display_name,
+                        metadata,
+                    )
+                })
+                .collect(),
+        );
+    }
+
+    fn queue_root_fetch(&mut self, ctx: &Ctx) -> Result<()> {
+        let target = self.target_pane.clone();
+        if self.tags[0].group_by.len() > 1 {
+            let primary_tag: Tag = self.tags[0].group_by[0][0].clone().try_into()?;
+            let group_tags: Vec<Tag> = self.tags[0].group_by[1..]
+                .iter()
+                .filter_map(|props| props.first().and_then(|p| p.clone().try_into().ok()))
+                .collect();
+            ctx.query().id(INIT_GROUPED).replace_id(INIT_GROUPED).target(target).query(
+                move |client| {
+                    let result = client
+                        .list_tag_grouped(primary_tag, &group_tags, None)
+                        .context("Cannot list grouped tags")?;
+                    Ok(MpdQueryResult::TagGroupedList { data: result })
+                },
+            );
+        } else {
+            let root_tag = self.tags[0].group_by[0][0].clone().try_into()?;
+            ctx.query().id(INIT).replace_id(INIT).target(target).query(move |client| {
+                let result = client.list_tag(root_tag, None).context("Cannot list artists")?;
+                log::debug!("Fetched root tag values: {:?}", result.0);
+                Ok(MpdQueryResult::LsInfo { data: result.0, path: None })
+            });
+        }
+        Ok(())
+    }
+
     fn songs_for_item(&self, item: &DirOrSong) -> Vec<Song> {
         let path = self.stack().path().to_owned();
         item.walk(&self.stack, path)
@@ -227,14 +294,7 @@ impl Pane for TagBrowserPane {
 
     fn before_show(&mut self, ctx: &Ctx) -> Result<()> {
         if !self.initialized {
-            let root_tag = self.tags[0].group_by[0][0].clone().try_into()?;
-            let target = self.target_pane.clone();
-            ctx.query().id(INIT).replace_id(INIT).target(target).query(move |client| {
-                let result = client.list_tag(root_tag, None).context("Cannot list artists")?;
-                log::debug!("Fetched root tag values: {:?}", result.0);
-                Ok(MpdQueryResult::LsInfo { data: result.0, path: None })
-            });
-
+            self.queue_root_fetch(ctx)?;
             self.initialized = true;
         }
 
@@ -244,13 +304,8 @@ impl Pane for TagBrowserPane {
     fn on_event(&mut self, event: &mut UiEvent, _is_visible: bool, ctx: &Ctx) -> Result<()> {
         match event {
             UiEvent::Database => {
-                let root_tag = self.tags[0].group_by[0][0].clone().try_into()?;
-                let target = self.target_pane.clone();
                 self.stack = DirStack::default();
-                ctx.query().id(INIT).replace_id(INIT).target(target).query(move |client| {
-                    let result = client.list_tag(root_tag, None).context("Cannot list artists")?;
-                    Ok(MpdQueryResult::LsInfo { data: result.0, path: None })
-                });
+                self.queue_root_fetch(ctx)?;
             }
             UiEvent::Reconnected => {
                 self.initialized = false;
@@ -291,6 +346,13 @@ impl Pane for TagBrowserPane {
 
                 self.process_songs(root_path, data, ctx);
                 self.fetch_data_internal(ctx)?;
+                ctx.render()?;
+            }
+            (INIT_GROUPED, MpdQueryResult::TagGroupedList { data }) => {
+                self.process_grouped_list(data, ctx);
+                if let Some(sel) = self.stack.current().selected() {
+                    self.fetch_data(sel, ctx)?;
+                }
                 ctx.render()?;
             }
             (INIT, MpdQueryResult::LsInfo { data, path: _ }) => {
@@ -338,11 +400,31 @@ impl BrowserPane<DirOrSong> for TagBrowserPane {
     fn fetch_data(&self, selected: &DirOrSong, ctx: &Ctx) -> Result<()> {
         match self.stack.path().as_slice() {
             [] => {
-                let current = selected.as_path();
-                let root_tag: Tag = self.tags[0].group_by[0][0].clone().try_into()?;
+                let current = selected.as_path().to_owned();
                 let target = self.target_pane.clone();
-                let current = current.to_owned();
 
+                if let DirOrSong::Dir { metadata, .. } = selected
+                    && !metadata.is_empty()
+                {
+                    let filters: Vec<(Tag, String)> =
+                        metadata.iter().map(|(k, v)| (Tag::from(k.clone()), v.clone())).collect();
+                    ctx.query().id(FETCH_SONGS).replace_id(FETCH_SONGS).target(target).query(
+                        move |client| {
+                            let filter_refs: Vec<Filter<'_>> = filters
+                                .iter()
+                                .map(|(tag, val)| Filter::new(tag.clone(), val.as_str()))
+                                .collect();
+                            let all_songs: Vec<Song> = client.find(&filter_refs)?;
+                            Ok(MpdQueryResult::SongsList {
+                                data: all_songs,
+                                path: Some(current.into()),
+                            })
+                        },
+                    );
+                    return Ok(());
+                }
+
+                let root_tag: Tag = self.tags[0].group_by[0][0].clone().try_into()?;
                 ctx.query().id(FETCH_SONGS).replace_id(FETCH_SONGS).target(target).query(
                     move |client| {
                         let all_songs: Vec<Song> =
@@ -724,6 +806,253 @@ mod tests {
         pane.process_songs(artist.clone(), songs, &ctx);
 
         assert_eq!(pane_albums(&pane), vec!["(<no originaldate>) album_a"]);
+    }
+
+    mod process_grouped_list {
+        use super::*;
+
+        fn grouped_record(pairs: &[(&str, &str)]) -> std::collections::HashMap<String, String> {
+            pairs.iter().map(|(k, v)| (k.to_string(), v.to_string())).collect()
+        }
+
+        fn grouped_album_by_artist_tag() -> BrowserTagConfig {
+            BrowserTagConfig {
+                group_by: vec![vec![SongProperty::Album], vec![SongProperty::Artist]],
+                sort_by: None,
+                format: vec![
+                    Property {
+                        kind: PropertyKindOrText::Property(SongProperty::Artist),
+                        style: None,
+                        default: None,
+                    },
+                    Property {
+                        kind: PropertyKindOrText::Text(" - ".to_string()),
+                        style: None,
+                        default: None,
+                    },
+                    Property {
+                        kind: PropertyKindOrText::Property(SongProperty::Album),
+                        style: None,
+                        default: None,
+                    },
+                ],
+                skip: CollapseLevel::default(),
+            }
+        }
+
+        fn grouped_album_sorted_by_date_tag() -> BrowserTagConfig {
+            BrowserTagConfig {
+                group_by: vec![vec![SongProperty::Album], vec![SongProperty::Artist], vec![
+                    SongProperty::Other("date".to_string()),
+                ]],
+                sort_by: Some(vec![vec![SongProperty::Other("date".to_string())]]),
+                format: vec![
+                    Property {
+                        kind: PropertyKindOrText::Text("(".to_string()),
+                        style: None,
+                        default: None,
+                    },
+                    Property {
+                        kind: PropertyKindOrText::Property(SongProperty::Other("date".to_string())),
+                        style: None,
+                        default: None,
+                    },
+                    Property {
+                        kind: PropertyKindOrText::Text(") ".to_string()),
+                        style: None,
+                        default: None,
+                    },
+                    Property {
+                        kind: PropertyKindOrText::Property(SongProperty::Album),
+                        style: None,
+                        default: None,
+                    },
+                ],
+                skip: CollapseLevel::default(),
+            }
+        }
+
+        fn pane_root_display_names(pane: &TagBrowserPane) -> Vec<String> {
+            pane.stack
+                .current()
+                .items
+                .iter()
+                .map(|item| match item {
+                    DirOrSong::Dir { display_name, name, .. } => {
+                        display_name.as_ref().unwrap_or(name).clone()
+                    }
+                    DirOrSong::Song(s) => s.file.clone(),
+                })
+                .collect_vec()
+        }
+
+        #[rstest]
+        fn sorts_by_display_name_when_no_sort_by(mut ctx: Ctx, config: Config) {
+            ctx.config = std::sync::Arc::new(config);
+            let mut pane =
+                TagBrowserPane::new(vec![grouped_album_by_artist_tag()], PaneType::Albums, &ctx);
+
+            pane.process_grouped_list(
+                MpdGroupedList(vec![
+                    grouped_record(&[("album", "B Album"), ("artist", "Artist Y")]),
+                    grouped_record(&[("album", "A Album"), ("artist", "Artist X")]),
+                    grouped_record(&[("album", "C Album"), ("artist", "Artist Z")]),
+                ]),
+                &ctx,
+            );
+
+            assert_eq!(pane_root_display_names(&pane), vec![
+                "Artist X - A Album",
+                "Artist Y - B Album",
+                "Artist Z - C Album"
+            ]);
+        }
+
+        #[rstest]
+        fn sorts_by_configured_tag(mut ctx: Ctx, config: Config) {
+            ctx.config = std::sync::Arc::new(config);
+            let mut pane = TagBrowserPane::new(
+                vec![grouped_album_sorted_by_date_tag()],
+                PaneType::Albums,
+                &ctx,
+            );
+
+            pane.process_grouped_list(
+                MpdGroupedList(vec![
+                    grouped_record(&[
+                        ("album", "B Album"),
+                        ("artist", "Artist Y"),
+                        ("date", "2005"),
+                    ]),
+                    grouped_record(&[
+                        ("album", "A Album"),
+                        ("artist", "Artist X"),
+                        ("date", "2003"),
+                    ]),
+                    grouped_record(&[
+                        ("album", "C Album"),
+                        ("artist", "Artist Z"),
+                        ("date", "2001"),
+                    ]),
+                ]),
+                &ctx,
+            );
+
+            assert_eq!(pane_root_display_names(&pane), vec![
+                "(2001) C Album",
+                "(2003) A Album",
+                "(2005) B Album"
+            ]);
+        }
+
+        #[rstest]
+        fn root_item_filters_contain_all_tags(mut ctx: Ctx, config: Config) {
+            ctx.config = std::sync::Arc::new(config);
+            let mut pane = TagBrowserPane::new(
+                vec![grouped_album_sorted_by_date_tag()],
+                PaneType::Albums,
+                &ctx,
+            );
+
+            pane.process_grouped_list(
+                MpdGroupedList(vec![grouped_record(&[
+                    ("album", "The Phantom Agony"),
+                    ("artist", "Epica"),
+                    ("date", "2003-08-21"),
+                ])]),
+                &ctx,
+            );
+
+            assert_eq!(pane.stack.current().items.len(), 1);
+            let item = &pane.stack.current().items[0];
+            let DirOrSong::Dir { metadata, .. } = item else {
+                panic!("expected Dir, got Song");
+            };
+            assert_eq!(metadata.get("album").map(String::as_str), Some("The Phantom Agony"));
+            assert_eq!(metadata.get("artist").map(String::as_str), Some("Epica"));
+            assert_eq!(metadata.get("date").map(String::as_str), Some("2003-08-21"));
+        }
+
+        #[rstest]
+        fn same_album_different_artists_are_separate_items(mut ctx: Ctx, config: Config) {
+            ctx.config = std::sync::Arc::new(config);
+            let mut pane = TagBrowserPane::new(
+                vec![grouped_album_sorted_by_date_tag()],
+                PaneType::Albums,
+                &ctx,
+            );
+
+            pane.process_grouped_list(
+                MpdGroupedList(vec![
+                    grouped_record(&[
+                        ("album", "Grimoire"),
+                        ("artist", "Artist A"),
+                        ("date", "2016"),
+                    ]),
+                    grouped_record(&[
+                        ("album", "Grimoire"),
+                        ("artist", "Artist B"),
+                        ("date", "2016"),
+                    ]),
+                ]),
+                &ctx,
+            );
+
+            assert_eq!(pane_root_display_names(&pane).len(), 2);
+            let artists: Vec<&str> = pane
+                .stack
+                .current()
+                .items
+                .iter()
+                .filter_map(|item| {
+                    if let DirOrSong::Dir { metadata, .. } = item {
+                        metadata.get("artist").map(String::as_str)
+                    } else {
+                        None
+                    }
+                })
+                .collect();
+            assert!(artists.contains(&"Artist A"));
+            assert!(artists.contains(&"Artist B"));
+        }
+
+        #[rstest]
+        fn empty_records_produces_empty_stack(mut ctx: Ctx, config: Config) {
+            ctx.config = std::sync::Arc::new(config);
+            let mut pane =
+                TagBrowserPane::new(vec![grouped_album_by_artist_tag()], PaneType::Albums, &ctx);
+
+            pane.process_grouped_list(MpdGroupedList(vec![]), &ctx);
+
+            assert!(pane.stack.current().items.is_empty());
+        }
+
+        #[rstest]
+        fn second_call_replaces_previous_state(mut ctx: Ctx, config: Config) {
+            ctx.config = std::sync::Arc::new(config);
+            let mut pane =
+                TagBrowserPane::new(vec![grouped_album_by_artist_tag()], PaneType::Albums, &ctx);
+
+            pane.process_grouped_list(
+                MpdGroupedList(vec![grouped_record(&[
+                    ("album", "Old Album"),
+                    ("artist", "Old Artist"),
+                ])]),
+                &ctx,
+            );
+            assert_eq!(pane.stack.current().items.len(), 1);
+
+            pane.process_grouped_list(
+                MpdGroupedList(vec![
+                    grouped_record(&[("album", "New Album A"), ("artist", "New Artist")]),
+                    grouped_record(&[("album", "New Album B"), ("artist", "New Artist")]),
+                ]),
+                &ctx,
+            );
+
+            assert_eq!(pane_root_display_names(&pane).len(), 2);
+            assert!(pane_root_display_names(&pane).iter().all(|n| n.contains("New")));
+        }
     }
 
     mod list_songs_in_item {

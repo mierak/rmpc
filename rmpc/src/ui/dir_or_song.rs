@@ -1,4 +1,4 @@
-use std::{borrow::Cow, cmp::Ordering, str::FromStr};
+use std::{borrow::Cow, cmp::Ordering, collections::HashMap, str::FromStr};
 
 use rmpc_mpd::commands::{
     Song,
@@ -23,6 +23,7 @@ pub(crate) enum DirOrSong {
         full_path: String,
         last_modified: chrono::DateTime<chrono::Utc>,
         playlist: bool,
+        metadata: HashMap<String, String>,
     },
     Song(Song),
 }
@@ -35,6 +36,7 @@ impl DirOrSong {
             full_path: String::new(),
             last_modified: chrono::Utc::now(),
             playlist: false,
+            metadata: HashMap::new(),
         }
     }
 
@@ -45,6 +47,22 @@ impl DirOrSong {
             full_path: String::new(),
             last_modified: chrono::Utc::now(),
             playlist: false,
+            metadata: HashMap::new(),
+        }
+    }
+
+    pub fn name_display_name_with_metadata(
+        name: String,
+        display_name: String,
+        metadata: HashMap<String, String>,
+    ) -> Self {
+        DirOrSong::Dir {
+            name,
+            display_name: Some(display_name),
+            full_path: String::new(),
+            last_modified: chrono::Utc::now(),
+            playlist: false,
+            metadata,
         }
     }
 
@@ -55,6 +73,7 @@ impl DirOrSong {
             full_path: String::new(),
             last_modified: chrono::Utc::now(),
             playlist: true,
+            metadata: HashMap::new(),
         }
     }
 
@@ -190,6 +209,7 @@ impl LsInfoEntryExt for LsInfoEntry {
                 full_path,
                 last_modified,
                 playlist: false,
+                metadata: HashMap::new(),
             }),
             LsInfoEntry::Playlist(playlist) => match show_playlists_mode {
                 ShowPlaylistsMode::All => Some(DirOrSong::Dir {
@@ -198,6 +218,7 @@ impl LsInfoEntryExt for LsInfoEntry {
                     full_path: playlist.full_path,
                     last_modified: playlist.last_modified,
                     playlist: true,
+                    metadata: HashMap::new(),
                 }),
                 ShowPlaylistsMode::None => None,
                 ShowPlaylistsMode::NonRoot if playlist.name == playlist.full_path => None,
@@ -207,6 +228,7 @@ impl LsInfoEntryExt for LsInfoEntry {
                     full_path: playlist.full_path,
                     last_modified: playlist.last_modified,
                     playlist: true,
+                    metadata: HashMap::new(),
                 }),
             },
         }
@@ -485,6 +507,7 @@ mod ordtest {
             full_path: name.to_string(),
             last_modified: mtime.parse().unwrap(),
             playlist: false,
+            metadata: HashMap::new(),
         }
     }
 

@@ -6,7 +6,7 @@ use crossbeam::channel::Sender;
 use ratatui::{style::Style, widgets::ListItem};
 use rmpc_mpd::{
     client::Client,
-    commands::{Decoder, IdleEvent, Song, Status, Volume},
+    commands::{Decoder, IdleEvent, Song, Status, Volume, list::MpdGroupedList},
 };
 
 use super::{events::AppEvent, mpd_client_ext::PartitionedOutput};
@@ -93,6 +93,7 @@ pub(crate) enum MpdQueryResult {
     Decoders(Vec<Decoder>),
     ExternalCommand(Arc<Vec<String>>, Vec<String>, Vec<Song>),
     SongStickers(HashMap<String, HashMap<String, String>>),
+    TagGroupedList { data: MpdGroupedList },
     Any(Box<dyn Any + Send + Sync>),
 }
 
