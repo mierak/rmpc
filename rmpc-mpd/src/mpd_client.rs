@@ -202,7 +202,7 @@ pub trait MpdCommand {
         &mut self,
         uri: &str,
         name: &str,
-        filter: Option<StickerFilter>,
+        opts: StickerFindOptions,
     ) -> MpdResult<()>;
     fn send_switch_to_partition(&mut self, name: &str) -> MpdResult<()>;
     fn send_new_partition(&mut self, name: &str) -> MpdResult<()>;
@@ -364,7 +364,7 @@ pub trait MpdClient: Sized {
         &mut self,
         uri: &str,
         name: &str,
-        filter: Option<StickerFilter>,
+        opts: StickerFindOptions,
     ) -> MpdResult<StickersWithFile>;
 
     // Partitions
@@ -868,22 +868,21 @@ impl<T: SocketClient> MpdCommand for T {
         &mut self,
         uri: &str,
         key: &str,
-        filter: Option<StickerFilter>,
+        opts: StickerFindOptions,
     ) -> MpdResult<()> {
-        if let Some(filter) = filter {
-            self.execute(&format!(
-                "sticker find song {} {} {}",
-                uri.quote_and_escape(),
-                key.quote_and_escape(),
-                filter.as_mpd_str(),
-            ))
-        } else {
-            self.execute(&format!(
-                "sticker find song {} {}",
-                uri.quote_and_escape(),
-                key.quote_and_escape(),
-            ))
+        let mut cmd =
+            format!("sticker find song {} {}", uri.quote_and_escape(), key.quote_and_escape());
+        if let Some(ref filter) = opts.filter {
+            cmd.push(' ');
+            filter.write_to(&mut cmd);
         }
+        if let Some(sort) = opts.sort {
+            let _ = write!(cmd, " sort {}", sort.as_mpd_str());
+        }
+        if let Some((start, end)) = opts.window {
+            let _ = write!(cmd, " window {start}:{end}");
+        }
+        self.execute(&cmd)
     }
 
     fn send_switch_to_partition(&mut self, name: &str) -> MpdResult<()> {
@@ -967,8 +966,6 @@ impl<T: SocketClient> MpdCommand for T {
     }
 }
 
-/// Sticker operators for filtering stickers in `find_stickers`
-/// The *Int variants cast the sticker value to an integer before comparing.
 #[derive(Debug, PartialEq, Clone, strum::IntoStaticStr, strum::AsRefStr)]
 pub enum StickerFilter {
     Equals(String),
@@ -982,17 +979,161 @@ pub enum StickerFilter {
 }
 
 impl StickerFilter {
-    fn as_mpd_str(&self) -> String {
+    fn write_to(&self, buf: &mut String) {
         match self {
-            StickerFilter::Equals(value) => format!("= {}", value.quote_and_escape()),
-            StickerFilter::GreaterThan(value) => format!("> {}", value.quote_and_escape()),
-            StickerFilter::LessThan(value) => format!("< {}", value.quote_and_escape()),
-            StickerFilter::Contains(value) => format!("contains {}", value.quote_and_escape()),
-            StickerFilter::StartsWith(value) => format!("starts_with {}", value.quote_and_escape()),
-            StickerFilter::EqualsInt(value) => format!("eq {value}"),
-            StickerFilter::GreaterThanInt(value) => format!("gt {value}"),
-            StickerFilter::LessThanInt(value) => format!("lt {value}"),
+            StickerFilter::Equals(value) => {
+                let _ = write!(buf, "= {}", value.quote_and_escape());
+            }
+            StickerFilter::GreaterThan(value) => {
+                let _ = write!(buf, "> {}", value.quote_and_escape());
+            }
+            StickerFilter::LessThan(value) => {
+                let _ = write!(buf, "< {}", value.quote_and_escape());
+            }
+            StickerFilter::Contains(value) => {
+                let _ = write!(buf, "contains {}", value.quote_and_escape());
+            }
+            StickerFilter::StartsWith(value) => {
+                let _ = write!(buf, "starts_with {}", value.quote_and_escape());
+            }
+            StickerFilter::EqualsInt(value) => {
+                let _ = write!(buf, "eq {value}");
+            }
+            StickerFilter::GreaterThanInt(value) => {
+                let _ = write!(buf, "gt {value}");
+            }
+            StickerFilter::LessThanInt(value) => {
+                let _ = write!(buf, "lt {value}");
+            }
         }
+    }
+}
+
+#[derive(Debug, PartialEq, Eq, Clone, Copy)]
+pub enum StickerSort {
+    Uri,
+    Value,
+    ValueInt,
+    UriDesc,
+    ValueDesc,
+    ValueIntDesc,
+}
+
+impl StickerSort {
+    fn as_mpd_str(self) -> &'static str {
+        match self {
+            StickerSort::Uri => "uri",
+            StickerSort::Value => "value",
+            StickerSort::ValueInt => "value_int",
+            StickerSort::UriDesc => "-uri",
+            StickerSort::ValueDesc => "-value",
+            StickerSort::ValueIntDesc => "-value_int",
+        }
+    }
+}
+
+/// Combined options for the MPD `sticker find` command.
+/// All fields are optional; unset fields are omitted from the wire command.
+#[derive(Debug, Default, PartialEq, Clone)]
+pub struct StickerFindOptions {
+    /// Filter by sticker value (operator + value).
+    pub filter: Option<StickerFilter>,
+    /// Sort results server-side.
+    pub sort: Option<StickerSort>,
+    /// `(start, end)` exclusive window for pagination.
+    pub window: Option<(u32, u32)>,
+}
+
+#[cfg(test)]
+#[allow(clippy::unwrap_used)]
+mod sticker_find_options_tests {
+    use std::fmt::Write;
+
+    use super::{StickerFilter, StickerFindOptions, StickerSort};
+
+    fn to_mpd_str(opts: &StickerFindOptions) -> String {
+        let mut buf = String::new();
+        if let Some(ref filter) = opts.filter {
+            filter.write_to(&mut buf);
+        }
+        if let Some(sort) = opts.sort {
+            if !buf.is_empty() {
+                buf.push(' ');
+            }
+            let _ = write!(buf, "sort {}", sort.as_mpd_str());
+        }
+        if let Some((start, end)) = opts.window {
+            if !buf.is_empty() {
+                buf.push(' ');
+            }
+            let _ = write!(buf, "window {start}:{end}");
+        }
+        buf
+    }
+
+    #[test]
+    fn all_none_produces_empty_string() {
+        let opts = StickerFindOptions { filter: None, sort: None, window: None };
+        assert_eq!(to_mpd_str(&opts), "");
+    }
+
+    #[test]
+    fn filter_only_greater_than_int() {
+        let opts = StickerFindOptions {
+            filter: Some(StickerFilter::GreaterThanInt(5)),
+            sort: None,
+            window: None,
+        };
+        assert_eq!(to_mpd_str(&opts), "gt 5");
+    }
+
+    #[test]
+    fn sort_value_int_desc_only() {
+        let opts = StickerFindOptions {
+            filter: None,
+            sort: Some(StickerSort::ValueIntDesc),
+            window: None,
+        };
+        assert_eq!(to_mpd_str(&opts), "sort -value_int");
+    }
+
+    #[test]
+    fn sort_value_int_asc_only() {
+        let opts =
+            StickerFindOptions { filter: None, sort: Some(StickerSort::ValueInt), window: None };
+        assert_eq!(to_mpd_str(&opts), "sort value_int");
+    }
+
+    #[test]
+    fn sort_uri_only() {
+        let opts = StickerFindOptions { filter: None, sort: Some(StickerSort::Uri), window: None };
+        assert_eq!(to_mpd_str(&opts), "sort uri");
+    }
+
+    #[test]
+    fn window_only() {
+        let opts = StickerFindOptions { filter: None, sort: None, window: Some((0, 20)) };
+        assert_eq!(to_mpd_str(&opts), "window 0:20");
+    }
+
+    #[test]
+    fn sort_and_window_no_filter() {
+        let opts = StickerFindOptions {
+            filter: None,
+            sort: Some(StickerSort::ValueIntDesc),
+            window: Some((0, 20)),
+        };
+        assert_eq!(to_mpd_str(&opts), "sort -value_int window 0:20");
+    }
+
+    #[test]
+    fn all_present() {
+        let opts = StickerFindOptions {
+            filter: Some(StickerFilter::GreaterThanInt(3)),
+            sort: Some(StickerSort::ValueIntDesc),
+            window: Some((0, 10)),
+        };
+        assert_eq!(to_mpd_str(&opts), "gt 3 sort -value_int window 0:10");
     }
 }
 

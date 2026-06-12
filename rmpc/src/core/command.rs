@@ -12,7 +12,7 @@ use rmpc_mpd::{
     client::Client,
     commands::{IdleEvent, State, mpd_config::MpdConfig, volume::Bound},
     filter::{Filter, Tag},
-    mpd_client::{AlbumArtOrder, MpdClient, MpdCommand, ValueChange},
+    mpd_client::{AlbumArtOrder, MpdClient, MpdCommand, StickerFindOptions, ValueChange},
     proto_client::ProtoClient,
     queue_position::QueuePosition,
     single_or_range::SingleOrRange,
@@ -516,7 +516,8 @@ impl Command {
             })),
             Command::Sticker { cmd: StickerCmd::Find { uri, key } } => {
                 Ok(Box::new(move |_, client| {
-                    let stickers = client.find_stickers(&uri, &key, None)?;
+                    let stickers =
+                        client.find_stickers(&uri, &key, StickerFindOptions::default())?;
                     println!("{}", serde_json::ser::to_string(&stickers)?);
                     Ok(())
                 }))

@@ -6,6 +6,7 @@ use ratatui::{
 };
 
 use crate::{
+    config::theme::properties::{Property, SongProperty},
     ctx::Ctx,
     ui::dirstack::{Dir, DirStack, DirStackItem},
 };
@@ -22,11 +23,21 @@ pub enum BrowserArea {
 pub struct Browser<T: std::fmt::Debug + DirStackItem + Clone + Send> {
     state_type_marker: std::marker::PhantomData<T>,
     pub areas: EnumMap<BrowserArea, Rect>,
+    pub song_format: Option<Vec<Property<SongProperty>>>,
 }
 
 impl<T: std::fmt::Debug + DirStackItem + Clone + Send> Browser<T> {
     pub fn new() -> Self {
-        Self { state_type_marker: std::marker::PhantomData, areas: EnumMap::default() }
+        Self {
+            state_type_marker: std::marker::PhantomData,
+            areas: EnumMap::default(),
+            song_format: None,
+        }
+    }
+
+    pub fn with_song_format(mut self, format: Vec<Property<SongProperty>>) -> Self {
+        self.song_format = Some(format);
+        self
     }
 }
 const MIDDLE_COLUMN_SYMBOLS: symbols::border::Set = symbols::border::Set {
@@ -53,7 +64,10 @@ where
         ctx: &Ctx,
     ) {
         let config = &ctx.config;
-        let song_format = ctx.config.theme.browser_song_format.0.as_slice();
+        let song_format: &[Property<SongProperty>] = self
+            .song_format
+            .as_deref()
+            .unwrap_or(ctx.config.theme.browser_song_format.0.as_slice());
         let scrollbar_margin = match config.theme.scrollbar.as_ref() {
             Some(scrollbar) if config.theme.draw_borders => {
                 let scrollbar_track = &scrollbar.symbols[0];

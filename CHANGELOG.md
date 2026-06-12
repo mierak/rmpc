@@ -33,6 +33,8 @@ All notable changes to this project will be documented in this file.
 - `SelectAlbum` queue keybind
 - More felixbility to `Browser` panes. They can now be configured to any arbitrary levels of nesting
   instead of hardcoded `["root_tag", "album"]`
+- Added `RecentlyPlayed` browser pane showing songs ordered by the `lastPlayed` sticker. The sticker
+  needs to be tracked externally by for example [rmpcd plugin](https://github.com/rmpc-org/rmpcd-lastplayed).
 
 ### Changed
 

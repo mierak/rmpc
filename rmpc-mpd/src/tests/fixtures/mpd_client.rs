@@ -28,7 +28,13 @@ use crate::{
     },
     errors::MpdError,
     filter::{Filter, Tag},
-    mpd_client::{MpdClient, SaveMode, StickerFilter, StringNormalizationFeature, ValueChange},
+    mpd_client::{
+        MpdClient,
+        SaveMode,
+        StickerFindOptions,
+        StringNormalizationFeature,
+        ValueChange,
+    },
     proto_client::SocketClient,
     queue_position::QueuePosition,
     single_or_range::SingleOrRange,
@@ -639,7 +645,7 @@ impl MpdClient for TestMpdClient {
         &mut self,
         _uri: &str,
         _name: &str,
-        _filter: Option<StickerFilter>,
+        _opts: StickerFindOptions,
     ) -> MpdResult<crate::commands::stickers::StickersWithFile> {
         todo!("Not yet implemented")
     }

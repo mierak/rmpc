@@ -1099,6 +1099,7 @@ pub enum UiEvent {
     Database,
     Output,
     StoredPlaylist,
+    Sticker,
     LogAdded(Vec<u8>),
     ModalOpened,
     ModalClosed,
@@ -1126,6 +1127,7 @@ impl TryFrom<IdleEvent> for UiEvent {
             IdleEvent::Database => UiEvent::Database,
             IdleEvent::StoredPlaylist => UiEvent::StoredPlaylist,
             IdleEvent::Output => UiEvent::Output,
+            IdleEvent::Sticker => UiEvent::Sticker,
             _ => return Err(()),
         })
     }

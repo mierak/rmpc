@@ -16,6 +16,7 @@ use progress_bar::ProgressBarPane;
 use property::PropertyPane;
 use queue::QueuePane;
 use ratatui::{Frame, layout::Layout, prelude::Rect, style::Color, text::Span, widgets::Block};
+use recently_played::RecentlyPlayedPane;
 use rmpc_mpd::commands::{Song, State, status::OnOffOneshot, volume::Bound};
 use search::SearchPane;
 use strum::{Display, IntoDiscriminant};
@@ -84,6 +85,7 @@ pub mod progress_bar;
 pub mod property;
 pub mod queue;
 pub mod queue_header;
+pub mod recently_played;
 pub mod search;
 pub mod tabs;
 pub mod tag_browser;
@@ -294,6 +296,15 @@ impl<'panes> PaneContainer<'panes> {
                     pane.pane.clone(),
                     Box::new(VolumePane::new(kind.clone())) as Box<dyn BoxedPane>,
                 )),
+                PaneType::RecentlyPlayed { format, limit } => Some((
+                    pane.pane.clone(),
+                    Box::new(RecentlyPlayedPane::new(
+                        ctx,
+                        pane.pane.clone(),
+                        format.clone(),
+                        *limit,
+                    )) as Box<dyn BoxedPane>,
+                )),
                 _ => None,
             })
     }
@@ -331,6 +342,11 @@ impl<'panes> PaneContainer<'panes> {
                     .with_context(|| format!("expected pane to be defined {p:?}"))?,
             )),
             p @ PaneType::Browser { .. } => Ok(Panes::Others(
+                self.others
+                    .get_mut(pane)
+                    .with_context(|| format!("expected pane to be defined {p:?}"))?,
+            )),
+            p @ PaneType::RecentlyPlayed { .. } => Ok(Panes::Others(
                 self.others
                     .get_mut(pane)
                     .with_context(|| format!("expected pane to be defined {p:?}"))?,

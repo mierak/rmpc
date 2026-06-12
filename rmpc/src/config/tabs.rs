@@ -161,6 +161,12 @@ pub enum PaneTypeFile {
     Albums,
     AlbumArtists,
     Playlists,
+    RecentlyPlayed {
+        #[serde(default)]
+        format: Option<Vec<PropertyFile<SongPropertyFile>>>,
+        #[serde(default)]
+        limit: Option<u32>,
+    },
     Search,
     AlbumArt,
     Lyrics,
@@ -203,6 +209,10 @@ pub enum PaneType {
     AlbumArtists,
     Albums,
     Playlists,
+    RecentlyPlayed {
+        format: Vec<Property<SongProperty>>,
+        limit: Option<u32>,
+    },
     Search,
     AlbumArt,
     Lyrics,
@@ -281,6 +291,14 @@ impl TryFrom<PaneTypeFile> for PaneType {
             PaneTypeFile::AlbumArtists => PaneType::AlbumArtists,
             PaneTypeFile::Albums => PaneType::Albums,
             PaneTypeFile::Playlists => PaneType::Playlists,
+            PaneTypeFile::RecentlyPlayed { format, limit } => PaneType::RecentlyPlayed {
+                format: format
+                    .unwrap_or_default()
+                    .into_iter()
+                    .map(|p| p.convert())
+                    .try_collect()?,
+                limit,
+            },
             PaneTypeFile::Search => PaneType::Search,
             PaneTypeFile::AlbumArt => PaneType::AlbumArt,
             PaneTypeFile::Lyrics => PaneType::Lyrics,
