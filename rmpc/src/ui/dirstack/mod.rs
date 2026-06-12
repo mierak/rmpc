@@ -34,6 +34,7 @@ pub trait DirStackItem {
     fn matches(&self, song_format: &[Property<SongProperty>], ctx: &Ctx, filter: &str) -> bool;
     fn to_list_item<'a>(
         &self,
+        song_format: &[Property<SongProperty>],
         ctx: &Ctx,
         is_marked: bool,
         is_current: bool,
@@ -41,7 +42,14 @@ pub trait DirStackItem {
         additional_content: Option<String>,
     ) -> ListItem<'a>;
     fn to_list_item_simple<'a>(&self, ctx: &Ctx) -> ListItem<'a> {
-        self.to_list_item(ctx, false, false, false, None)
+        self.to_list_item(
+            ctx.config.theme.browser_song_format.0.as_slice(),
+            ctx,
+            false,
+            false,
+            false,
+            None,
+        )
     }
     fn format(&self, format: &[Property<SongProperty>], sep: &str, ctx: &Ctx) -> String;
 }
@@ -123,6 +131,7 @@ impl DirStackItem for DirOrSong {
 
     fn to_list_item<'a>(
         &self,
+        song_format: &[Property<SongProperty>],
         ctx: &Ctx,
         is_marked: bool,
         is_current: bool,
@@ -169,9 +178,7 @@ impl DirStackItem for DirOrSong {
                     ListItem::from(value)
                 }
             }
-            DirOrSong::Song(s) => {
-                s.to_list_item(ctx, is_marked, is_current, matches_filter, additional_content)
-            }
+            DirOrSong::Song(s) => s.to_list_item(song_format, ctx, is_marked, is_current, matches_filter, additional_content),
         }
     }
 
@@ -206,6 +213,7 @@ impl DirStackItem for Song {
 
     fn to_list_item<'a>(
         &self,
+        song_format: &[Property<SongProperty>],
         ctx: &Ctx,
         is_marked: bool,
         is_current: bool,
@@ -228,7 +236,7 @@ impl DirStackItem for Song {
             Span::from(" "),
         ]
         .into_iter()
-        .chain(config.theme.browser_song_format.0.iter().map(|prop| {
+        .chain(song_format.iter().map(|prop| {
             Span::from(
                 prop.as_string(
                     Some(self),
@@ -333,6 +341,7 @@ impl DirStackItem for String {
 
     fn to_list_item<'a>(
         &self,
+        _song_format: &[Property<SongProperty>],
         ctx: &Ctx,
         is_marked: bool,
         _is_current: bool,

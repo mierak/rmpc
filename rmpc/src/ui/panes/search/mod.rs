@@ -12,7 +12,7 @@ use rmpc_mpd::{
     client::Client,
     commands::Song,
     filter::{Filter, FilterKind},
-    mpd_client::{MpdClient, MpdCommand},
+    mpd_client::{MpdClient, MpdCommand, StickerFindOptions},
     proto_client::ProtoClient,
 };
 use rmpc_shared::version::Version;
@@ -250,13 +250,13 @@ impl SearchPane {
                     let uris = match (rating_filter, liked_filter) {
                         (Some(rf), Some(lf)) => {
                             let mut ratings: HashSet<_> = client
-                                .find_stickers("", RATING_STICKER, Some(rf))?
+                                .find_stickers("", RATING_STICKER, StickerFindOptions { filter: Some(rf), ..Default::default() })?
                                 .0
                                 .into_iter()
                                 .map(|s| s.file)
                                 .collect();
                             let liked: HashSet<_> = client
-                                .find_stickers("", LIKE_STICKER, Some(lf))?
+                                .find_stickers("", LIKE_STICKER, StickerFindOptions { filter: Some(lf), ..Default::default() })?
                                 .0
                                 .into_iter()
                                 .map(|s| s.file)
@@ -268,13 +268,13 @@ impl SearchPane {
                             ratings
                         }
                         (Some(rf), None) => client
-                            .find_stickers("", RATING_STICKER, Some(rf))?
+                            .find_stickers("", RATING_STICKER, StickerFindOptions { filter: Some(rf), ..Default::default() })?
                             .0
                             .into_iter()
                             .map(|s| s.file)
                             .collect(),
                         (None, Some(lf)) => client
-                            .find_stickers("", LIKE_STICKER, Some(lf))?
+                            .find_stickers("", LIKE_STICKER, StickerFindOptions { filter: Some(lf), ..Default::default() })?
                             .0
                             .into_iter()
                             .map(|s| s.file)
@@ -308,7 +308,7 @@ impl SearchPane {
 
                     let data = if stickers_supported && rating_filter.is_some() {
                         // empty URI returns all songs with the sticker
-                        let ratings = client.find_stickers("", RATING_STICKER, rating_filter)?;
+                        let ratings = client.find_stickers("", RATING_STICKER, StickerFindOptions { filter: rating_filter, ..Default::default() })?;
                         let ratings: HashSet<_> = ratings.into_iter().map(|r| r.file).collect();
                         data.into_iter().filter(|song| ratings.contains(&song.file)).collect()
                     } else {
@@ -317,7 +317,7 @@ impl SearchPane {
 
                     let data = if stickers_supported && liked_filter.is_some() {
                         // empty URI returns all songs with the sticker
-                        let liked = client.find_stickers("", LIKE_STICKER, liked_filter)?;
+                        let liked = client.find_stickers("", LIKE_STICKER, StickerFindOptions { filter: liked_filter, ..Default::default() })?;
                         let liked: HashSet<_> = liked.into_iter().map(|r| r.file).collect();
                         data.into_iter().filter(|song| liked.contains(&song.file)).collect()
                     } else {

@@ -347,6 +347,7 @@ impl DirStackItem for DownloadId {
 
     fn to_list_item<'a>(
         &self,
+        _song_format: &[Property<SongProperty>],
         _ctx: &Ctx,
         _is_marked: bool,
         _is_current: bool,

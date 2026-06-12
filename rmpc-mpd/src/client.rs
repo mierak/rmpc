@@ -43,7 +43,7 @@ use crate::{
         MpdClient,
         MpdCommand,
         SaveMode,
-        StickerFilter,
+        StickerFindOptions,
         StringNormalizationFeature,
         ValueChange,
     },
@@ -818,9 +818,9 @@ impl MpdClient for Client<'_> {
         &mut self,
         uri: &str,
         key: &str,
-        filter: Option<StickerFilter>,
+        opts: StickerFindOptions,
     ) -> MpdResult<StickersWithFile> {
-        self.send_find_stickers(uri, key, filter).and_then(|()| self.read_response())
+        self.send_find_stickers(uri, key, opts).and_then(|()| self.read_response())
     }
 
     fn switch_to_partition(&mut self, name: &str) -> MpdResult<()> {

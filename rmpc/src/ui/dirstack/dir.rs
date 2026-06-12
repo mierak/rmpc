@@ -157,6 +157,7 @@ where
                     None
                 };
                 item.to_list_item(
+                    song_format,
                     ctx,
                     self.marked().contains(&i),
                     current_item_idx.is_some_and(|idx| idx == i),
