@@ -178,7 +178,14 @@ impl DirStackItem for DirOrSong {
                     ListItem::from(value)
                 }
             }
-            DirOrSong::Song(s) => s.to_list_item(song_format, ctx, is_marked, is_current, matches_filter, additional_content),
+            DirOrSong::Song(s) => s.to_list_item(
+                song_format,
+                ctx,
+                is_marked,
+                is_current,
+                matches_filter,
+                additional_content,
+            ),
         }
     }
 
