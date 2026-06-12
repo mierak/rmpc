@@ -20,6 +20,7 @@ impl<T> PluginStore<T> {
             (Triggers::Message, flag_to_slot(Triggers::Message)),
             (Triggers::Idle, flag_to_slot(Triggers::Idle)),
             (Triggers::Shutdown, flag_to_slot(Triggers::Shutdown)),
+            (Triggers::Reconnect, flag_to_slot(Triggers::Reconnect)),
         ] {
             if triggers.contains(flag) {
                 self.by_flag[slot].push(idx);

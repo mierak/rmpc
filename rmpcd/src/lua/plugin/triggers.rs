@@ -17,10 +17,10 @@ bitflags! {
     pub struct Triggers: u8 {
         const SongChange = 0b000_0001;
         const StateChange = 0b000_0010;
-        const Message = 0b000_1000;
-        const Idle = 0b001_0000;
-        const Shutdown = 0b010_0000;
-        const Reconnect = 0b100_0000;
+        const Message = 0b000_0100;
+        const Idle = 0b000_1000;
+        const Shutdown = 0b001_0000;
+        const Reconnect = 0b010_0000;
     }
 }
 
