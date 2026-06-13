@@ -12,7 +12,7 @@ use serde_json::json;
 use tokio::sync::RwLock;
 use tracing::{error, info, level_filters::LevelFilter, warn};
 use tracing_appender::non_blocking::WorkerGuard;
-use tracing_subscriber::{EnvFilter, Registry, layer::SubscriberExt, util::SubscriberInitExt};
+use tracing_subscriber::{EnvFilter, Registry, layer::SubscriberExt};
 
 use crate::{
     async_client::AsyncClient,
@@ -24,6 +24,7 @@ mod async_client;
 mod ctx;
 mod event_loop;
 mod ext;
+mod kv_bridge;
 mod lua;
 mod mpd_ext;
 mod mpris;
@@ -57,7 +58,7 @@ fn init_logging(level: &str) -> Result<(WorkerGuard, WorkerGuard)> {
         .from_env_lossy()
         .add_directive(format!("rmpcd={level}").parse()?);
 
-    Registry::default()
+    let subscriber = Registry::default()
         .with(
             tracing_subscriber::fmt::Layer::new()
                 .with_line_number(true)
@@ -74,8 +75,11 @@ fn init_logging(level: &str) -> Result<(WorkerGuard, WorkerGuard)> {
                 .with_ansi(false)
                 .with_writer(non_blocking_file),
         )
-        .with(env_filter)
-        .init();
+        .with(env_filter);
+
+    tracing::subscriber::set_global_default(subscriber)?;
+    log::set_boxed_logger(Box::new(kv_bridge::KvBridgeLogger::new()))?;
+    log::set_max_level(log::LevelFilter::Trace);
 
     Ok((file_guard, stderr_guard))
 }
