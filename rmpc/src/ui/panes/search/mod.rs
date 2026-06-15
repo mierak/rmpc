@@ -66,7 +66,7 @@ use crate::{
             },
             select_modal::SelectModal,
         },
-        panes::search::inputs::{ActionResult, InputGroups, InputType, SearchTag, TextboxInput},
+        panes::search::inputs::{ActionResult, InputGroups, SearchTag},
         widgets::{browser::BrowserArea, input::Input},
     },
 };
@@ -226,19 +226,7 @@ impl SearchPane {
             } else {
                 match self.search_tag {
                     SearchTag::Any => {
-                        self.inputs
-                            .inputs
-                            .iter()
-                            .filter_map(|input| match input {
-                                InputType::Textbox(TextboxInput {
-                                    filter_key: Some(key), ..
-                                }) if !key.is_empty() => Some(
-                                    Filter::new(key.clone(), query.clone())
-                                        .with_type(search_mode.into()),
-                                ),
-                                _ => None,
-                            })
-                            .collect_vec()
+                        vec![Filter::new(Tag::Any, query).with_type(search_mode.into())]
                     }
                     SearchTag::Title => {
                         vec![Filter::new(Tag::Title, query).with_type(search_mode.into())]
@@ -449,7 +437,11 @@ impl SearchPane {
 
                     ctx.render()?;
                 }
-                CommonAction::EnterSearch => {}
+                CommonAction::EnterSearch => {
+                    self.inputs.first();
+                    self.inputs.enter_insert_mode(ctx);
+                    ctx.render()?;
+                }
                 CommonAction::NextResult => {}
                 CommonAction::PreviousResult => {}
                 CommonAction::Select => {}
@@ -1299,6 +1291,16 @@ impl Pane for SearchPane {
         Ok(())
     }
 
+    fn before_show(&mut self, ctx: &Ctx) -> Result<()> {
+        // Auto-focus the query field when the Search tab is opened so the user
+        // can start typing immediately, without first pressing `/` or `i`.
+        if matches!(self.phase, Phase::Search) {
+            self.inputs.first();
+            self.inputs.enter_insert_mode(ctx);
+        }
+        Ok(())
+    }
+
     fn on_event(&mut self, event: &mut UiEvent, _is_visible: bool, ctx: &Ctx) -> Result<()> {
         match event {
             UiEvent::Database => {
@@ -1538,8 +1540,12 @@ impl Pane for SearchPane {
     fn handle_insert_mode(&mut self, kind: InputResultEvent, ctx: &mut Ctx) -> Result<()> {
         match self.phase {
             Phase::Search => match kind {
-                InputResultEvent::Push => {}
-                InputResultEvent::Pop => {}
+                InputResultEvent::Push => {
+                    self.maybe_search_on_change(ctx);
+                }
+                InputResultEvent::Pop => {
+                    self.maybe_search_on_change(ctx);
+                }
                 InputResultEvent::Confirm => {
                     self.maybe_search_on_change(ctx);
                 }
