@@ -11,6 +11,9 @@ pub struct Search {
     pub search_button: bool,
     pub custom_query: bool,
     pub mode: FilterKindFile,
+    /// Retained for config backward-compatibility; the search bar now uses
+    /// fixed scope chips (Title/Artist/Album/Any) instead of per-tag fields.
+    #[allow(dead_code)]
     pub tags: Vec<SearchableTag>,
 }
 
@@ -30,6 +33,7 @@ pub struct SearchFile {
 
 #[derive(Debug, Default, Clone)]
 pub struct SearchableTag {
+    #[allow(dead_code)]
     pub value: String,
 }
 

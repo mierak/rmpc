@@ -52,14 +52,13 @@ impl InputGroups {
         ctx: &Ctx,
     ) -> Self {
         let mut inputs = Vec::new();
-        for tag in &search_config.tags {
-            inputs.push(InputType::Textbox(TextboxInput {
-                key: "",
-                filter_key: Some(tag.value.clone()),
-                initial_value: None,
-                buffer_id: BufferId::new(),
-            }));
-        }
+        let query_buffer_id = BufferId::new();
+        ctx.input.create_buffer(query_buffer_id, None);
+        inputs.push(InputType::Textbox(TextboxInput {
+            key: "",
+            initial_value: None,
+            buffer_id: query_buffer_id,
+        }));
 
         if custom_query {
             inputs.push(InputType::Separator);
@@ -67,7 +66,6 @@ impl InputGroups {
             ctx.input.create_buffer(buffer_id, None);
             inputs.push(InputType::Textbox(TextboxInput {
                 key: CUSTOM_QUERY_KEY,
-                filter_key: None,
                 initial_value: None,
                 buffer_id,
             }));
@@ -81,7 +79,6 @@ impl InputGroups {
             ctx.input.create_buffer(buffer_id, Some("0"));
             inputs.push(InputType::Numberbox(TextboxInput {
                 key: RATING_VALUE_KEY,
-                filter_key: None,
                 initial_value: Some("0".to_owned()),
                 buffer_id,
             }));
@@ -370,7 +367,6 @@ pub(super) enum InputType {
 #[derive(Debug)]
 pub(super) struct TextboxInput {
     pub key: &'static str,
-    pub filter_key: Option<String>,
     pub initial_value: Option<String>,
     pub buffer_id: BufferId,
 }
