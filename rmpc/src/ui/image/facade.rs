@@ -198,9 +198,24 @@ impl AlbumArtFacade {
         if let Some(req_data) = self.request_queue.pop()
             && !self.request_queue.is_empty()
         {
+            // A newer image arrived while this one was encoding -> drop the
+            // stale queue and encode the latest request instead.
             log::debug!("More image requests in queue, encoding the latest one instead");
             self.request_queue.clear();
-            self.show(req_data, ctx)?;
+            return self.show(req_data, ctx);
+        }
+        self.request_queue.clear();
+
+        // Nothing newer is pending: degrade to the default placeholder rather
+        // than leaving the area a blank/black box. Guard against an infinite
+        // loop in case the placeholder itself is what just failed to encode
+        // (pointer identity, since `show` stores a clone of the in-flight art).
+        let was_default = self
+            .current_album_art
+            .as_ref()
+            .is_some_and(|cur| Arc::ptr_eq(cur, &self.default_album_art));
+        if self.is_showing && !was_default {
+            self.show_default(ctx)?;
         }
         Ok(())
     }
