@@ -1291,16 +1291,6 @@ impl Pane for SearchPane {
         Ok(())
     }
 
-    fn before_show(&mut self, ctx: &Ctx) -> Result<()> {
-        // Auto-focus the query field when the Search tab is opened so the user
-        // can start typing immediately, without first pressing `/` or `i`.
-        if matches!(self.phase, Phase::Search) {
-            self.inputs.first();
-            self.inputs.enter_insert_mode(ctx);
-        }
-        Ok(())
-    }
-
     fn on_event(&mut self, event: &mut UiEvent, _is_visible: bool, ctx: &Ctx) -> Result<()> {
         match event {
             UiEvent::Database => {
