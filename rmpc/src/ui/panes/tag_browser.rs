@@ -404,6 +404,22 @@ impl Pane for TagBrowserPane {
         self.album_art.hide(ctx)
     }
 
+    fn resize(&mut self, _area: Rect, ctx: &Ctx) -> Result<()> {
+        // The preview cover renders out-of-band at a rect computed during
+        // render(); a terminal resize clears the whole screen (event loop) but
+        // fetch_selected_cover() early-returns when the selection is unchanged,
+        // so the cover would not be re-shown. Reset the cache and re-fetch so it
+        // re-renders at the new geometry (mirrors AlbumsGridPane::resize).
+        if self.crisp {
+            self.shown_cover = None;
+            self.has_cover = false;
+            self.album_art.hide(ctx)?;
+            self.fetch_selected_cover(ctx);
+            ctx.render()?;
+        }
+        Ok(())
+    }
+
     fn handle_mouse_event(&mut self, event: MouseEvent, ctx: &Ctx) -> Result<()> {
         self.handle_mouse_action(event, ctx)
     }
