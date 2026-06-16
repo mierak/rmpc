@@ -29,7 +29,7 @@ use crate::{
         UiEvent,
         browser::{BrowserPane, MoveDirection},
         dir_or_song::DirOrSong,
-        dirstack::{DirStack, DirStackItem},
+        dirstack::{DirStack, DirState, DirStackItem},
         image::facade::AlbumArtFacade,
         input::InputResultEvent,
         modals::{info_list_modal::InfoListModal, input_modal::InputModal},
@@ -388,6 +388,10 @@ impl BrowserPane<DirOrSong> for PlaylistsPane {
 
     fn browser_areas(&self) -> EnumMap<BrowserArea, Rect> {
         self.browser.areas
+    }
+
+    fn preview_scroll_mut(&mut self) -> Option<&mut DirState<ListState>> {
+        Some(&mut self.browser.preview_scroll)
     }
 
     fn list_songs_in_item(
