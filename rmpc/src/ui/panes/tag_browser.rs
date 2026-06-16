@@ -30,7 +30,7 @@ use crate::{
         UiEvent,
         browser::BrowserPane,
         dir_or_song::DirOrSong,
-        dirstack::{DirStack, DirStackItem, Path, WalkDirStackItem},
+        dirstack::{DirStack, DirState, DirStackItem, Path, WalkDirStackItem},
         image::facade::AlbumArtFacade,
         input::InputResultEvent,
         song_ext::SongExt,
@@ -422,6 +422,10 @@ impl BrowserPane<DirOrSong> for TagBrowserPane {
 
     fn browser_areas(&self) -> EnumMap<BrowserArea, Rect> {
         self.browser.areas
+    }
+
+    fn preview_scroll_mut(&mut self) -> Option<&mut DirState<ListState>> {
+        Some(&mut self.browser.preview_scroll)
     }
 
     fn list_songs_in_item(

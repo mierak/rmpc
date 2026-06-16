@@ -33,7 +33,7 @@ use crate::{
         mpd_query::EXTERNAL_COMMAND,
     },
     ui::{
-        dirstack::{DirStack, DirStackItem, WalkDirStackItem},
+        dirstack::{DirStack, DirState, DirStackItem, WalkDirStackItem},
         input::InputResultEvent,
         modals::{
             confirm_modal::{Action, ConfirmModal},
@@ -73,6 +73,9 @@ where
         let areas = self.browser_areas();
         let scrollbar = areas[BrowserArea::Scrollbar];
         if scrollbar.width > 0 { Some(scrollbar) } else { None }
+    }
+    fn preview_scroll_mut(&mut self) -> Option<&mut DirState<ListState>> {
+        None
     }
     fn open(&mut self, autoplay: bool, ctx: &Ctx) -> Result<()> {
         let Some(selected) = self.stack().current().selected() else {
@@ -363,6 +366,18 @@ where
                 self.stack_mut().current_mut().select_idx(idx_to_select.unwrap_or_default(), 0);
 
                 self.fetch_data_internal(ctx);
+            }
+            MouseEventKind::ScrollUp if preview_area.contains(position) => {
+                if let Some(scroll) = self.preview_scroll_mut() {
+                    scroll.scroll_up(ctx.config.scroll_amount, ctx.config.scrolloff);
+                    ctx.render()?;
+                }
+            }
+            MouseEventKind::ScrollDown if preview_area.contains(position) => {
+                if let Some(scroll) = self.preview_scroll_mut() {
+                    scroll.scroll_down(ctx.config.scroll_amount, ctx.config.scrolloff);
+                    ctx.render()?;
+                }
             }
             MouseEventKind::ScrollUp if current_area.contains(position) => {
                 self.stack_mut()

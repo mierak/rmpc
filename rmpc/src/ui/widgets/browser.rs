@@ -8,7 +8,7 @@ use ratatui::{
 use crate::{
     config::theme::properties::{Property, PropertyKindOrText, SongProperty},
     ctx::Ctx,
-    ui::dirstack::{Dir, DirStack, DirStackItem},
+    ui::dirstack::{Dir, DirStack, DirState, DirStackItem},
 };
 
 #[derive(Copy, Clone, Debug, Enum, Eq, PartialEq, Hash)]
@@ -31,6 +31,12 @@ pub struct Browser<T: std::fmt::Debug + DirStackItem + Clone + Send> {
     /// When true, the preview column reserves a `Cover` rect for an image
     /// facade.
     pub preview_cover: bool,
+    /// Vertical scroll state for the song-detail preview list so it can be
+    /// scrolled (mouse wheel) when its content overflows the preview height.
+    pub preview_scroll: DirState<ListState>,
+    /// Identity (`as_path`) of the item currently previewed; when it changes
+    /// the preview scroll is reset to the top.
+    preview_key: Option<String>,
 }
 impl<T: std::fmt::Debug + DirStackItem + Clone + Send> Browser<T> {
     pub fn new() -> Self {
@@ -40,6 +46,8 @@ impl<T: std::fmt::Debug + DirStackItem + Clone + Send> Browser<T> {
             column_titles: None,
             widths: None,
             preview_cover: false,
+            preview_scroll: DirState::default(),
+            preview_key: None,
         }
     }
 }
@@ -94,9 +102,12 @@ where
             }
             let pblock = {
                 let mut b = if config.theme.draw_borders {
-                    Block::bordered().border_type(BorderType::Rounded).border_style(dim_border)
+                    Block::bordered()
+                        .border_type(BorderType::Rounded)
+                        .border_style(dim_border)
+                        .padding(Padding::new(0, column_right_padding, 0, 0))
                 } else {
-                    Block::default().padding(Padding::new(1, 0, 0, 0))
+                    Block::default().padding(Padding::new(1, column_right_padding, 0, 0))
                 };
                 if let Some(t) = box_title(2, Some(" \u{f05a} Preview ".to_string())) {
                     b = b.title(t).title_style(title_style);
@@ -153,13 +164,27 @@ where
                             ))));
                         }
                         result.push(sep());
-                        for group in sel.to_file_preview(ctx) {
+                        for (gi, group) in sel.to_file_preview(ctx).into_iter().enumerate() {
                             if let Some(name) = group.name {
-                                let mut item = ListItem::new(name);
-                                if let Some(style) = group.header_style {
-                                    item = item.style(style);
+                                if gi > 0 {
+                                    result.push(ListItem::new(Line::default()));
                                 }
-                                result.push(item);
+                                let label_fg =
+                                    group.header_style.and_then(|s| s.fg).unwrap_or(accent);
+                                let label = format!(" {name} ");
+                                let label_w = label.chars().count();
+                                let rule_w = pw.saturating_sub(label_w);
+                                let mut spans = vec![Span::styled(
+                                    label,
+                                    Style::default().fg(label_fg).add_modifier(Modifier::BOLD),
+                                )];
+                                if rule_w > 0 {
+                                    spans.push(Span::styled(
+                                        "\u{2500}".repeat(rule_w),
+                                        Style::default().fg(rule),
+                                    ));
+                                }
+                                result.push(ListItem::new(Line::from(spans)));
                             }
                             result.extend(group.items);
                         }
@@ -257,8 +282,31 @@ where
             } else {
                 inner
             };
+            let content_len = result.len();
+            self.preview_scroll
+                .set_content_and_viewport_len(content_len, render_area.height as usize);
+            let preview_key = state.current().selected().map(|s| s.as_path().to_owned());
+            if self.preview_key != preview_key {
+                self.preview_key = preview_key;
+                self.preview_scroll.first();
+            }
             let preview = List::new(result).style(config.as_text_style());
-            ratatui::widgets::Widget::render(preview, render_area, buf);
+            ratatui::widgets::StatefulWidget::render(
+                preview,
+                render_area,
+                buf,
+                self.preview_scroll.as_render_state_ref(),
+            );
+            if let Some(scrollbar) = config.as_styled_scrollbar()
+                && content_len > render_area.height as usize
+            {
+                ratatui::widgets::StatefulWidget::render(
+                    scrollbar,
+                    preview_area.inner(scrollbar_margin),
+                    buf,
+                    self.preview_scroll.as_scrollbar_state_ref(),
+                );
+            }
         }
         // ---- Previous (parent) column ----
         self.areas[BrowserArea::Previous] = Rect::default();
