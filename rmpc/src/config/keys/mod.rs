@@ -168,9 +168,6 @@ impl Default for KeyConfigFile {
             (s().char('D'),                       Q::DeleteAll),
             (s().cr(),                            Q::Play),
             (s().char('C'),                       Q::JumpToCurrent),
-            (s().char('z').char('t'),             Q::FocusTop),
-            (s().char('z').char('z'),             Q::FocusMiddle),
-            (s().char('z').char('b'),             Q::FocusBottom),
             (s().char('L'),                       Q::SelectAlbum()),
             (s().char('X'),                       Q::Shuffle),
         ]);

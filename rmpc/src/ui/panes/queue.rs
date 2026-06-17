@@ -832,18 +832,6 @@ impl Pane for QueuePane {
                         status_info!("No song is currently playing");
                     }
                 }
-                QueueActions::FocusTop => {
-                    self.queue.scroll_selected_to_top();
-                    ctx.render()?;
-                }
-                QueueActions::FocusMiddle => {
-                    self.queue.scroll_selected_to_middle();
-                    ctx.render()?;
-                }
-                QueueActions::FocusBottom => {
-                    self.queue.scroll_selected_to_bottom();
-                    ctx.render()?;
-                }
 
                 QueueActions::SelectAlbum => {
                     if let Some(selected_idx) = self.queue.selected_idx() {

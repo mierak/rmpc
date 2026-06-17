@@ -291,36 +291,6 @@ impl<T: ScrollingState> DirState<T> {
         self.clamp_to_offset(scrolloff);
     }
 
-    pub fn scroll_selected_to_top(&mut self) {
-        let Some(selected) = self.get_selected() else {
-            return;
-        };
-
-        self.set_offset_clamped(selected);
-    }
-
-    pub fn scroll_selected_to_middle(&mut self) {
-        let Some(selected) = self.get_selected() else {
-            return;
-        };
-        let Some(viewport_len) = self.viewport_len else {
-            return;
-        };
-
-        self.set_offset_clamped(selected.saturating_sub(viewport_len / 2));
-    }
-
-    pub fn scroll_selected_to_bottom(&mut self) {
-        let Some(selected) = self.get_selected() else {
-            return;
-        };
-        let Some(viewport_len) = self.viewport_len else {
-            return;
-        };
-
-        self.set_offset_clamped(selected.saturating_sub(viewport_len.saturating_sub(1)));
-    }
-
     pub fn clamp_to_offset(&mut self, scrolloff: usize) {
         let Some(viewport_len) = self.viewport_len else {
             return;
@@ -462,19 +432,6 @@ impl<T: ScrollingState> DirState<T> {
     }
 
     pub fn set_offset(&mut self, offset: usize) {
-        self.inner.set_offset(offset);
-        self.scrollbar_state = self.scrollbar_state.position(offset);
-    }
-
-    fn set_offset_clamped(&mut self, offset: usize) {
-        let Some(content_len) = self.content_len else {
-            return;
-        };
-        let Some(viewport_len) = self.viewport_len else {
-            return;
-        };
-
-        let offset = offset.min(content_len.saturating_sub(viewport_len));
         self.inner.set_offset(offset);
         self.scrollbar_state = self.scrollbar_state.position(offset);
     }
@@ -1122,77 +1079,6 @@ mod tests {
 
             assert_eq!(subject.offset(), expected_offset);
             assert_eq!(subject.get_selected(), Some(expected_selected));
-        }
-    }
-
-    mod scroll_selected_to {
-        use ratatui::widgets::ListState;
-
-        use crate::ui::dirstack::DirState;
-
-        #[test]
-        fn top_places_selected_item_at_top_of_viewport() {
-            let mut subject: DirState<ListState> = DirState::default();
-            subject.set_content_len(Some(100));
-            subject.set_viewport_len(Some(10));
-            subject.select(Some(50), 0);
-
-            subject.scroll_selected_to_top();
-
-            assert_eq!(subject.offset(), 50);
-            assert_eq!(subject.get_selected(), Some(50));
-        }
-
-        #[test]
-        fn middle_places_selected_item_in_middle_of_viewport() {
-            let mut subject: DirState<ListState> = DirState::default();
-            subject.set_content_len(Some(100));
-            subject.set_viewport_len(Some(10));
-            subject.select(Some(50), 0);
-
-            subject.scroll_selected_to_middle();
-
-            assert_eq!(subject.offset(), 45);
-            assert_eq!(subject.get_selected(), Some(50));
-        }
-
-        #[test]
-        fn bottom_places_selected_item_at_bottom_of_viewport() {
-            let mut subject: DirState<ListState> = DirState::default();
-            subject.set_content_len(Some(100));
-            subject.set_viewport_len(Some(10));
-            subject.select(Some(50), 0);
-
-            subject.scroll_selected_to_bottom();
-
-            assert_eq!(subject.offset(), 41);
-            assert_eq!(subject.get_selected(), Some(50));
-        }
-
-        #[test]
-        fn clamps_to_start_near_top() {
-            let mut subject: DirState<ListState> = DirState::default();
-            subject.set_content_len(Some(100));
-            subject.set_viewport_len(Some(10));
-            subject.select(Some(3), 0);
-
-            subject.scroll_selected_to_middle();
-
-            assert_eq!(subject.offset(), 0);
-            assert_eq!(subject.get_selected(), Some(3));
-        }
-
-        #[test]
-        fn clamps_to_end_near_bottom() {
-            let mut subject: DirState<ListState> = DirState::default();
-            subject.set_content_len(Some(100));
-            subject.set_viewport_len(Some(10));
-            subject.select(Some(99), 0);
-
-            subject.scroll_selected_to_top();
-
-            assert_eq!(subject.offset(), 90);
-            assert_eq!(subject.get_selected(), Some(99));
         }
     }
 }

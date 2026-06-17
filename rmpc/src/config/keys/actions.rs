@@ -347,9 +347,6 @@ pub enum QueueActionsFile {
     #[deprecated]
     ShowInfo,
     JumpToCurrent,
-    FocusTop,
-    FocusMiddle,
-    FocusBottom,
     Shuffle,
     SortByColumn(usize),
     Sort {
@@ -365,9 +362,6 @@ pub enum QueueActions {
     DeleteAll,
     Play,
     JumpToCurrent,
-    FocusTop,
-    FocusMiddle,
-    FocusBottom,
     Shuffle,
     Unused,
     SelectAlbum,
@@ -387,9 +381,6 @@ impl TryFrom<QueueActionsFile> for QueueActions {
             QueueActionsFile::AddToPlaylist => Ok(QueueActions::Unused),
             QueueActionsFile::ShowInfo => Ok(QueueActions::Unused),
             QueueActionsFile::JumpToCurrent => Ok(QueueActions::JumpToCurrent),
-            QueueActionsFile::FocusTop => Ok(QueueActions::FocusTop),
-            QueueActionsFile::FocusMiddle => Ok(QueueActions::FocusMiddle),
-            QueueActionsFile::FocusBottom => Ok(QueueActions::FocusBottom),
             QueueActionsFile::SelectAlbum() => Ok(QueueActions::SelectAlbum),
             QueueActionsFile::Shuffle => Ok(QueueActions::Shuffle),
             QueueActionsFile::SortByColumn(idx) => {
@@ -430,9 +421,6 @@ impl ToDescription for QueueActions {
             QueueActions::JumpToCurrent => {
                 "Moves the cursor in Queue table to the currently playing song".into()
             }
-            QueueActions::FocusTop => "Scrolls the focused queue item to the top".into(),
-            QueueActions::FocusMiddle => "Scrolls the focused queue item to the middle".into(),
-            QueueActions::FocusBottom => "Scrolls the focused queue item to the bottom".into(),
             QueueActions::SelectAlbum => "Marks songs of album around selected song".into(),
             QueueActions::Shuffle => "Shuffles the current queue".into(),
             QueueActions::SortByColumn(idx) => {

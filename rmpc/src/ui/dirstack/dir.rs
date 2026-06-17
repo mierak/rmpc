@@ -288,18 +288,6 @@ where
         self.state.scroll_up(amount, scrolloff);
     }
 
-    pub fn scroll_selected_to_top(&mut self) {
-        self.state.scroll_selected_to_top();
-    }
-
-    pub fn scroll_selected_to_middle(&mut self) {
-        self.state.scroll_selected_to_middle();
-    }
-
-    pub fn scroll_selected_to_bottom(&mut self) {
-        self.state.scroll_selected_to_bottom();
-    }
-
     pub fn last(&mut self) {
         self.state.last();
     }
