@@ -450,6 +450,21 @@ where
                 self.fetch_data_internal(ctx);
                 ctx.render()?;
             }
+            CommonAction::ScrollFocusedToTop => {
+                self.stack_mut().current_mut().scroll_focused_to_top(ctx.config.scrolloff);
+                self.fetch_data_internal(ctx);
+                ctx.render()?;
+            }
+            CommonAction::ScrollFocusedToMiddle => {
+                self.stack_mut().current_mut().scroll_focused_to_middle(ctx.config.scrolloff);
+                self.fetch_data_internal(ctx);
+                ctx.render()?;
+            }
+            CommonAction::ScrollFocusedToBottom => {
+                self.stack_mut().current_mut().scroll_focused_to_bottom(ctx.config.scrolloff);
+                self.fetch_data_internal(ctx);
+                ctx.render()?;
+            }
             CommonAction::Right => {
                 self.open(false, ctx)?;
                 self.fetch_data_internal(ctx);

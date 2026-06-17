@@ -288,6 +288,18 @@ where
         self.state.scroll_up(amount, scrolloff);
     }
 
+    pub fn scroll_focused_to_top(&mut self, scrolloff: usize) {
+        self.state.scroll_focused_to_top(scrolloff);
+    }
+
+    pub fn scroll_focused_to_middle(&mut self, scrolloff: usize) {
+        self.state.scroll_focused_to_middle(scrolloff);
+    }
+
+    pub fn scroll_focused_to_bottom(&mut self, scrolloff: usize) {
+        self.state.scroll_focused_to_bottom(scrolloff);
+    }
+
     pub fn last(&mut self) {
         self.state.last();
     }

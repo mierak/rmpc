@@ -948,6 +948,9 @@ pub enum CommonActionFile {
     PageDown,
     Top,
     Bottom,
+    ScrollFocusedToTop,
+    ScrollFocusedToMiddle,
+    ScrollFocusedToBottom,
     EnterSearch,
     NextResult,
     PreviousResult,
@@ -1013,6 +1016,9 @@ pub enum CommonAction {
     PageDown,
     Top,
     Bottom,
+    ScrollFocusedToTop,
+    ScrollFocusedToMiddle,
+    ScrollFocusedToBottom,
     EnterSearch,
     NextResult,
     PreviousResult,
@@ -1061,6 +1067,15 @@ impl ToDescription for CommonAction {
             CommonAction::Left => "Go left".into(),
             CommonAction::Top => "Jump all the way to the top".into(),
             CommonAction::Bottom => "Jump all the way to the bottom".into(),
+            CommonAction::ScrollFocusedToTop => {
+                "Scroll the focused item near the top of the viewport".into()
+            }
+            CommonAction::ScrollFocusedToMiddle => {
+                "Scroll the focused item to the middle of the viewport".into()
+            }
+            CommonAction::ScrollFocusedToBottom => {
+                "Scroll the focused item near the bottom of the viewport".into()
+            }
             CommonAction::EnterSearch => "Enter search mode".into(),
             CommonAction::NextResult => "When a filter is active, jump to the next result".into(),
             CommonAction::PreviousResult => "When a filter is active, jump to the previous result".into(),
@@ -1247,6 +1262,9 @@ impl TryFrom<CommonActionFile> for CommonAction {
             CommonActionFile::Left => CommonAction::Left,
             CommonActionFile::Top => CommonAction::Top,
             CommonActionFile::Bottom => CommonAction::Bottom,
+            CommonActionFile::ScrollFocusedToTop => CommonAction::ScrollFocusedToTop,
+            CommonActionFile::ScrollFocusedToMiddle => CommonAction::ScrollFocusedToMiddle,
+            CommonActionFile::ScrollFocusedToBottom => CommonAction::ScrollFocusedToBottom,
             CommonActionFile::EnterSearch => CommonAction::EnterSearch,
             CommonActionFile::NextResult => CommonAction::NextResult,
             CommonActionFile::PreviousResult => CommonAction::PreviousResult,

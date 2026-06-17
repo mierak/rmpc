@@ -399,6 +399,9 @@ impl SearchPane {
                 CommonAction::UpHalf => {}
                 CommonAction::PageDown => {}
                 CommonAction::PageUp => {}
+                CommonAction::ScrollFocusedToTop => {}
+                CommonAction::ScrollFocusedToMiddle => {}
+                CommonAction::ScrollFocusedToBottom => {}
                 CommonAction::Right if !self.songs_dir.items.is_empty() => {
                     self.phase = Phase::BrowseResults;
 
@@ -623,6 +626,21 @@ impl SearchPane {
                 }
                 CommonAction::Bottom => {
                     self.songs_dir.last();
+
+                    ctx.render()?;
+                }
+                CommonAction::ScrollFocusedToTop => {
+                    self.songs_dir.scroll_focused_to_top(ctx.config.scrolloff);
+
+                    ctx.render()?;
+                }
+                CommonAction::ScrollFocusedToMiddle => {
+                    self.songs_dir.scroll_focused_to_middle(ctx.config.scrolloff);
+
+                    ctx.render()?;
+                }
+                CommonAction::ScrollFocusedToBottom => {
+                    self.songs_dir.scroll_focused_to_bottom(ctx.config.scrolloff);
 
                     ctx.render()?;
                 }

@@ -137,6 +137,18 @@ impl Modal for DownloadsModal {
                     self.queue.last();
                     ctx.render()?;
                 }
+                CommonAction::ScrollFocusedToTop => {
+                    self.queue.scroll_focused_to_top(ctx.config.scrolloff);
+                    ctx.render()?;
+                }
+                CommonAction::ScrollFocusedToMiddle => {
+                    self.queue.scroll_focused_to_middle(ctx.config.scrolloff);
+                    ctx.render()?;
+                }
+                CommonAction::ScrollFocusedToBottom => {
+                    self.queue.scroll_focused_to_bottom(ctx.config.scrolloff);
+                    ctx.render()?;
+                }
                 CommonAction::Select => {}
                 CommonAction::ShowInfo => {}
 
