@@ -1091,6 +1091,27 @@ impl Pane for QueuePane {
 
                     ctx.render()?;
                 }
+                CommonAction::ScrollFocusedToTop => {
+                    if !self.queue.is_empty() {
+                        self.queue.scroll_focused_to_top(ctx.config.scrolloff);
+                    }
+
+                    ctx.render()?;
+                }
+                CommonAction::ScrollFocusedToMiddle => {
+                    if !self.queue.is_empty() {
+                        self.queue.scroll_focused_to_middle(ctx.config.scrolloff);
+                    }
+
+                    ctx.render()?;
+                }
+                CommonAction::ScrollFocusedToBottom => {
+                    if !self.queue.is_empty() {
+                        self.queue.scroll_focused_to_bottom(ctx.config.scrolloff);
+                    }
+
+                    ctx.render()?;
+                }
                 CommonAction::Right => {}
                 CommonAction::Left => {}
                 CommonAction::EnterSearch => {

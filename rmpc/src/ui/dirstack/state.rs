@@ -291,6 +291,18 @@ impl<T: ScrollingState> DirState<T> {
         self.clamp_to_offset(scrolloff);
     }
 
+    pub fn scroll_focused_to_top(&mut self, scrolloff: usize) {
+        self.scroll_focused_to_viewport_row(FocusedScrollPosition::Top, scrolloff);
+    }
+
+    pub fn scroll_focused_to_middle(&mut self, scrolloff: usize) {
+        self.scroll_focused_to_viewport_row(FocusedScrollPosition::Middle, scrolloff);
+    }
+
+    pub fn scroll_focused_to_bottom(&mut self, scrolloff: usize) {
+        self.scroll_focused_to_viewport_row(FocusedScrollPosition::Bottom, scrolloff);
+    }
+
     pub fn clamp_to_offset(&mut self, scrolloff: usize) {
         let Some(viewport_len) = self.viewport_len else {
             return;
@@ -435,6 +447,51 @@ impl<T: ScrollingState> DirState<T> {
         self.inner.set_offset(offset);
         self.scrollbar_state = self.scrollbar_state.position(offset);
     }
+
+    fn set_offset_clamped(&mut self, offset: usize) {
+        let Some(content_len) = self.content_len else {
+            return;
+        };
+        let Some(viewport_len) = self.viewport_len else {
+            return;
+        };
+
+        let offset = offset.min(content_len.saturating_sub(viewport_len));
+        self.inner.set_offset(offset);
+        self.scrollbar_state = self.scrollbar_state.position(offset);
+    }
+
+    fn scroll_focused_to_viewport_row(
+        &mut self,
+        position: FocusedScrollPosition,
+        scrolloff: usize,
+    ) {
+        let Some(selected) = self.get_selected() else {
+            return;
+        };
+        let Some(viewport_len) = self.viewport_len else {
+            return;
+        };
+
+        let target_row = if scrolloff.saturating_mul(2) >= viewport_len {
+            viewport_len / 2
+        } else {
+            match position {
+                FocusedScrollPosition::Top => scrolloff,
+                FocusedScrollPosition::Middle => viewport_len / 2,
+                FocusedScrollPosition::Bottom => viewport_len.saturating_sub(scrolloff + 1),
+            }
+        };
+
+        self.set_offset_clamped(selected.saturating_sub(target_row));
+    }
+}
+
+#[derive(Clone, Copy)]
+enum FocusedScrollPosition {
+    Top,
+    Middle,
+    Bottom,
 }
 
 #[cfg(test)]
@@ -1079,6 +1136,103 @@ mod tests {
 
             assert_eq!(subject.offset(), expected_offset);
             assert_eq!(subject.get_selected(), Some(expected_selected));
+        }
+    }
+
+    mod scroll_focused_to {
+        use ratatui::widgets::ListState;
+
+        use crate::ui::dirstack::DirState;
+
+        #[test]
+        fn top_places_focused_item_at_top_without_scrolloff() {
+            let mut subject: DirState<ListState> = DirState::default();
+            subject.set_content_len(Some(100));
+            subject.set_viewport_len(Some(10));
+            subject.select(Some(50), 0);
+
+            subject.scroll_focused_to_top(0);
+
+            assert_eq!(subject.offset(), 50);
+            assert_eq!(subject.get_selected(), Some(50));
+        }
+
+        #[test]
+        fn top_respects_scrolloff() {
+            let mut subject: DirState<ListState> = DirState::default();
+            subject.set_content_len(Some(100));
+            subject.set_viewport_len(Some(10));
+            subject.select(Some(50), 0);
+
+            subject.scroll_focused_to_top(2);
+
+            assert_eq!(subject.offset(), 48);
+            assert_eq!(subject.get_selected(), Some(50));
+        }
+
+        #[test]
+        fn middle_places_focused_item_in_middle() {
+            let mut subject: DirState<ListState> = DirState::default();
+            subject.set_content_len(Some(100));
+            subject.set_viewport_len(Some(10));
+            subject.select(Some(50), 0);
+
+            subject.scroll_focused_to_middle(2);
+
+            assert_eq!(subject.offset(), 45);
+            assert_eq!(subject.get_selected(), Some(50));
+        }
+
+        #[test]
+        fn bottom_respects_scrolloff() {
+            let mut subject: DirState<ListState> = DirState::default();
+            subject.set_content_len(Some(100));
+            subject.set_viewport_len(Some(10));
+            subject.select(Some(50), 0);
+
+            subject.scroll_focused_to_bottom(2);
+
+            assert_eq!(subject.offset(), 43);
+            assert_eq!(subject.get_selected(), Some(50));
+        }
+
+        #[test]
+        fn clamps_to_start_near_top() {
+            let mut subject: DirState<ListState> = DirState::default();
+            subject.set_content_len(Some(100));
+            subject.set_viewport_len(Some(10));
+            subject.select(Some(1), 0);
+
+            subject.scroll_focused_to_top(2);
+
+            assert_eq!(subject.offset(), 0);
+            assert_eq!(subject.get_selected(), Some(1));
+        }
+
+        #[test]
+        fn clamps_to_end_near_bottom() {
+            let mut subject: DirState<ListState> = DirState::default();
+            subject.set_content_len(Some(100));
+            subject.set_viewport_len(Some(10));
+            subject.select(Some(99), 0);
+
+            subject.scroll_focused_to_top(2);
+
+            assert_eq!(subject.offset(), 90);
+            assert_eq!(subject.get_selected(), Some(99));
+        }
+
+        #[test]
+        fn oversized_scrolloff_centers_focused_item() {
+            let mut subject: DirState<ListState> = DirState::default();
+            subject.set_content_len(Some(100));
+            subject.set_viewport_len(Some(10));
+            subject.select(Some(50), 0);
+
+            subject.scroll_focused_to_bottom(5);
+
+            assert_eq!(subject.offset(), 45);
+            assert_eq!(subject.get_selected(), Some(50));
         }
     }
 }

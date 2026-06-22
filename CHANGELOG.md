@@ -35,6 +35,8 @@ All notable changes to this project will be documented in this file.
   instead of hardcoded `["root_tag", "album"]`
 - Added `RecentlyPlayed` browser pane showing songs ordered by the `lastPlayed` sticker. The sticker
   needs to be tracked externally by for example [rmpcd plugin](https://github.com/rmpc-org/rmpcd-lastplayed).
+- Added `zt`, `zz` and `zb` Vim-style navigation keybinds to scroll the focused entry to the top,
+  middle or bottom of the viewport
 
 ### Changed
 

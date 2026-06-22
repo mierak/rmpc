@@ -184,6 +184,21 @@ impl Pane for LogsPane {
 
                     ctx.render()?;
                 }
+                CommonAction::ScrollFocusedToTop => {
+                    self.scrolling_state.scroll_focused_to_top(ctx.config.scrolloff);
+
+                    ctx.render()?;
+                }
+                CommonAction::ScrollFocusedToMiddle => {
+                    self.scrolling_state.scroll_focused_to_middle(ctx.config.scrolloff);
+
+                    ctx.render()?;
+                }
+                CommonAction::ScrollFocusedToBottom => {
+                    self.scrolling_state.scroll_focused_to_bottom(ctx.config.scrolloff);
+
+                    ctx.render()?;
+                }
                 _ => {}
             }
         }

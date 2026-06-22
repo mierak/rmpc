@@ -237,6 +237,24 @@ impl<V: Display + std::fmt::Debug, Callback: FnOnce(&Ctx, V, usize) -> Result<()
                     self.hide(ctx)?;
                     ctx.render()?;
                 }
+                CommonAction::ScrollFocusedToTop => {
+                    if matches!(self.focused, FocusedComponent::List) {
+                        self.scrolling_state.scroll_focused_to_top(ctx.config.scrolloff);
+                        ctx.render()?;
+                    }
+                }
+                CommonAction::ScrollFocusedToMiddle => {
+                    if matches!(self.focused, FocusedComponent::List) {
+                        self.scrolling_state.scroll_focused_to_middle(ctx.config.scrolloff);
+                        ctx.render()?;
+                    }
+                }
+                CommonAction::ScrollFocusedToBottom => {
+                    if matches!(self.focused, FocusedComponent::List) {
+                        self.scrolling_state.scroll_focused_to_bottom(ctx.config.scrolloff);
+                        ctx.render()?;
+                    }
+                }
                 _ => {}
             }
         }
