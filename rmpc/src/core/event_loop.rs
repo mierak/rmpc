@@ -605,15 +605,19 @@ fn main_task<B: Backend + std::io::Write>(
                                 }
                             }
 
-                            if let Some(song) = new_current_song.as_ref()
-                                && Some(song.id) != current_song_id
-                            {
+                            let prev_song_file = (previous_status.state != State::Stop)
+                                .then(|| ctx.current_song().map(|s| s.file.clone()))
+                                .flatten();
+
+                            let new_song_id = new_current_song.as_ref().map(|s| s.id);
+                            let is_new_song =
+                                new_song_id.is_some() && new_song_id != current_song_id;
+
+                            ctx.set_current_song(new_current_song);
+
+                            if is_new_song {
                                 if let Some(command) = &ctx.config.on_song_change {
                                     let mut env = create_env(&ctx, std::iter::empty());
-
-                                    let prev_song_file = (previous_status.state != State::Stop)
-                                        .then(|| ctx.current_song().map(|s| s.file.clone()))
-                                        .flatten();
 
                                     if let (Some(prev_song), Some(played)) =
                                         (prev_song_file, ctx.song_played)
@@ -631,7 +635,6 @@ fn main_task<B: Backend + std::io::Write>(
                                 ctx.song_played = Some(Duration::ZERO);
                             }
 
-                            ctx.set_current_song(new_current_song);
                             if song_changed
                                 && let Err(err) = ui.on_event(UiEvent::SongChanged, &mut ctx)
                             {
