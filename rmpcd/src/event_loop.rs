@@ -163,7 +163,7 @@ pub async fn init(
                         }
                         ev => {
                             trace!(?ev, "Event currently not supported");
-                            client.skip_to_idle().await;
+                            client.skip_to_idle();
                         }
                     }
 

@@ -140,6 +140,7 @@ fn main() -> Result<()> {
                 "debug",
                 None,
                 false,
+                false,
             )?;
 
             client.set_read_timeout(Some(Duration::from_secs(3)))?;
@@ -225,14 +226,20 @@ fn main() -> Result<()> {
                 }
             };
 
-            let mpd_info =
-                Client::init(config.address.clone(), config.password.clone(), "debug", None, false)
-                    .and_then(|mut client| -> Result<_, _> {
-                        let version = client.version();
-                        let commands = client.commands().map(|c| c.0)?;
-                        let not_commands = client.not_commands().map(|c| c.0)?;
-                        Ok((version, commands, not_commands))
-                    });
+            let mpd_info = Client::init(
+                config.address.clone(),
+                config.password.clone(),
+                "debug",
+                None,
+                false,
+                config.enable_keepalive,
+            )
+            .and_then(|mut client| -> Result<_, _> {
+                let version = client.version();
+                let commands = client.commands().map(|c| c.0)?;
+                let not_commands = client.not_commands().map(|c| c.0)?;
+                Ok((version, commands, not_commands))
+            });
 
             let theme_path = config.theme_name.as_ref().and_then(|theme_name| {
                 find_first_existing_path(theme_paths(
@@ -329,6 +336,7 @@ fn main() -> Result<()> {
                 "main",
                 args.partition.partition,
                 args.partition.autocreate,
+                false,
             )?;
             client.set_read_timeout(None)?;
             let (sender, _receiver) = crossbeam::channel::unbounded();
@@ -402,6 +410,7 @@ fn main() -> Result<()> {
                 "command",
                 args.partition.partition,
                 args.partition.autocreate,
+                config.enable_keepalive,
             )
             .context("Failed to connect to MPD")?;
 

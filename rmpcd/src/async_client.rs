@@ -2,9 +2,8 @@ use std::{
     io::Write,
     sync::{
         Arc,
-        Condvar,
         Mutex as StdMutex,
-        atomic::{AtomicBool, Ordering},
+        atomic::{AtomicU8, Ordering},
     },
     thread,
     time::Duration,
@@ -14,6 +13,7 @@ use rmpc_mpd::{
     address::{MpdAddress, MpdPassword},
     commands::IdleEvent,
     mpd_client::MpdClient as _,
+    proto_client::ProtoClient as _,
 };
 use tokio::{
     sync::{Mutex, mpsc, oneshot},
@@ -25,55 +25,56 @@ pub type MpdClient = rmpc_mpd::client::Client<'static>;
 pub type MpdError = rmpc_mpd::errors::MpdError;
 pub type MpdStream = rmpc_mpd::client::TcpOrUnixStream;
 
-type CmdFn = Box<dyn FnOnce(&mut MpdClient) -> Result<(), MpdError> + Send + 'static>;
+type OnIdle = Box<dyn Fn(Vec<IdleEvent>) + Send + Sync>;
+type OnReconnect = Box<dyn Fn() + Send + Sync>;
+type RunFn = Box<dyn FnOnce(&mut MpdClient) + Send>;
+
+const IDLE_STATE_NOT_IDLE: u8 = 0;
+const IDLE_STATE_IDLE: u8 = 1;
+const IDLE_STATE_PREEMPTED: u8 = 2;
 
 enum Msg {
-    Run { f: CmdFn, done: oneshot::Sender<Result<(), MpdError>> },
-    Shutdown { done: oneshot::Sender<()> },
+    Run(RunFn),
+    Shutdown(oneshot::Sender<()>),
     SkipToIdle,
 }
 
-#[derive(Debug)]
+struct InitData {
+    rx: mpsc::UnboundedReceiver<Msg>,
+    on_idle: OnIdle,
+    on_reconnect: OnReconnect,
+}
+
+#[derive(derive_more::Debug)]
 struct Shared {
-    in_idle: AtomicBool,
-
-    wake_flag: StdMutex<bool>,
-    wake_cv: Condvar,
+    #[debug(skip)]
+    interrupt_stream: StdMutex<Option<MpdStream>>,
+    idle_state: AtomicU8,
 }
 
-fn notify_interrupter(shared: &Shared) {
-    let mut flag = shared.wake_flag.lock().expect("Failed to lock interrupter wake flag");
-    *flag = true;
-    shared.wake_cv.notify_one();
-}
-
-fn spawn_interrupter(interrupt_stream: Arc<StdMutex<MpdStream>>, shared: Arc<Shared>) {
-    thread::spawn(move || {
-        loop {
-            let mut flag = shared.wake_flag.lock().expect("Failed to lock interrupter wake flag");
-            while !*flag {
-                flag = shared.wake_cv.wait(flag).expect("Failed to wait on interrupter wake CV");
-            }
-            *flag = false;
-            drop(flag);
-
-            if shared.in_idle.load(Ordering::Acquire) {
-                let mut stream = interrupt_stream.lock().expect("Failed to lock interrupt stream");
-                let _ = stream.write_all(b"noidle\n");
-                let _ = stream.flush();
-            }
-        }
-    });
+fn preempt_idle(shared: &Shared) {
+    if shared
+        .idle_state
+        .compare_exchange(
+            IDLE_STATE_IDLE,
+            IDLE_STATE_PREEMPTED,
+            Ordering::AcqRel,
+            Ordering::Acquire,
+        )
+        .is_ok()
+        && let Ok(mut guard) = shared.interrupt_stream.lock()
+        && let Some(stream) = guard.as_mut()
+    {
+        let _ = stream.write_all(b"noidle\n");
+        let _ = stream.flush();
+    }
 }
 
 fn handle_msg(msg: Msg, client: &mut MpdClient, shutting_down: &mut bool) {
     match msg {
-        Msg::Run { f, done } => {
-            let r = f(client);
-            let _ = done.send(r);
-        }
+        Msg::Run(f) => f(client),
         Msg::SkipToIdle => {}
-        Msg::Shutdown { done } => {
+        Msg::Shutdown(done) => {
             *shutting_down = true;
             let _ = done.send(());
         }
@@ -82,16 +83,15 @@ fn handle_msg(msg: Msg, client: &mut MpdClient, shutting_down: &mut bool) {
 
 fn worker_loop(
     mut client: MpdClient,
-    mut rx: mpsc::Receiver<Msg>,
+    mut rx: mpsc::UnboundedReceiver<Msg>,
     shared: Arc<Shared>,
-    interrupt_stream_slot: Arc<StdMutex<MpdStream>>,
-    on_idle: impl Fn(Vec<IdleEvent>) + Send + Sync + 'static,
-    on_reconnect: impl Fn() + Send + Sync + 'static,
+    on_idle: OnIdle,
+    on_reconnect: OnReconnect,
 ) {
     thread::spawn(move || {
         let mut shutting_down = false;
-        let reconnect_base_delay = std::time::Duration::from_millis(500);
-        let reconnect_max_delay = std::time::Duration::from_secs(16);
+        let reconnect_base_delay = Duration::from_millis(500);
+        let reconnect_max_delay = Duration::from_secs(16);
         let mut skip_recv = false;
 
         'outer: while !shutting_down {
@@ -115,33 +115,50 @@ fn worker_loop(
             }
             skip_recv = false;
 
-            shared.in_idle.store(true, Ordering::Release);
-            let idle_result = client.idle(None);
-            shared.in_idle.store(false, Ordering::Release);
+            let idle_result: Result<Vec<IdleEvent>, _> = if let Err(e) = client.enter_idle(None) {
+                Err(e)
+            } else {
+                shared.idle_state.store(IDLE_STATE_IDLE, Ordering::Release);
+                if !rx.is_empty() {
+                    preempt_idle(&shared);
+                }
+                let r = client.read_response();
+                shared.idle_state.store(IDLE_STATE_NOT_IDLE, Ordering::Release);
+                r
+            };
 
             match idle_result {
-                Ok(changes) => {
-                    if !changes.is_empty() {
-                        on_idle(changes);
+                Ok(events) => {
+                    if !events.is_empty() {
+                        on_idle(events);
                     }
                 }
                 Err(e) => {
                     warn!(error = ?e, "Lost MPD connection, attempting reconnect");
+                    shared.idle_state.store(IDLE_STATE_NOT_IDLE, Ordering::Release);
 
                     let mut delay = reconnect_base_delay;
                     loop {
-                        std::thread::sleep(delay);
+                        while let Ok(msg) = rx.try_recv() {
+                            if let Msg::Shutdown(done) = msg {
+                                let _ = done.send(());
+                                break 'outer;
+                            }
+                        }
+
+                        thread::sleep(delay);
                         match client.reconnect() {
                             Ok(_) => {
                                 skip_recv = true;
                                 match client.stream.try_clone() {
                                     Ok(new_stream) => {
-                                        *interrupt_stream_slot
-                                            .lock()
-                                            .expect("lock interrupter stream") = new_stream;
+                                        if let Ok(mut guard) = shared.interrupt_stream.lock() {
+                                            *guard = Some(new_stream);
+                                        }
                                     }
                                     Err(e) => {
-                                        error!(error = ?e, "Failed to clone stream after reconnect");
+                                        error!(error = ?e, "Failed to clone stream after reconnect, will attempt reconnect again");
+                                        continue;
                                     }
                                 }
                                 info!("Reconnected to MPD");
@@ -162,13 +179,10 @@ fn worker_loop(
 
 #[derive(derive_more::Debug)]
 pub struct AsyncClient {
-    rx: Mutex<Option<mpsc::Receiver<Msg>>>,
-    tx: mpsc::Sender<Msg>,
+    tx: mpsc::UnboundedSender<Msg>,
     shared: Arc<Shared>,
     #[debug(skip)]
-    on_idle: Mutex<Option<Box<dyn Fn(Vec<IdleEvent>) + Send + Sync>>>,
-    #[debug(skip)]
-    on_reconnect: Mutex<Option<Box<dyn Fn() + Send + Sync>>>,
+    init: Mutex<Option<InitData>>,
 }
 
 impl AsyncClient {
@@ -176,39 +190,41 @@ impl AsyncClient {
         on_idle: impl Fn(Vec<IdleEvent>) + Send + Sync + 'static,
         on_reconnect: impl Fn() + Send + Sync + 'static,
     ) -> Self {
-        let (tx, rx) = mpsc::channel(64);
+        let (tx, rx) = mpsc::unbounded_channel();
 
         let shared = Arc::new(Shared {
-            in_idle: AtomicBool::new(false),
-            wake_flag: StdMutex::new(false),
-            wake_cv: Condvar::new(),
+            interrupt_stream: StdMutex::new(None),
+            idle_state: AtomicU8::new(IDLE_STATE_NOT_IDLE),
         });
 
-        Self {
-            rx: Mutex::new(Some(rx)),
-            tx,
-            shared,
-            on_idle: Mutex::new(Some(Box::new(on_idle))),
-            on_reconnect: Mutex::new(Some(Box::new(on_reconnect))),
-        }
+        let init =
+            InitData { rx, on_idle: Box::new(on_idle), on_reconnect: Box::new(on_reconnect) };
+
+        Self { tx, shared, init: Mutex::new(Some(init)) }
     }
 
     pub async fn connect(
         &self,
         address: MpdAddress,
         password: Option<MpdPassword>,
+        enable_keepalive: bool,
     ) -> anyhow::Result<()> {
-        let client = MpdClient::init(address, password, "", None, false)?;
-        let on_idle = self.on_idle.lock().await.take().expect("on_idle already taken");
-        let on_reconnect =
-            self.on_reconnect.lock().await.take().expect("on_reconnect already taken");
-        let rx = self.rx.lock().await.take().expect("Receiver already taken");
+        let InitData { rx, on_idle, on_reconnect } = self
+            .init
+            .lock()
+            .await
+            .take()
+            .ok_or_else(|| anyhow::anyhow!("AsyncClient::connect called more than once"))?;
 
-        let interrupt_stream = client.stream.try_clone().expect("Client stream is not cloneable");
-        let interrupt_stream_slot = Arc::new(StdMutex::new(interrupt_stream));
+        let client = MpdClient::init(address, password, "", None, false, enable_keepalive)?;
+        let interrupt_stream = client
+            .stream
+            .try_clone()
+            .map_err(|e| anyhow::anyhow!("Failed to clone MPD stream: {e}"))?;
+        *self.shared.interrupt_stream.lock().expect("Failed to lock interrupt stream") =
+            Some(interrupt_stream);
 
-        spawn_interrupter(Arc::clone(&interrupt_stream_slot), self.shared.clone());
-        worker_loop(client, rx, self.shared.clone(), interrupt_stream_slot, on_idle, on_reconnect);
+        worker_loop(client, rx, self.shared.clone(), on_idle, on_reconnect);
 
         Ok(())
     }
@@ -219,47 +235,38 @@ impl AsyncClient {
         F: FnOnce(&mut MpdClient) -> Result<T, MpdError> + Send + 'static,
         T: Send + 'static,
     {
-        let (typed_tx, typed_rx) = oneshot::channel::<Result<T, MpdError>>();
-        let wrapper = Box::new(move |client: &mut MpdClient| -> Result<(), MpdError> {
-            let r = f(client);
-            let _ = typed_tx.send(r);
-            Ok(())
+        let (resp_tx, resp_rx) = oneshot::channel::<Result<T, MpdError>>();
+        let closure: RunFn = Box::new(move |client| {
+            let _ = resp_tx.send(f(client));
         });
 
-        let (done_tx, done_rx) = oneshot::channel();
+        self.tx.send(Msg::Run(closure)).map_err(|_| MpdError::Generic("worker stopped".into()))?;
+        preempt_idle(&self.shared);
 
-        notify_interrupter(&self.shared);
-
-        self.tx.send(Msg::Run { f: wrapper, done: done_tx }).await.expect("worker stopped");
-
-        timeout(Duration::from_secs(10), done_rx)
+        timeout(Duration::from_secs(10), resp_rx)
             .await
-            .map_err(|err| {
-                MpdError::Generic(format!("Timed out waiting for done response: {err}"))
-            })?
-            .map_err(|err| {
-                MpdError::Generic(format!("Failed to receive done response: {err}"))
-            })??;
-
-        timeout(Duration::from_secs(10), typed_rx)
-            .await
-            .map_err(|err| {
-                MpdError::Generic(format!("Timed out waiting for typed response: {err}"))
-            })?
-            .map_err(|err| MpdError::Generic(format!("Failed to receive typed response: {err}")))?
+            .map_err(|err| MpdError::Generic(format!("Timed out waiting for response: {err}")))?
+            .map_err(|err| MpdError::Generic(format!("Worker dropped response: {err}")))?
     }
 
-    pub async fn skip_to_idle(&self) {
-        notify_interrupter(&self.shared);
-        let _ = self.tx.send(Msg::SkipToIdle).await;
+    pub fn skip_to_idle(&self) {
+        if self.tx.send(Msg::SkipToIdle).is_err() {
+            warn!("skip_to_idle: worker stopped");
+            return;
+        }
+        preempt_idle(&self.shared);
     }
 
     pub async fn shutdown(&self) {
         let (done_tx, done_rx) = oneshot::channel();
 
-        notify_interrupter(&self.shared);
-
-        let _ = self.tx.send(Msg::Shutdown { done: done_tx }).await;
-        let _ = done_rx.await;
+        if self.tx.send(Msg::Shutdown(done_tx)).is_err() {
+            warn!("shutdown: worker stopped");
+            return;
+        }
+        preempt_idle(&self.shared);
+        if done_rx.await.is_err() {
+            warn!("shutdown: worker exited without acknowledging");
+        }
     }
 }

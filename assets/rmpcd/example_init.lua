@@ -15,6 +15,9 @@ local config = {
 -- Enable mpris support
 -- config.mpris = true
 
+-- Disable TCP keepalive on the MPD socket (enabled by default)
+-- config.enable_keepalive = false
+
 -- Automatically increment play count on song change
 -- rmpcd.install("#builtin.playcount")
 
