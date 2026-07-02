@@ -62,6 +62,7 @@ thiserror = "2.0.18"
 parking_lot = { version = "0.12.5", features = [] }
 unicode-segmentation = "1.12.0"
 winnow = "^0.7.14"
+socket2 = { version = "0.5", features = ["all"] }
 mlua = { version = "0.11.6", features = ["lua55", "vendored", "anyhow", "serde", "async", "send"]}
 zbus = { version = "5.14.0", features = ["tokio"] }
 tokio = { version = "1.49.0", features = ["full", "tracing"] }

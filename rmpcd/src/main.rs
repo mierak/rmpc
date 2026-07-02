@@ -191,8 +191,9 @@ async fn run() -> Result<()> {
     let (address, password) = rmpc_mpd::address::resolve(None, None, address, password);
     let subscribed_channels =
         lua_config.get::<Option<Vec<String>>>("subscribed_channels")?.unwrap_or_default();
+    let enable_keepalive = lua_config.get::<Option<bool>>("enable_keepalive")?.unwrap_or(true);
 
-    mpd.connect(address, password).await?;
+    mpd.connect(address, password, enable_keepalive).await?;
 
     for channel in
         plugin_store.all().flat_map(|p| &p.subscribed_channels).chain(subscribed_channels.iter())

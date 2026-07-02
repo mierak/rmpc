@@ -7,6 +7,7 @@ use std::{
     io::{BufRead, BufReader, Write},
     net::{Shutdown, TcpStream},
     os::unix::net::UnixStream,
+    time::Duration,
 };
 
 use anyhow::Result;
@@ -14,6 +15,7 @@ use itertools::Itertools;
 use log::debug;
 use rand::seq::SliceRandom;
 use rmpc_shared::version::Version;
+use socket2::{Socket, TcpKeepalive};
 
 use crate::{
     address::{MpdAddress, MpdPassword},
@@ -67,6 +69,7 @@ pub struct Client<'name> {
     pub supported_commands: HashSet<String>,
     partition: Option<String>,
     autocreate_partition: bool,
+    enable_keepalive: bool,
 }
 
 impl std::fmt::Debug for Client<'_> {
@@ -103,6 +106,26 @@ impl TcpOrUnixStream {
             }
         }
         Ok(())
+    }
+
+    fn set_keepalive(self, enable: bool) -> std::io::Result<TcpOrUnixStream> {
+        if enable {
+            match self {
+                s @ TcpOrUnixStream::Unix(_) => Ok(s),
+                TcpOrUnixStream::Tcp(s) => {
+                    let socket = Socket::from(s);
+                    socket.set_keepalive(true)?;
+                    let keepalive = TcpKeepalive::new()
+                        .with_time(Duration::from_secs(30))
+                        .with_interval(Duration::from_secs(10))
+                        .with_retries(3);
+                    socket.set_tcp_keepalive(&keepalive)?;
+                    Ok(TcpOrUnixStream::Tcp(TcpStream::from(socket)))
+                }
+            }
+        } else {
+            Ok(self)
+        }
     }
 
     pub fn try_clone(&self) -> std::io::Result<Self> {
@@ -153,6 +176,7 @@ impl<'name> Client<'name> {
         name: &'name str,
         partition: Option<String>,
         autocreate_partition: bool,
+        enable_keepalive: bool,
     ) -> MpdResult<Client<'name>> {
         let mut stream = match addr {
             MpdAddress::IpAndPort(ref addr) => TcpOrUnixStream::Tcp(TcpStream::connect(addr)?),
@@ -168,7 +192,8 @@ impl<'name> Client<'name> {
                     "Abstract socket only supported on Linux".to_string(),
                 ));
             }
-        };
+        }
+        .set_keepalive(enable_keepalive)?;
         stream.set_write_timeout(None)?;
         stream.set_read_timeout(None)?;
         let mut rx = BufReader::new(stream.try_clone()?);
@@ -197,6 +222,7 @@ impl<'name> Client<'name> {
             version,
             partition,
             autocreate_partition,
+            enable_keepalive,
             config: None,
             supported_commands: HashSet::new(),
         };
@@ -244,7 +270,8 @@ impl<'name> Client<'name> {
                     "Abstract socket only supported on Linux".to_string(),
                 ));
             }
-        };
+        }
+        .set_keepalive(self.enable_keepalive)?;
         stream.set_write_timeout(None)?;
         stream.set_read_timeout(None)?;
         let mut rx = BufReader::new(stream.try_clone()?);

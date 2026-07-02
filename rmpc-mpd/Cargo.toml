@@ -17,6 +17,7 @@ itertools = { workspace = true }
 log = { workspace = true }
 rand = { workspace = true }
 serde = { workspace = true }
+socket2 = { workspace = true }
 strum = { workspace = true }
 
 [dev-dependencies]
