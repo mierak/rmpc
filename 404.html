@@ -1,1 +1,22 @@
-<!DOCTYPE html><title>Redirecting to: https://rmpc.mierak.dev</title><meta http-equiv="refresh" content="0;url=https://rmpc.mierak.dev"><meta name="robots" content="noindex"><link rel="canonical" href="https://rmpc.mierak.dev/next"><body> <a href="https://rmpc.mierak.dev/next">Redirecting from <code>https://mierak.github.io/rmpc/</code> to <code>https://rmpc.mierak.dev</code></a> </body>
+<!DOCTYPE html>
+<meta charset="utf-8">
+<title>Redirecting to rmpc.mierak.dev</title>
+<link rel="canonical" href="https://rmpc.mierak.dev/">
+<script>
+    (function () {
+        var p = window.location.pathname;
+        // Strip the /rmpc/ project prefix that existed on mierak.github.io.
+        p = p.replace(/^\/rmpc(\/|$)/, '/');
+        // Map old versioned prefixes (next, release-0-10-0, release-0-9-0)
+        // onto the current latest docs so old deep links land somewhere useful.
+        p = p.replace(/^\/(next|release-\d+-\d+-\d+)(\/|$)/, '/');
+        if (p.charAt(0) !== '/') p = '/' + p;
+        window.location.replace('https://rmpc.mierak.dev' + p + window.location.search + window.location.hash);
+    })();
+</script>
+<noscript>
+    <meta http-equiv="refresh" content="0;url=https://rmpc.mierak.dev/">
+</noscript>
+<body>
+    <a href="https://rmpc.mierak.dev/">Continue to rmpc.mierak.dev</a>
+</body>
