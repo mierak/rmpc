@@ -1174,5 +1174,33 @@ mod tests {
             assert_eq!(result.len(), expected_count);
             assert!(result.iter().all(|s| s.file.contains("album_a")));
         }
+
+        #[rstest]
+        fn multiple_albums_each_return_their_own_songs(mut ctx: Ctx, config: Config) {
+            ctx.config = std::sync::Arc::new(config);
+            let mut pane = TagBrowserPane::new(
+                vec![tag("artist"), album_tag(None, None)],
+                PaneType::Artists,
+                &ctx,
+            );
+            let songs_a = vec![song("album_a", "2020"), song("album_a", "2020")];
+            let songs_b = vec![song("album_b", "2021")];
+            pane.stack.insert(Path::new(), vec![DirOrSong::name_only("artist".to_string())]);
+            pane.process_songs(
+                "artist".to_string(),
+                [songs_a.clone(), songs_b.clone()].concat(),
+                &ctx,
+            );
+            pane.stack_mut().current_mut().select_idx(0, 0);
+            pane.stack_mut().enter();
+
+            let result_a = pane.songs_for_item(find_dir_by_display_name(&pane, "album_a"));
+            let result_b = pane.songs_for_item(find_dir_by_display_name(&pane, "album_b"));
+
+            assert_eq!(result_a.len(), songs_a.len());
+            assert!(result_a.iter().all(|s| s.file.contains("album_a")));
+            assert_eq!(result_b.len(), songs_b.len());
+            assert!(result_b.iter().all(|s| s.file.contains("album_b")));
+        }
     }
 }
