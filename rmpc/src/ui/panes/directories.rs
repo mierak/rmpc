@@ -52,12 +52,14 @@ impl Pane for DirectoriesPane {
         if !self.initialized {
             let sort = ctx.config.directories_sort.clone();
             let playlist_display_mode = ctx.config.show_playlists_in_browser;
+            let hidden_dirs = ctx.config.directories_hidden_dirs.clone();
             ctx.query().id(INIT).replace_id(INIT).target(PaneType::Directories).query(
                 move |client| {
                     let result = client
                         .lsinfo(None)?
                         .into_iter()
                         .filter_map(|v| v.into_dir_or_song(playlist_display_mode))
+                        .filter(|v| !v.is_hidden_dir(&hidden_dirs))
                         .sorted_by(|a, b| a.with_custom_sort(&sort).cmp(&b.with_custom_sort(&sort)))
                         .collect::<Vec<_>>();
                     Ok(MpdQueryResult::DirOrSong { data: result, path: None })
@@ -74,12 +76,14 @@ impl Pane for DirectoriesPane {
             UiEvent::Database => {
                 let sort = ctx.config.directories_sort.clone();
                 let playlist_display_mode = ctx.config.show_playlists_in_browser;
+                let hidden_dirs = ctx.config.directories_hidden_dirs.clone();
                 ctx.query().id(INIT).replace_id(INIT).target(PaneType::Directories).query(
                     move |client| {
                         let result = client
                             .lsinfo(None)?
                             .into_iter()
                             .filter_map(|v| v.into_dir_or_song(playlist_display_mode))
+                            .filter(|v| !v.is_hidden_dir(&hidden_dirs))
                             .sorted_by(|a, b| {
                                 a.with_custom_sort(&sort).cmp(&b.with_custom_sort(&sort))
                             })
@@ -185,6 +189,7 @@ impl BrowserPane<DirOrSong> for DirectoriesPane {
 
                 let is_playlist = *is_playlist;
                 let playlist_display_mode = ctx.config.show_playlists_in_browser;
+                let hidden_dirs = ctx.config.directories_hidden_dirs.clone();
 
                 let sort = ctx.config.directories_sort.clone();
                 ctx.query()
@@ -212,6 +217,7 @@ impl BrowserPane<DirOrSong> for DirectoriesPane {
                             .0
                             .into_iter()
                             .filter_map(|v| v.into_dir_or_song(playlist_display_mode))
+                            .filter(|v| !v.is_hidden_dir(&hidden_dirs))
                             .sorted_by(|a, b| {
                                 a.with_custom_sort(&sort).cmp(&b.with_custom_sort(&sort))
                             })

@@ -84,6 +84,10 @@ impl DirOrSong {
         }
     }
 
+    pub fn is_hidden_dir(&self, hidden: &[String]) -> bool {
+        matches!(self, DirOrSong::Dir { name, playlist: false, .. } if hidden.iter().any(|h| h == name))
+    }
+
     pub fn last_modified(&self) -> chrono::DateTime<chrono::Utc> {
         match self {
             DirOrSong::Dir { last_modified, .. } => *last_modified,
@@ -1006,5 +1010,21 @@ mod ordtest {
             Ordering::Less,
             "transitivity requires: if a<b and b<c then a<c, but got ac={ac:?}"
         );
+    }
+
+    #[test]
+    fn is_hidden_dir_matches_dirs_by_leaf_name() {
+        let hidden = vec![".Trash-1000".to_string()];
+
+        // A directory whose leaf name is blacklisted is hidden.
+        assert!(dir(".Trash-1000").is_hidden_dir(&hidden));
+        // Other directories are kept.
+        assert!(!dir("Music").is_hidden_dir(&hidden));
+        // Songs are never hidden, even if their file matches.
+        assert!(!song(".Trash-1000", &[]).is_hidden_dir(&hidden));
+        // Playlists sharing the name are not hidden (blacklist targets folders).
+        assert!(!DirOrSong::playlist_name_only(".Trash-1000".to_string()).is_hidden_dir(&hidden));
+        // Empty blacklist hides nothing.
+        assert!(!dir(".Trash-1000").is_hidden_dir(&[]));
     }
 }

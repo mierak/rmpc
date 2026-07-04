@@ -6,6 +6,8 @@ All notable changes to this project will be documented in this file.
 
 ### Added
 
+- `directories_hidden_dirs` config option to hide directories with the given names from the
+  `Directories` pane
 - Added `current` option to `Save()` keybind to save the currently playing song
 - Added a new vertical volume slider pane.
 - **Breaking** `ExternalCommand` can now have arguments supplied at runtime. This will break your

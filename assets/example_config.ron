@@ -26,6 +26,7 @@
     ignore_leading_the: false,
     browser_song_sort: [Disc, Track, Artist, Title],
     directories_sort: SortFormat(group_by_type: true, reverse: false),
+    directories_hidden_dirs: [],
     auto_open_downloads: true,
     quit_closes_modal: false,
     queue_disable_current_item_style_timeout_ms: None,
