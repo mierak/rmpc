@@ -133,7 +133,7 @@ impl Default for UiConfigFile {
         Self {
             layout: PaneOrSplitFile::default(),
             default_album_art_path: None,
-            draw_borders: true,
+            draw_borders: false,
             background_color: None,
             text_color: None,
             header_background_color: None,

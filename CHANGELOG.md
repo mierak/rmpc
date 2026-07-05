@@ -76,6 +76,7 @@ keybinds
 - The queue should not leave empty space in the table anymore
 - rmpc will now handle focused events and attempt to resize the TUI if needed
 - Loading a playlist when with missing songs will now load the existing songs instead of nothing
+- The borders of browser panes are nolonger affected by the scrollbar track being set
 
 ## [0.11.0] - 2026-02-01
 

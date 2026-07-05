@@ -68,13 +68,7 @@ where
             .song_format
             .as_deref()
             .unwrap_or(ctx.config.theme.browser_song_format.0.as_slice());
-        let scrollbar_margin = match config.theme.scrollbar.as_ref() {
-            Some(scrollbar) if config.theme.draw_borders => {
-                let scrollbar_track = &scrollbar.symbols[0];
-                Margin { vertical: 0, horizontal: scrollbar_track.is_empty().into() }
-            }
-            Some(_) | None => Margin { vertical: 0, horizontal: 0 },
-        };
+        let scrollbar_margin = Margin { vertical: 0, horizontal: config.theme.draw_borders.into() };
         let column_right_padding: u16 = config.theme.scrollbar.is_some().into();
 
         let current = state.current().to_list_items(song_format, ctx);
@@ -144,7 +138,7 @@ where
                     .padding(Padding::new(0, column_right_padding, 0, 0))
                     .border_set(LEFT_COLUMN_SYMBOLS)
             } else {
-                Block::default().padding(Padding::new(1, column_right_padding, 0, 0))
+                Block::default().padding(Padding::new(0, column_right_padding, 0, 0))
             };
             if let Some(title) = title {
                 block = block.title(title);
