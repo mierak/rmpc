@@ -6,6 +6,9 @@ All notable changes to this project will be documented in this file.
 
 ### Added
 
+- Home Manager module (`homeManagerModules.rmpc` flake output) with structured
+  `programs.rmpc.settings` and `programs.rmpc.themes` options written in plain
+  Nix and rendered to RON at build time.
 - Added a new vertical volume slider pane.
 - **Breaking** `ExternalCommand` can now have arguments supplied at runtime. This will break your
   existing keybinds if they contained either `{` or `}`. You will now need to escape these by

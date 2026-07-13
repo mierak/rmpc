@@ -82,5 +82,16 @@
 
         devShells.default = (mkScope pkgs).shell;
       }
-    );
+    )
+    // {
+      # Structured `programs.rmpc.settings`/`themes` options rendered to RON,
+      # extending the module that ships with Home Manager.
+      homeManagerModules = {
+        rmpc = import ./nix/home-manager.nix;
+        default = inputs.self.homeManagerModules.rmpc;
+      };
+
+      # The Nix -> RON serializer on its own, for use outside Home Manager.
+      lib.ron = import ./nix/ron.nix {inherit (inputs.nixpkgs) lib;};
+    };
 }
