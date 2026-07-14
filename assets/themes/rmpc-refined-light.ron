@@ -1,44 +1,44 @@
 #![enable(implicit_some)]
 #![enable(unwrap_newtypes)]
 #![enable(unwrap_variant_newtypes)]
-// rmpc Refined — dark
+// rmpc Refined — light (warm paper; matched pair to the built-in dark default)
 //
 // An elevated-terminal theme: deep cool-ink surfaces, one cyan/teal primary
 // accent, an amber "now-playing" accent, and a violet -> magenta -> cyan cava
 // gradient. Rounded 1px borders, real type hierarchy, Nerd Font icons.
 // Palette (oklch -> sRGB):
-//   bg #0c0f14  panel #14171d  panelAlt #191e25  panelHi #20252d
-//   border #2d333c  borderFocus #33c0c7
-//   text #e5e8ed  muted #959aa3  faint #5f646b
-//   accent(cyan) #45cdd4  accentDim #4e9397  warm(amber) #f0b96b  good #7ccd8e
-//   selFg #090b0f  cava cyan #28d6df / violet #bc88f4 / magenta #ed68ae
+//   bg #f5f3ef  panel #fefdfa  panelAlt #f0efeb  panelHi #dbe5e9
+//   border #d3d1ca  borderFocus #00878f
+//   text #232933  muted #5d646e  faint #8d939b
+//   accent(cyan) #007e87  accentDim #1c989e  warm(amber) #b36300  good #0a7e3a
+//   selFg #fcfcf9  cava cyan #0099a3 / violet #8b4ec4 / magenta #bf2a82
 (
     default_album_art_path: None,
     format_tag_separator: " | ",
     browser_column_widths: [20, 38, 42],
-    background_color: "#0c0f14",
-    panel_background_color: "#14171d",
-    alternate_row_background_color: "#191e25",
-    text_color: "#e5e8ed",
+    background_color: "#f5f3ef",
+    panel_background_color: "#fefdfa",
+    alternate_row_background_color: "#f0efeb",
+    text_color: "#232933",
     header_background_color: None,
-    modal_background_color: "#14171d",
+    modal_background_color: "#fefdfa",
     modal_backdrop: true,
-    preview_label_style: (fg: "#959aa3"),
-    preview_metadata_group_style: (fg: "#45cdd4", modifiers: "Bold"),
-    highlighted_item_style: (fg: "#f0b96b", modifiers: "Bold"),
-    current_item_style: (bg: "#1c343a", modifiers: "Bold"),
-    borders_style: (fg: "#2d333c"),
-    highlight_border_style: (fg: "#33c0c7"),
+    preview_label_style: (fg: "#5d646e"),
+    preview_metadata_group_style: (fg: "#007e87", modifiers: "Bold"),
+    highlighted_item_style: (fg: "#b36300", modifiers: "Bold"),
+    current_item_style: (bg: "#daebea", modifiers: "Bold"),
+    borders_style: (fg: "#d3d1ca"),
+    highlight_border_style: (fg: "#00878f"),
     symbols: (
         song: "\u{f001}",
         dir: "\u{f07b}",
         playlist: "\u{f03a}",
         marker: "\u{f00c}",
         ellipsis: "…",
-        song_style: (fg: "#959aa3"),
-        dir_style: (fg: "#45cdd4"),
-        playlist_style: (fg: "#45cdd4"),
-        marker_style: (fg: "#f0b96b"),
+        song_style: (fg: "#5d646e"),
+        dir_style: (fg: "#007e87"),
+        playlist_style: (fg: "#007e87"),
+        marker_style: (fg: "#b36300"),
         song_highlighted_style: None,
         dir_highlighted_style: None,
         playlist_highlighted_style: None,
@@ -49,29 +49,29 @@
         marker_current_style: None,
     ),
     level_styles: (
-        info:  (fg: "#45cdd4", bg: "#0c0f14"),
-        warn:  (fg: "#f0b96b", bg: "#0c0f14"),
-        error: (fg: "#e06c75", bg: "#0c0f14"),
-        debug: (fg: "#7ccd8e", bg: "#0c0f14"),
-        trace: (fg: "#bc88f4", bg: "#0c0f14"),
+        info:  (fg: "#007e87", bg: "#f5f3ef"),
+        warn:  (fg: "#b36300", bg: "#f5f3ef"),
+        error: (fg: "#c0392b", bg: "#f5f3ef"),
+        debug: (fg: "#0a7e3a", bg: "#f5f3ef"),
+        trace: (fg: "#8b4ec4", bg: "#f5f3ef"),
     ),
     progress_bar: (
         symbols: ["━", "━", "━", "─", "●"],
-        track_style: (fg: "#5f646b"),
-        elapsed_style: (fg: "#45cdd4"),
-        thumb_style: (fg: "#45cdd4"),
+        track_style: (fg: "#8d939b"),
+        elapsed_style: (fg: "#007e87"),
+        thumb_style: (fg: "#007e87"),
         use_track_when_empty: true,
-        elapsed_gradient: ("#45cdd4", "#8b5cf6"),
+        elapsed_gradient: ("#007e87", "#8b4ec4"),
     ),
     scrollbar: (
         symbols: ["│", "┃", "▲", "▼"],
-        track_style: (fg: "#191e25"),
-        ends_style: (fg: "#2d333c"),
-        thumb_style: (fg: "#4e9397"),
+        track_style: (fg: "#f0efeb"),
+        ends_style: (fg: "#d3d1ca"),
+        thumb_style: (fg: "#1c989e"),
     ),
     tab_bar: (
-        active_style: (fg: "#090b0f", bg: "#45cdd4", modifiers: "Bold"),
-        inactive_style: (fg: "#959aa3"),
+        active_style: (fg: "#fcfcf9", bg: "#007e87", modifiers: "Bold"),
+        inactive_style: (fg: "#5d646e"),
     ),
     lyrics: (
         timestamp: false
@@ -80,11 +80,11 @@
         bar_symbols: [' ', '▁', '▂', '▃', '▄', '▅', '▆', '▇', '█'],
         inverted_bar_symbols: ['█', '▇', '▆', '▅', '▄', '▃', '▂', '▁', ' '],
         inverted_bar_as_mask: false,
-        bg_color: "#14171d",
+        bg_color: "#fefdfa",
         bar_color: Gradient({
-            0:   "#ed68ae",
-            45:  "#bc88f4",
-            100: "#28d6df",
+            0:   "#bf2a82",
+            45:  "#8b4ec4",
+            100: "#0099a3",
         }),
         bar_spacing: 1,
         bar_width: 1,
@@ -123,15 +123,15 @@
             width: "37%",
         ),
         (
-            prop: (kind: Property(Artist), style: (fg: "#959aa3"),
-                default: (kind: Text("Unknown"), style: (fg: "#959aa3"))
+            prop: (kind: Property(Artist), style: (fg: "#5d646e"),
+                default: (kind: Text("Unknown"), style: (fg: "#5d646e"))
             ),
             label_prop: (kind: Text("Artist")),
             width: "22%",
         ),
         (
-            prop: (kind: Property(Album), style: (fg: "#959aa3"),
-                default: (kind: Text("Unknown Album"), style: (fg: "#959aa3"))
+            prop: (kind: Property(Album), style: (fg: "#5d646e"),
+                default: (kind: Text("Unknown Album"), style: (fg: "#5d646e"))
             ),
             label_prop: (kind: Text("Album")),
             width: "23%",
@@ -155,21 +155,21 @@
                     panes: [
                         (
                             size: "35",
-                            background_color: "#14171d",
+                            background_color: "#fefdfa",
                             borders: "LEFT | TOP | BOTTOM",
                             border_symbols: Inherited(parent: Rounded, bottom_left: "├"),
                             pane: Component("header_left")
                         ),
                         (
                             size: "100%",
-                            background_color: "#14171d",
+                            background_color: "#fefdfa",
                             borders: "ALL",
                             border_symbols: Inherited(parent: Rounded, top_left: "┬", top_right: "┬", bottom_left: "┴", bottom_right: "┴"),
                             pane: Component("header_center")
                         ),
                         (
                             size: "35",
-                            background_color: "#14171d",
+                            background_color: "#fefdfa",
                             borders: "RIGHT | TOP | BOTTOM",
                             border_symbols: Inherited(parent: Rounded, bottom_right: "┤"),
                             pane: Component("header_right")
@@ -179,7 +179,7 @@
             ),
             (
                 pane: Pane(Tabs),
-                background_color: "#14171d",
+                background_color: "#fefdfa",
                 borders: "RIGHT | LEFT | BOTTOM",
                 border_symbols: Rounded,
                 size: "2",
@@ -190,7 +190,7 @@
             ),
             (
                 size: "3",
-                background_color: "#14171d",
+                background_color: "#fefdfa",
                 borders: "ALL",
                 border_symbols: Rounded,
                 border_title: [(kind: Text(" ")), (kind: Property(Status(QueueLength()))), (kind: Text(" songs / ")), (kind: Property(Status(QueueTimeTotal()))), (kind: Text(" total time "))],
@@ -209,12 +209,12 @@
     components: {
         "state": Pane(Property(
             content: [
-                (kind: Text("● "), style: (fg: "#f0b96b")),
+                (kind: Text("● "), style: (fg: "#b36300")),
                 (kind: Property(Status(StateV2(
                     playing_label: "Playing",
                     paused_label: "Paused",
                     stopped_label: "Stopped",
-                ))), style: (fg: "#959aa3", modifiers: "Bold")),
+                ))), style: (fg: "#5d646e", modifiers: "Bold")),
             ], align: Left,
         )),
         "title": Pane(Property(
@@ -227,10 +227,10 @@
             direction: Horizontal,
             panes: [
                 (size: "2", pane: Pane(Empty())),
-                (size: "2", pane: Pane(Property(content: [(kind: Text("\u{f028} "), style: (fg: "#45cdd4"))]))),
-                (size: "100%", pane: Pane(Volume(kind: Slider(symbols: (filled: "━", thumb: "●", track: "─"), filled_style: (fg: "#45cdd4"), thumb_style: (fg: "#7fe0e8", modifiers: "Bold"), track_style: (fg: "#2d333c"))))),
-                (size: "3", pane: Pane(Property(content: [(kind: Property(Status(Volume)), style: (fg: "#45cdd4"))], align: Right))),
-                (size: "3", pane: Pane(Property(content: [(kind: Text("% "), style: (fg: "#45cdd4"))]))),
+                (size: "2", pane: Pane(Property(content: [(kind: Text("\u{f028} "), style: (fg: "#007e87"))]))),
+                (size: "100%", pane: Pane(Volume(kind: Slider(symbols: (filled: "━", thumb: "●", track: "─"), filled_style: (fg: "#007e87"), thumb_style: (fg: "#1c989e", modifiers: "Bold"), track_style: (fg: "#d3d1ca"))))),
+                (size: "3", pane: Pane(Property(content: [(kind: Property(Status(Volume)), style: (fg: "#007e87"))], align: Right))),
+                (size: "3", pane: Pane(Property(content: [(kind: Text("% "), style: (fg: "#007e87"))]))),
             ]
         ),
         "elapsed_and_bitrate": Pane(Property(
@@ -248,8 +248,8 @@
         )),
         "artist_and_album": Pane(Property(
             content: [
-                (kind: Property(Song(Artist)), style: (fg: "#f0b96b", modifiers: "Bold"),
-                    default: (kind: Text("Unknown"), style: (fg: "#f0b96b", modifiers: "Bold"))),
+                (kind: Property(Song(Artist)), style: (fg: "#b36300", modifiers: "Bold"),
+                    default: (kind: Text("Unknown"), style: (fg: "#b36300", modifiers: "Bold"))),
                 (kind: Text(" - ")),
                 (kind: Property(Song(Album)), default: (kind: Text("Unknown Album"))),
             ], align: Center, scroll_speed: 1
@@ -263,7 +263,7 @@
                 ),
                 (
                     size: "100%",
-                    pane: Pane(Property(content: [(kind: Property(Status(InputBuffer())), style: (fg: "#45cdd4"), align: Left)]))
+                    pane: Pane(Property(content: [(kind: Property(Status(InputBuffer())), style: (fg: "#007e87"), align: Left)]))
                 ),
                 (
                     size: "12",
@@ -275,14 +275,14 @@
             content: [
                 (kind: Transform(Replace(content: (kind: Property(Status(InputMode()))), replacements: [
                     (match: "Normal", replace: (kind: Group([
-                        (kind: Text("\u{e0b6}"), style: (fg: "#45cdd4")),
-                        (kind: Text("NORMAL"), style: (fg: "#090b0f", bg: "#45cdd4", modifiers: "Bold")),
-                        (kind: Text("\u{e0b4}"), style: (fg: "#45cdd4")),
+                        (kind: Text("\u{e0b6}"), style: (fg: "#007e87")),
+                        (kind: Text("NORMAL"), style: (fg: "#fcfcf9", bg: "#007e87", modifiers: "Bold")),
+                        (kind: Text("\u{e0b4}"), style: (fg: "#007e87")),
                     ]))),
                     (match: "Insert", replace: (kind: Group([
-                        (kind: Text("\u{e0b6}"), style: (fg: "#7ccd8e")),
-                        (kind: Text("INSERT"), style: (fg: "#090b0f", bg: "#7ccd8e", modifiers: "Bold")),
-                        (kind: Text("\u{e0b4}"), style: (fg: "#7ccd8e")),
+                        (kind: Text("\u{e0b6}"), style: (fg: "#0a7e3a")),
+                        (kind: Text("INSERT"), style: (fg: "#fcfcf9", bg: "#0a7e3a", modifiers: "Bold")),
+                        (kind: Text("\u{e0b4}"), style: (fg: "#0a7e3a")),
                     ]))),
                 ])))
             ], align: Center

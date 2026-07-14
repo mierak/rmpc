@@ -184,7 +184,29 @@ impl From<(u16, u16)> for Size {
 }
 
 impl Default for ConfigFile {
+    /// The default config is the "Refined" layout, parsed from the embedded
+    /// `assets/example_config.ron`. A thread-local guard returns the bare
+    /// hand-built default on re-entry so serde's container `default` (invoked
+    /// while parsing that file) does not recurse.
     fn default() -> Self {
+        thread_local! {
+            static PARSING: std::cell::Cell<bool> = const { std::cell::Cell::new(false) };
+        }
+        if PARSING.with(std::cell::Cell::get) {
+            return Self::bare_default();
+        }
+        PARSING.with(|p| p.set(true));
+        let parsed = ron::de::from_str::<ConfigFile>(include_str!(concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/../assets/example_config.ron"
+        )));
+        PARSING.with(|p| p.set(false));
+        parsed.expect("embedded example_config.ron must deserialize")
+    }
+}
+
+impl ConfigFile {
+    pub(crate) fn bare_default() -> Self {
         Self {
             address: String::from("127.0.0.1:6600"),
             keybinds: KeyConfigFile::default(),
@@ -445,55 +467,59 @@ impl From<OnOffOneshot> for rmpc_mpd::commands::status::OnOffOneshot {
 mod tests {
     use std::path::PathBuf;
 
-    #[cfg(debug_assertions)]
-    use crate::config::keys::KeyConfigFile;
-    use crate::config::{ConfigFile, theme::UiConfigFile};
+    use crate::config::{
+        Config,
+        ConfigFile,
+        theme::{UiConfig, UiConfigFile},
+    };
 
-    #[test]
-    #[cfg(debug_assertions)]
-    fn example_config_equals_default() {
-        let config = ConfigFile::default();
-        let mut path = PathBuf::from(std::env::var("CARGO_MANIFEST_DIR").unwrap())
-            .parent()
-            .unwrap()
-            .to_owned();
-        path.push("assets");
-        path.push("example_config.ron");
-
-        let mut f: ConfigFile = ron::de::from_str(&std::fs::read_to_string(path).unwrap()).unwrap();
-        f.keybinds.logs = KeyConfigFile::default().logs;
-
-        assert_eq!(config, f);
+    fn assets() -> PathBuf {
+        PathBuf::from(std::env::var("CARGO_MANIFEST_DIR").unwrap()).parent().unwrap().join("assets")
     }
 
+    /// The embedded `example_theme.ron` is the default UI/theme (loaded by
+    /// `UiConfig::default()`); it must parse and convert.
     #[test]
-    #[cfg(not(debug_assertions))]
-    fn example_config_equals_default() {
-        let config = ConfigFile::default();
-        let mut path = PathBuf::from(std::env::var("CARGO_MANIFEST_DIR").unwrap())
-            .parent()
-            .unwrap()
-            .to_owned();
-        path.push("assets");
-        path.push("example_config.ron");
-
-        let f: ConfigFile = ron::de::from_str(&std::fs::read_to_string(path).unwrap()).unwrap();
-
-        assert_eq!(config, f);
+    fn example_theme_is_the_default_ui() {
+        let raw = std::fs::read_to_string(assets().join("example_theme.ron")).unwrap();
+        let file: UiConfigFile = ron::de::from_str(&raw).expect("example_theme.ron must parse");
+        UiConfig::try_from(file).expect("example_theme.ron must convert");
+        let _ = UiConfig::default();
     }
 
+    /// Every bundled theme in `assets/themes/` (e.g. the Refined light
+    /// variant) must parse and convert against the current schema.
     #[test]
-    fn example_theme_equals_default() {
-        let theme = UiConfigFile::default();
-        let mut path = PathBuf::from(std::env::var("CARGO_MANIFEST_DIR").unwrap())
-            .parent()
-            .unwrap()
-            .to_owned();
-        path.push("assets");
-        path.push("example_theme.ron");
+    fn bundled_themes_parse_and_convert() {
+        let dir = assets().join("themes");
+        let mut found = 0;
+        for entry in std::fs::read_dir(&dir).unwrap().flatten() {
+            let path = entry.path();
+            if path.extension().is_none_or(|e| e != "ron") {
+                continue;
+            }
+            found += 1;
+            let raw = std::fs::read_to_string(&path).unwrap();
+            let file: UiConfigFile = ron::de::from_str(&raw)
+                .unwrap_or_else(|e| panic!("{} must parse: {e}", path.display()));
+            UiConfig::try_from(file)
+                .unwrap_or_else(|e| panic!("{} must convert: {e}", path.display()));
+        }
+        assert!(found > 0, "no bundled themes found in {}", dir.display());
+    }
 
-        let file = ron::de::from_str(&std::fs::read_to_string(path).unwrap()).unwrap();
-
-        assert_eq!(theme, file);
+    /// The embedded `example_config.ron` is the default config (loaded by
+    /// `Config::default()`); it must parse and its tab/pane layout must convert
+    /// against the default theme.
+    #[test]
+    fn example_config_is_the_default() {
+        let raw = std::fs::read_to_string(assets().join("example_config.ron")).unwrap();
+        let cfg: ConfigFile = ron::de::from_str(&raw).expect("example_config.ron must parse");
+        let theme = UiConfig::default();
+        cfg.tabs
+            .clone()
+            .convert(&theme.components, &theme.border_symbol_sets)
+            .expect("example_config.ron tabs must convert");
+        let _ = Config::default();
     }
 }

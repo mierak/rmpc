@@ -17,6 +17,7 @@ pub struct ProgressBar<'a> {
     thumb_style: Style,
     track_style: Style,
     use_track_when_empty: bool,
+    elapsed_gradient: Option<(Color, Color)>,
 }
 
 impl Widget for ProgressBar<'_> {
@@ -37,7 +38,7 @@ impl Widget for ProgressBar<'_> {
             let x = left + i;
             let last_idx = len.saturating_sub(1);
 
-            let (char, style) = if i == 0 && self.use_track_when_empty && filled_cols == 0 {
+            let (char, mut style) = if i == 0 && self.use_track_when_empty && filled_cols == 0 {
                 // start char
                 (self.track_char, self.track_style)
             } else if i == last_idx && self.use_track_when_empty && filled_cols < last_idx {
@@ -63,6 +64,17 @@ impl Widget for ProgressBar<'_> {
                 (self.track_char, self.track_style)
             };
 
+            // optional per-cell gradient across the elapsed fill (thumb keeps its glow)
+            if let Some((c0, c1)) = self.elapsed_gradient
+                && style == self.elapsed_style
+            {
+                let frac =
+                    if filled_cols > 1 { f32::from(i) / f32::from(filled_cols - 1) } else { 0.0 };
+                if let Some(c) = lerp_rgb(c0, c1, frac) {
+                    style = style.fg(c);
+                }
+            }
+
             buf.set_string(x, top, char, style);
         }
     }
@@ -81,7 +93,18 @@ impl Default for ProgressBar<'_> {
             thumb_style: Style::default().bg(Color::Black).fg(Color::Blue),
             track_style: Style::default().bg(Color::Black),
             use_track_when_empty: false,
+            elapsed_gradient: None,
         }
+    }
+}
+
+fn lerp_rgb(a: Color, b: Color, t: f32) -> Option<Color> {
+    if let (Color::Rgb(ar, ag, ab), Color::Rgb(br, bg, bb)) = (a, b) {
+        let t = t.clamp(0.0, 1.0);
+        let l = |x: u8, y: u8| (f32::from(x) + (f32::from(y) - f32::from(x)) * t).round() as u8;
+        Some(Color::Rgb(l(ar, br), l(ag, bg), l(ab, bb)))
+    } else {
+        None
     }
 }
 

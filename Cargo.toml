@@ -8,7 +8,7 @@ edition = "2024"
 license = "BSD-3-Clause"
 homepage = "https://rmpc.mierak.dev"
 repository = "https://github.com/mierak/rmpc"
-rust-version = "1.88.0"
+rust-version = "1.95.0"
 
 [workspace.dependencies]
 clap = { version = "4.5.56", features = ["derive", "cargo", "string" ] }
@@ -17,7 +17,7 @@ serde = { version = "1.0.228", features = ["derive"] }
 log = { version = "0.4.29", features = ["kv"] }
 anyhow = "1.0.100"
 itertools = "0.14.0"
-rand = "0.9.2"
+rand = "0.10.1"
 sha2 = "0.10.9"
 
 # dev
@@ -26,7 +26,7 @@ test-case = "3.3.1"
 
 # build
 clap_complete = "4.5.65"
-clap_mangen = "0.2.31"
+clap_mangen = "0.3.0"
 vergen-gitcl = { version = "9.1.0", features = ["build"] }
 
 dialoguer = { version = "0.12.0", default-features = false }
@@ -47,7 +47,7 @@ either = "1.15.0"
 walkdir = "2.5.0"
 which = "8.0.0"
 url = "2.5.8"
-sysinfo = "0.38.0"
+sysinfo = "0.39.3"
 color_quant = "1.1.0"
 enum-map = "2.7.3"
 textwrap = "0.16.2"
@@ -61,7 +61,7 @@ ansi_colours = "1"
 thiserror = "2.0.18"
 parking_lot = { version = "0.12.5", features = [] }
 unicode-segmentation = "1.12.0"
-winnow = "^0.7.14"
+winnow = "1.0.3"
 socket2 = { version = "0.5", features = ["all"] }
 mlua = { version = "0.11.6", features = ["lua55", "vendored", "anyhow", "serde", "async", "send"]}
 zbus = { version = "5.14.0", features = ["tokio"] }

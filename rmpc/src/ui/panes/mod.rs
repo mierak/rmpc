@@ -4,13 +4,16 @@ use std::{
 };
 
 use album_art::AlbumArtPane;
+use albums_grid::AlbumsGridPane;
 use anyhow::{Context, Result};
 use cava::CavaPane;
 use directories::DirectoriesPane;
 use either::Either;
+use gradient_art::GradientArtPane;
 use header::HeaderPane;
 use itertools::Itertools;
 use lyrics::LyricsPane;
+use playback_controls::PlaybackControlsPane;
 use playlists::PlaylistsPane;
 use progress_bar::ProgressBarPane;
 use property::PropertyPane;
@@ -19,6 +22,7 @@ use ratatui::{Frame, layout::Layout, prelude::Rect, style::Color, text::Span, wi
 use recently_played::RecentlyPlayedPane;
 use rmpc_mpd::commands::{Song, State, status::OnOffOneshot, volume::Bound};
 use search::SearchPane;
+use states_controls::StatesControlsPane;
 use strum::{Display, IntoDiscriminant};
 use tabs::TabsPane;
 use tag_browser::TagBrowserPane;
@@ -71,15 +75,18 @@ use crate::{
 };
 
 pub mod album_art;
+pub mod albums_grid;
 pub mod cava;
 pub mod directories;
 pub mod empty;
 #[cfg(debug_assertions)]
 pub mod frame_count;
+pub mod gradient_art;
 pub mod header;
 #[cfg(debug_assertions)]
 pub mod logs;
 pub mod lyrics;
+pub mod playback_controls;
 pub mod playlists;
 pub mod progress_bar;
 pub mod property;
@@ -87,6 +94,7 @@ pub mod queue;
 pub mod queue_header;
 pub mod recently_played;
 pub mod search;
+pub mod states_controls;
 pub mod tabs;
 pub mod tag_browser;
 pub mod volume;
@@ -104,6 +112,10 @@ pub enum Panes<'pane_ref, 'pane> {
     Playlists(&'pane_ref mut PlaylistsPane),
     Search(&'pane_ref mut SearchPane),
     AlbumArt(&'pane_ref mut AlbumArtPane),
+    GradientArt(&'pane_ref mut GradientArtPane),
+    PlaybackControls(&'pane_ref mut PlaybackControlsPane),
+    AlbumsGrid(&'pane_ref mut AlbumsGridPane),
+    StatesControls(&'pane_ref mut StatesControlsPane),
     Lyrics(&'pane_ref mut LyricsPane),
     ProgressBar(&'pane_ref mut ProgressBarPane),
     Header(&'pane_ref mut HeaderPane),
@@ -134,6 +146,10 @@ pub struct PaneContainer<'panes> {
     pub playlists: PlaylistsPane,
     pub search: SearchPane,
     pub album_art: AlbumArtPane,
+    pub gradient_art: GradientArtPane,
+    pub playback_controls: PlaybackControlsPane,
+    pub albums_grid: AlbumsGridPane,
+    pub states_controls: StatesControlsPane,
     pub lyrics: LyricsPane,
     pub progress_bar: ProgressBarPane,
     pub header: HeaderPane,
@@ -191,80 +207,116 @@ impl<'panes> PaneContainer<'panes> {
             queue_header: QueueHeaderPane::new(ctx),
             #[cfg(debug_assertions)]
             logs: LogsPane::new(),
-            directories: DirectoriesPane::new(ctx),
-            albums: TagBrowserPane::new(
-                vec![BrowserTagConfig {
-                    group_by: vec![vec![SongProperty::Album]],
-                    sort_by: None,
-                    format: vec![],
-                    skip: CollapseLevel::default(),
-                }],
-                PaneType::Albums,
-                ctx,
-            ),
-            artists: TagBrowserPane::new(
-                vec![
-                    BrowserTagConfig {
-                        group_by: vec![vec![SongProperty::Artist]],
+            directories: {
+                let mut p = DirectoriesPane::new(ctx);
+                p.browser.column_titles = Some([
+                    " \u{f07b} Directories ".into(),
+                    String::new(),
+                    " \u{f05a} Preview ".into(),
+                ]);
+                p
+            },
+            albums: {
+                let mut p = TagBrowserPane::new(
+                    vec![BrowserTagConfig {
+                        group_by: vec![vec![SongProperty::Album]],
                         sort_by: None,
                         format: vec![],
                         skip: CollapseLevel::default(),
-                    },
-                    BrowserTagConfig {
-                        group_by: match display_mode {
-                            AlbumDisplayMode::SplitByDate => {
-                                vec![vec![SongProperty::Album], date_tags.clone()]
-                            }
-                            AlbumDisplayMode::NameOnly => {
-                                vec![vec![SongProperty::Album]]
-                            }
+                    }],
+                    PaneType::Albums,
+                    ctx,
+                );
+                p.browser.column_titles =
+                    Some([" \u{f001} Albums ".into(), String::new(), " \u{f05a} Preview ".into()]);
+                p
+            },
+            artists: {
+                let mut p = TagBrowserPane::new(
+                    vec![
+                        BrowserTagConfig {
+                            group_by: vec![vec![SongProperty::Artist]],
+                            sort_by: None,
+                            format: vec![],
+                            skip: CollapseLevel::default(),
                         },
-                        sort_by: match sort_by {
-                            AlbumSortMode::Name => None,
-                            AlbumSortMode::Date => {
-                                Some(vec![date_tags.clone(), vec![SongProperty::Album]])
-                            }
+                        BrowserTagConfig {
+                            group_by: match display_mode {
+                                AlbumDisplayMode::SplitByDate => {
+                                    vec![vec![SongProperty::Album], date_tags.clone()]
+                                }
+                                AlbumDisplayMode::NameOnly => {
+                                    vec![vec![SongProperty::Album]]
+                                }
+                            },
+                            sort_by: match sort_by {
+                                AlbumSortMode::Name => None,
+                                AlbumSortMode::Date => {
+                                    Some(vec![date_tags.clone(), vec![SongProperty::Album]])
+                                }
+                            },
+                            format: album_format.clone().into(),
+                            skip: CollapseLevel::default(),
                         },
-                        format: album_format.clone().into(),
-                        skip: CollapseLevel::default(),
-                    },
-                ],
-                PaneType::Artists,
-                ctx,
-            ),
-            album_artists: TagBrowserPane::new(
-                vec![
-                    BrowserTagConfig {
-                        group_by: vec![vec![SongProperty::Other("albumartist".to_string())]],
-                        sort_by: None,
-                        format: vec![],
-                        skip: CollapseLevel::default(),
-                    },
-                    BrowserTagConfig {
-                        group_by: match display_mode {
-                            AlbumDisplayMode::SplitByDate => {
-                                vec![vec![SongProperty::Album], date_tags.clone()]
-                            }
-                            AlbumDisplayMode::NameOnly => {
-                                vec![vec![SongProperty::Album]]
-                            }
+                    ],
+                    PaneType::Artists,
+                    ctx,
+                );
+                p.browser.column_titles =
+                    Some([" \u{f007} Artists ".into(), String::new(), " \u{f05a} Preview ".into()]);
+                p
+            },
+            album_artists: {
+                let mut p = TagBrowserPane::new(
+                    vec![
+                        BrowserTagConfig {
+                            group_by: vec![vec![SongProperty::Other("albumartist".to_string())]],
+                            sort_by: None,
+                            format: vec![],
+                            skip: CollapseLevel::default(),
                         },
-                        sort_by: match sort_by {
-                            AlbumSortMode::Name => None,
-                            AlbumSortMode::Date => {
-                                Some(vec![date_tags.clone(), vec![SongProperty::Album]])
-                            }
+                        BrowserTagConfig {
+                            group_by: match display_mode {
+                                AlbumDisplayMode::SplitByDate => {
+                                    vec![vec![SongProperty::Album], date_tags.clone()]
+                                }
+                                AlbumDisplayMode::NameOnly => {
+                                    vec![vec![SongProperty::Album]]
+                                }
+                            },
+                            sort_by: match sort_by {
+                                AlbumSortMode::Name => None,
+                                AlbumSortMode::Date => {
+                                    Some(vec![date_tags.clone(), vec![SongProperty::Album]])
+                                }
+                            },
+                            format: album_format.into(),
+                            skip: CollapseLevel::default(),
                         },
-                        format: album_format.into(),
-                        skip: CollapseLevel::default(),
-                    },
-                ],
-                PaneType::AlbumArtists,
-                ctx,
-            ),
-            playlists: PlaylistsPane::new(ctx),
+                    ],
+                    PaneType::AlbumArtists,
+                    ctx,
+                );
+                p.browser.column_titles = Some([
+                    " \u{f007} Album Artists ".into(),
+                    String::new(),
+                    " \u{f05a} Preview ".into(),
+                ]);
+                p
+            },
+            playlists: {
+                let mut p = PlaylistsPane::new(ctx);
+                p.browser.column_titles =
+                    Some([String::new(), " \u{f0ca} Playlists ".into(), " \u{f001} Songs ".into()]);
+                p.browser.widths = Some([0, 30, 70]);
+                p
+            },
             search: SearchPane::new(ctx),
             album_art: AlbumArtPane::new(ctx),
+            gradient_art: GradientArtPane::new(),
+            playback_controls: PlaybackControlsPane::new(),
+            albums_grid: AlbumsGridPane::new(ctx),
+            states_controls: StatesControlsPane::new(),
             lyrics: LyricsPane::new(ctx),
             progress_bar: ProgressBarPane::new(),
             header: HeaderPane::new(),
@@ -326,6 +378,10 @@ impl<'panes> PaneContainer<'panes> {
             PaneType::Playlists => Ok(Panes::Playlists(&mut self.playlists)),
             PaneType::Search => Ok(Panes::Search(&mut self.search)),
             PaneType::AlbumArt => Ok(Panes::AlbumArt(&mut self.album_art)),
+            PaneType::GradientArt => Ok(Panes::GradientArt(&mut self.gradient_art)),
+            PaneType::PlaybackControls => Ok(Panes::PlaybackControls(&mut self.playback_controls)),
+            PaneType::AlbumsGrid => Ok(Panes::AlbumsGrid(&mut self.albums_grid)),
+            PaneType::StatesControls => Ok(Panes::StatesControls(&mut self.states_controls)),
             PaneType::Lyrics => Ok(Panes::Lyrics(&mut self.lyrics)),
             PaneType::ProgressBar => Ok(Panes::ProgressBar(&mut self.progress_bar)),
             PaneType::Header => Ok(Panes::Header(&mut self.header)),
@@ -371,6 +427,10 @@ macro_rules! pane_call {
             Panes::Playlists(s) => s.$fn($($param),+),
             Panes::Search(s) => s.$fn($($param),+),
             Panes::AlbumArt(s) => s.$fn($($param),+),
+            Panes::GradientArt(s) => s.$fn($($param),+),
+            Panes::PlaybackControls(s) => s.$fn($($param),+),
+            Panes::AlbumsGrid(s) => s.$fn($($param),+),
+            Panes::StatesControls(s) => s.$fn($($param),+),
             Panes::Lyrics(s) => s.$fn($($param),+),
             Panes::ProgressBar(s) => s.$fn($($param),+),
             Panes::Header(s) => s.$fn($($param),+),
@@ -842,6 +902,7 @@ impl SizedPaneOrSplit {
     ) -> Result<()> {
         self.for_each_pane_custom_data(
             area,
+            None,
             (),
             &mut |pane, pane_area, block, block_area, background_color, ()| {
                 pane_callback(pane, pane_area, block, block_area, background_color)?;
@@ -855,6 +916,7 @@ impl SizedPaneOrSplit {
     pub fn for_each_pane_custom_data<T>(
         &self,
         area: Rect,
+        focused: Option<crate::shared::id::Id>,
         mut custom_data: T,
         pane_callback: &mut impl FnMut(
             &ConfigPane,
@@ -910,7 +972,15 @@ impl SizedPaneOrSplit {
                     };
                     let constraints =
                         panes.iter().map(|pane| pane.size.into_constraint(parent_other_size));
-                    let border_style = border_style.unwrap_or_else(|| ctx.config.as_border_style());
+                    let contains_focus = focused
+                        .is_some_and(|fid| configured_panes.panes_iter().any(|p| p.id == fid));
+                    let border_style = border_style.unwrap_or_else(|| {
+                        if contains_focus {
+                            ctx.config.as_focused_border_style()
+                        } else {
+                            ctx.config.as_border_style()
+                        }
+                    });
                     let mut block = Block::default()
                         .borders(*borders)
                         .border_style(border_style)

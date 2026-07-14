@@ -12,7 +12,7 @@ use rmpc_shared::version::Version;
 use rstest::fixture;
 
 use crate::{
-    config::{Config, tabs::TabName},
+    config::{Config, ConfigFile, tabs::TabName, theme::UiConfigFile},
     core::scheduler::Scheduler,
     ctx::{Ctx, StickersSupport},
     shared::{
@@ -25,6 +25,16 @@ use crate::{
     },
     ui::input::InputManager,
 };
+
+/// Tests must run against a stable, neutral theme/config — not the real
+/// (Refined) default, which would change expected formatting output. This
+/// builds a `Config` from the hand-built bare defaults.
+fn bare_config() -> Config {
+    let ui = UiConfigFile::bare_default().try_into().expect("bare UiConfig should convert");
+    ConfigFile::bare_default()
+        .into_config(ui, None, None, true)
+        .expect("bare Config should be valid")
+}
 
 #[fixture]
 pub fn ipc_stream() -> IpcStream {
@@ -58,7 +68,7 @@ pub fn ctx(
     work_request_channel: (Sender<WorkRequest>, Receiver<WorkRequest>),
     client_request_channel: (Sender<ClientRequest>, Receiver<ClientRequest>),
 ) -> Ctx {
-    let config = Config::default();
+    let config = bare_config();
 
     let scheduler = Scheduler::new((app_event_channel.0.clone(), unbounded().0));
     let key_resolver = KeyResolver::new(&config);
@@ -94,7 +104,7 @@ pub fn ctx(
 
 #[fixture]
 pub fn config() -> Config {
-    Config::default()
+    bare_config()
 }
 
 #[fixture]

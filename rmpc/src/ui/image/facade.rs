@@ -1,4 +1,10 @@
-use std::{io::Write, sync::Arc};
+use std::{
+    io::Write,
+    sync::{
+        Arc,
+        atomic::{AtomicU64, Ordering},
+    },
+};
 
 use anyhow::Result;
 use crossbeam::channel::Sender;
@@ -18,12 +24,23 @@ use crate::{
     shared::{events::WorkRequest, macros::status_error, terminal::TERMINAL},
 };
 
+/// Unique facade id so encode results can be routed back to the exact facade
+/// that requested them. Multiple facades live at once (now-playing cover,
+/// albums grid, browser previews) and an encode finishing after a tab switch
+/// must never be displayed by another pane's facade.
+static NEXT_FACADE_ID: AtomicU64 = AtomicU64::new(1);
+
 #[derive(Debug)]
 pub struct AlbumArtFacade {
+    id: u64,
     image_backend: ImageBackend,
     current_album_art: Option<Arc<Vec<u8>>>,
     default_album_art: Arc<Vec<u8>>,
     last_size: Rect,
+    /// `last_size` at the time the in-flight encode request was issued; if the
+    /// pane was resized/moved in the meantime the encode is stale and must be
+    /// redone instead of displayed at the old coordinates.
+    last_requested_size: Rect,
     work_tx: Sender<WorkRequest>,
     is_showing: bool,
     request_queue: Vec<Arc<Vec<u8>>>,
@@ -55,7 +72,7 @@ impl AlbumArtFacade {
     pub fn new(ctx: &Ctx) -> Self {
         let config = ctx.config.as_ref();
         let image_backend = match config.album_art.method {
-            ImageMethod::Kitty => ImageBackend::Kitty(Kitty),
+            ImageMethod::Kitty => ImageBackend::Kitty(Kitty::new()),
             ImageMethod::UeberzugWayland => ImageBackend::Ueberzug(Ueberzug::new(Layer::Wayland)),
             ImageMethod::UeberzugX11 => ImageBackend::Ueberzug(Ueberzug::new(Layer::X11)),
             ImageMethod::Iterm2 => ImageBackend::Iterm2(Iterm2),
@@ -65,14 +82,22 @@ impl AlbumArtFacade {
         };
 
         Self {
+            id: NEXT_FACADE_ID.fetch_add(1, Ordering::Relaxed),
             image_backend,
             current_album_art: None,
             last_size: Rect::default(),
+            last_requested_size: Rect::default(),
             default_album_art: Arc::new(config.theme.default_album_art.to_vec()),
             work_tx: ctx.work_sender.clone(),
             is_showing: false,
             request_queue: Vec::new(),
         }
+    }
+
+    /// Identity used to route `ImageEncoded`/`ImageEncodeFailed` events back
+    /// to this facade.
+    pub fn id(&self) -> u64 {
+        self.id
     }
 
     pub fn show_default(&mut self, ctx: &Ctx) -> Result<()> {
@@ -98,6 +123,7 @@ impl AlbumArtFacade {
         let halign = ctx.config.album_art.horizontal_align;
         let valign = ctx.config.album_art.vertical_align;
         let size = self.last_size;
+        self.last_requested_size = size;
 
         let data = data.into();
         self.current_album_art = Some(Arc::clone(&data));
@@ -110,40 +136,55 @@ impl AlbumArtFacade {
 
         match &mut self.image_backend {
             ImageBackend::Kitty(_kitty) => {
-                self.work_tx.send(WorkRequest::ResizeImage(Box::new(move || {
-                    Ok(EncodeData::Kitty(Kitty::create_data(
-                        &data, size, max_size, halign, valign,
-                    )?))
-                })))?;
+                self.work_tx.send(WorkRequest::ResizeImage(
+                    self.id,
+                    Box::new(move || {
+                        Ok(EncodeData::Kitty(Kitty::create_data(
+                            &data, size, max_size, halign, valign,
+                        )?))
+                    }),
+                ))?;
             }
             ImageBackend::Iterm2(_iterm2) => {
-                self.work_tx.send(WorkRequest::ResizeImage(Box::new(move || {
-                    Ok(EncodeData::Iterm2(Iterm2::create_data(
-                        &data, size, max_size, halign, valign,
-                    )?))
-                })))?;
+                self.work_tx.send(WorkRequest::ResizeImage(
+                    self.id,
+                    Box::new(move || {
+                        Ok(EncodeData::Iterm2(Iterm2::create_data(
+                            &data, size, max_size, halign, valign,
+                        )?))
+                    }),
+                ))?;
             }
             ImageBackend::Sixel(_sixel) => {
                 log::debug!("Sending sixel image encode request");
-                self.work_tx.send(WorkRequest::ResizeImage(Box::new(move || {
-                    Ok(EncodeData::Sixel(Sixel::create_data(
-                        &data, size, max_size, halign, valign,
-                    )?))
-                })))?;
+                self.work_tx.send(WorkRequest::ResizeImage(
+                    self.id,
+                    Box::new(move || {
+                        Ok(EncodeData::Sixel(Sixel::create_data(
+                            &data, size, max_size, halign, valign,
+                        )?))
+                    }),
+                ))?;
             }
             ImageBackend::Block(_block) => {
-                self.work_tx.send(WorkRequest::ResizeImage(Box::new(move || {
-                    Ok(EncodeData::Block(Block::create_data(
-                        &data, size, max_size, halign, valign,
-                    )?))
-                })))?;
+                self.work_tx.send(WorkRequest::ResizeImage(
+                    self.id,
+                    Box::new(move || {
+                        Ok(EncodeData::Block(Block::create_data(
+                            &data, size, max_size, halign, valign,
+                        )?))
+                    }),
+                ))?;
             }
             ImageBackend::Ueberzug(_ueberzug) => {
-                self.work_tx.send(WorkRequest::ResizeImage(Box::new(move || {
-                    Ok(EncodeData::Ueberzug(Ueberzug::create_data(
-                        &data, size, max_size, halign, valign,
-                    )?))
-                })))?;
+                self.work_tx.send(WorkRequest::ResizeImage(
+                    self.id,
+                    Box::new(move || {
+                        Ok(EncodeData::Ueberzug(Ueberzug::create_data(
+                            &data, size, max_size, halign, valign,
+                        )?))
+                    }),
+                ))?;
             }
             ImageBackend::None => {}
         }
@@ -157,9 +198,24 @@ impl AlbumArtFacade {
         if let Some(req_data) = self.request_queue.pop()
             && !self.request_queue.is_empty()
         {
+            // A newer image arrived while this one was encoding -> drop the
+            // stale queue and encode the latest request instead.
             log::debug!("More image requests in queue, encoding the latest one instead");
             self.request_queue.clear();
-            self.show(req_data, ctx)?;
+            return self.show(req_data, ctx);
+        }
+        self.request_queue.clear();
+
+        // Nothing newer is pending: degrade to the default placeholder rather
+        // than leaving the area a blank/black box. Guard against an infinite
+        // loop in case the placeholder itself is what just failed to encode
+        // (pointer identity, since `show` stores a clone of the in-flight art).
+        let was_default = self
+            .current_album_art
+            .as_ref()
+            .is_some_and(|cur| Arc::ptr_eq(cur, &self.default_album_art));
+        if self.is_showing && !was_default {
+            self.show_default(ctx)?;
         }
         Ok(())
     }
@@ -178,6 +234,14 @@ impl AlbumArtFacade {
             self.request_queue.clear();
             self.show(req_data, ctx)?;
             return Ok(());
+        }
+
+        if self.last_size != self.last_requested_size {
+            log::debug!(
+                "Pane was resized while the image was encoding, re-encoding for the new size"
+            );
+            self.request_queue.clear();
+            return self.show_current(ctx);
         }
 
         log::debug!(data:?, area:? = self.last_size; "Received encoded data");
