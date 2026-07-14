@@ -3,7 +3,8 @@ use std::{collections::HashMap, sync::Arc};
 
 use rmpc_mpd::{
     commands::{Song, State, status::OnOffOneshot, volume::Bound},
-    mpd_client::{MpdClient, ValueChange},
+    mpd_client::{MpdClient, MpdCommand, ValueChange},
+    proto_client::ProtoClient,
 };
 use tokio::sync::RwLock;
 use zbus::{
@@ -186,8 +187,55 @@ impl Player {
         match single {
             OnOffOneshot::On => "Track",
             OnOffOneshot::Off => "Playlist",
-            OnOffOneshot::Oneshot => "None",
+            OnOffOneshot::Oneshot => "Playlist",
         }
+    }
+
+    #[zbus(property)]
+    async fn set_loop_status(&self, value: &str) -> zbus::Result<()> {
+        let (repeat, single) = match value {
+            "None" => (false, OnOffOneshot::Off),
+            "Track" => (true, OnOffOneshot::On),
+            "Playlist" => (true, OnOffOneshot::Off),
+            other => {
+                return Err(fdo::Error::InvalidArgs(format!("Invalid loop status: {other}")).into());
+            }
+        };
+
+        self.client
+            .run(move |c| {
+                c.send_start_cmd_list()?;
+                c.send_repeat(repeat)?;
+                c.send_single(single)?;
+                c.send_execute_cmd_list()?;
+                c.read_ok()?;
+                Ok(())
+            })
+            .await
+            .map_err(|e| fdo::Error::Failed(format!("Failed to set loop status: {e}")))?;
+
+        let mut state = self.ctx.write().await;
+        state.status.repeat = repeat;
+        state.status.single = single;
+
+        Ok(())
+    }
+
+    #[zbus(property)]
+    async fn shuffle(&self) -> bool {
+        self.ctx.read().await.status.random
+    }
+
+    #[zbus(property)]
+    async fn set_shuffle(&self, value: bool) -> zbus::Result<()> {
+        self.client
+            .run(move |c| c.random(value))
+            .await
+            .map_err(|e| fdo::Error::Failed(format!("Failed to set shuffle: {e}")))?;
+
+        self.ctx.write().await.status.random = value;
+
+        Ok(())
     }
 
     #[zbus(property)]

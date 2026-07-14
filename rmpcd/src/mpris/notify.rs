@@ -14,6 +14,8 @@ use crate::{
 pub enum Change {
     Volume,
     PlaybackState,
+    LoopStatus,
+    Shuffle,
     Metadata,
     Queue,
 }
@@ -57,6 +59,14 @@ pub async fn notify_consumer(
                 emit_player_changed!(can_play_changed, "CanPlay");
                 emit_player_changed!(can_go_next_changed, "CanGoNext");
                 emit_player_changed!(can_go_previous_changed, "CanGoPrevious");
+            }
+            Change::LoopStatus => {
+                emit_player_changed!(loop_status_changed, "LoopStatus");
+                emit_player_changed!(can_go_next_changed, "CanGoNext");
+                emit_player_changed!(can_go_previous_changed, "CanGoPrevious");
+            }
+            Change::Shuffle => {
+                emit_player_changed!(shuffle_changed, "Shuffle");
             }
             Change::Metadata => {
                 emit_player_changed!(metadata_changed, "Metadata");
