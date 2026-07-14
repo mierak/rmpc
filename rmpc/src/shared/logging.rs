@@ -168,7 +168,7 @@ pub fn console_format(
         w,
         r"{:<5}: {} {}",
         flexi_logger::style(level).paint(level.to_string()),
-        &record.args().to_string(),
+        record.args(),
         visitor
     )
 }
@@ -193,7 +193,7 @@ pub fn structured_detailed_format(
         std::thread::current().name().unwrap_or("<unnamed>"),
         record.file().unwrap_or("<unnamed>"),
         record.line().unwrap_or(0),
-        &record.args().to_string(),
+        record.args(),
         visitor
     )
 }
