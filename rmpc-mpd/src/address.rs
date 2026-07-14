@@ -98,46 +98,34 @@ fn resolve_env() -> Option<(MpdAddress, Option<MpdPassword>)> {
     let mpd_port = ENV.var_os("MPD_PORT");
     let mpd_port = mpd_port.as_ref().and_then(|v| v.to_str());
 
-    if let Some(host) = mpd_host {
-        if !host.starts_with('@')
-            && let Some((password, host)) = host.split_once('@')
-        {
-            let expanded = tilde_expand(host);
-            if expanded.starts_with('/') {
-                Some((
-                    MpdAddress::SocketPath(expanded.into_owned()),
-                    Some(password.to_string().into()),
-                ))
-            } else if let Some(path) = expanded.strip_prefix('@') {
-                Some((
-                    MpdAddress::AbstractSocket(path.to_owned()),
-                    Some(password.to_string().into()),
-                ))
-            } else if let Some(port) = mpd_port {
-                Some((
-                    MpdAddress::IpAndPort(format!("{host}:{port}")),
-                    Some(password.to_string().into()),
-                ))
-            } else {
-                Some((
-                    MpdAddress::IpAndPort(format!("{host}:6600")),
-                    Some(password.to_string().into()),
-                ))
-            }
+    let host = mpd_host?;
+    if !host.starts_with('@')
+        && let Some((password, host)) = host.split_once('@')
+    {
+        let expanded = tilde_expand(host);
+        if expanded.starts_with('/') {
+            Some((MpdAddress::SocketPath(expanded.into_owned()), Some(password.to_string().into())))
+        } else if let Some(path) = expanded.strip_prefix('@') {
+            Some((MpdAddress::AbstractSocket(path.to_owned()), Some(password.to_string().into())))
+        } else if let Some(port) = mpd_port {
+            Some((
+                MpdAddress::IpAndPort(format!("{host}:{port}")),
+                Some(password.to_string().into()),
+            ))
         } else {
-            let expanded = tilde_expand(host);
-            if expanded.starts_with('/') {
-                Some((MpdAddress::SocketPath(expanded.into_owned()), None))
-            } else if let Some(path) = expanded.strip_prefix('@') {
-                Some((MpdAddress::AbstractSocket(path.to_owned()), None))
-            } else if let Some(port) = mpd_port {
-                Some((MpdAddress::IpAndPort(format!("{host}:{port}")), None))
-            } else {
-                Some((MpdAddress::IpAndPort(format!("{host}:6600")), None))
-            }
+            Some((MpdAddress::IpAndPort(format!("{host}:6600")), Some(password.to_string().into())))
         }
     } else {
-        return None;
+        let expanded = tilde_expand(host);
+        if expanded.starts_with('/') {
+            Some((MpdAddress::SocketPath(expanded.into_owned()), None))
+        } else if let Some(path) = expanded.strip_prefix('@') {
+            Some((MpdAddress::AbstractSocket(path.to_owned()), None))
+        } else if let Some(port) = mpd_port {
+            Some((MpdAddress::IpAndPort(format!("{host}:{port}")), None))
+        } else {
+            Some((MpdAddress::IpAndPort(format!("{host}:6600")), None))
+        }
     }
 }
 

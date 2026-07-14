@@ -3366,6 +3366,7 @@ dependencies = [
  "tracing-appender",
  "tracing-log",
  "tracing-subscriber",
+ "url",
  "walkdir",
  "which",
  "zbus",

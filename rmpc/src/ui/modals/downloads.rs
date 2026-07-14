@@ -286,7 +286,7 @@ impl DownloadsModal {
                                     let modal = InfoModal::builder()
                                         .ctx(ctx)
                                         .title("Logs")
-                                        .percent_width(80.0)
+                                        .percent_width(80.0f32)
                                         .message(logs)
                                         .replacement_id("download_logs")
                                         .build();

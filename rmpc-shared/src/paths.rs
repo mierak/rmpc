@@ -12,9 +12,7 @@ const CONFIG_NAME: &str = "config.ron";
 const CRATE_NAME: &str = env!("CARGO_CRATE_NAME");
 
 pub fn home_dir() -> Option<PathBuf> {
-    ENV.var_os("HOME")
-        .and_then(|home| if home.is_empty() { None } else { Some(home) })
-        .map(PathBuf::from)
+    ENV.var_os("HOME").filter(|home| !home.is_empty()).map(PathBuf::from)
 }
 
 pub fn config_dir() -> Option<PathBuf> {
@@ -31,6 +29,13 @@ pub fn data_dir() -> Option<PathBuf> {
         .or_else(|| home_dir().map(|home| home.join(".local").join("share")))
 }
 
+pub fn cache_dir() -> Option<PathBuf> {
+    ENV.var_os("XDG_CACHE_HOME")
+        .map(PathBuf::from)
+        .filter(|p| p.is_absolute())
+        .or_else(|| home_dir().map(|home| home.join(".cache")))
+}
+
 pub fn rmpc_config_dir() -> Option<PathBuf> {
     config_dir().map(|config_dir| config_dir.join("rmpc"))
 }
@@ -41,6 +46,10 @@ pub fn rmpcd_config_dir() -> Option<PathBuf> {
 
 pub fn rmpcd_data_dir() -> Option<PathBuf> {
     data_dir().map(|data_dir| data_dir.join("rmpcd"))
+}
+
+pub fn rmpcd_cache_dir() -> Option<PathBuf> {
+    cache_dir().map(|cache_dir| cache_dir.join("rmpcd"))
 }
 
 pub fn config_paths(cli_arg_config_path: Option<&Path>) -> Vec<PathBuf> {

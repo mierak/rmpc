@@ -1,4 +1,8 @@
-use std::sync::Arc;
+use std::{
+    path::Path,
+    sync::Arc,
+    time::{SystemTime, UNIX_EPOCH},
+};
 
 use anyhow::{Result, bail};
 use clap::{Parser, Subcommand};
@@ -6,7 +10,7 @@ use rmpc_mpd::{
     commands::{IdleEvent, Status},
     mpd_client::MpdClient,
 };
-use rmpc_shared::paths::rmpcd_config_dir;
+use rmpc_shared::paths::{rmpcd_cache_dir, rmpcd_config_dir};
 use serde::Serialize;
 use serde_json::json;
 use tokio::sync::RwLock;
@@ -16,7 +20,7 @@ use tracing_subscriber::{EnvFilter, Registry, layer::SubscriberExt};
 
 use crate::{
     async_client::AsyncClient,
-    ctx::Ctx,
+    ctx::{ALBUM_ART_CACHE_DIR, Ctx},
     lua::plugin::{LuaPlugin, PluginStore},
 };
 
@@ -170,6 +174,13 @@ async fn run() -> Result<()> {
         bail!("Could not determine config directory");
     };
 
+    let Some(cache_dir) = rmpcd_cache_dir() else {
+        bail!("Could not determine cache directory");
+    };
+
+    let albumart_dir = cache_dir.join(ALBUM_ART_CACHE_DIR);
+    prepare_album_art_cache_dir(albumart_dir.as_path()).await?;
+
     let plugins: Arc<RwLock<Vec<_>>> = Arc::new(RwLock::new(Vec::new()));
     let lua = lua::create(&cfg_dir, &mpd, Some(&plugins))?;
     let lua_config = lua::eval_config(&lua, &cfg_dir).await?;
@@ -211,6 +222,7 @@ async fn run() -> Result<()> {
         status: status.clone(),
         queue,
         album_art: None,
+        cache_dir,
         last_written_album_art_song_uri: None,
     }));
 
@@ -232,4 +244,40 @@ enum AppEvent {
     Idle(Vec<IdleEvent>),
     StatusUpdate(Status),
     Reconnected,
+}
+
+async fn prepare_album_art_cache_dir(dir: &Path) -> Result<()> {
+    tokio::fs::create_dir_all(dir).await?;
+
+    let max_age = std::time::Duration::from_secs(60 * 60 * 24 * 7); // 7 days
+    let now = SystemTime::now();
+
+    match tokio::fs::read_dir(dir).await {
+        Ok(mut entries) => loop {
+            match entries.next_entry().await {
+                Ok(Some(entry)) => {
+                    if entry.metadata().await.is_ok_and(|m| {
+                        m.is_file()
+                            && m.modified().is_ok_and(|modified| {
+                                modified < (now.checked_sub(max_age).unwrap_or(UNIX_EPOCH))
+                            })
+                    }) && let Err(err) = tokio::fs::remove_file(entry.path()).await
+                        && err.kind() != std::io::ErrorKind::NotFound
+                    {
+                        tracing::warn!(path = ?entry.path(), err = ?err, "Failed to prune stale album art file");
+                    }
+                }
+                Ok(None) => break,
+                Err(err) => {
+                    tracing::warn!(err = ?err, "Failed to read album art cache entry during prune");
+                    break;
+                }
+            }
+        },
+        Err(err) => {
+            tracing::warn!(err = ?err, "Failed to read album art cache dir for pruning");
+        }
+    }
+
+    Ok(())
 }
