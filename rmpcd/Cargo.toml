@@ -15,6 +15,7 @@ bitflags = { workspace = true }
 clap = { workspace = true }
 ctrlc = { workspace = true }
 derive_more = { workspace = true }
+log = { workspace = true }
 md5 = { workspace = true }
 mlua = { workspace = true }
 reqwest = { workspace = true }
@@ -27,11 +28,11 @@ serde_with = { workspace = true }
 sha2 = { workspace = true }
 tokio = { workspace = true, features = ["full"] }
 tokio-util = { workspace = true }
-log = { workspace = true }
 tracing = { workspace = true }
 tracing-appender = { workspace = true }
 tracing-log = { workspace = true }
 tracing-subscriber = { workspace = true, features = ["fmt", "env-filter"] }
+url = { workspace = true }
 which = { workspace = true }
 zbus = { workspace = true }
 
