@@ -122,7 +122,7 @@ pub enum State {
     Pause,
 }
 
-#[derive(Debug, Serialize, Default, Clone, Copy, strum::AsRefStr)]
+#[derive(Debug, Serialize, Default, Clone, Copy, PartialEq, Eq, strum::AsRefStr)]
 pub enum OnOffOneshot {
     #[strum(serialize = "On")]
     On,

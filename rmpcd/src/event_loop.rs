@@ -93,6 +93,8 @@ pub async fn init(
                         old: ro_song.as_ref().map(Song::from),
                         new: song.as_ref().map(Song::from),
                     });
+
+                    change_buffer.push(Change::Metadata);
                 }
 
                 if ro_status.state != new_status.state {
@@ -100,10 +102,7 @@ pub async fn init(
                         old: ro_status.clone().into(),
                         new: new_status.clone().into(),
                     });
-                }
 
-                change_buffer.push(Change::Metadata); // TODO
-                if ro_status.state != new_status.state {
                     change_buffer.push(Change::PlaybackState);
                     match new_status.state {
                         State::Play => {
@@ -137,6 +136,32 @@ pub async fn init(
                         IdleEvent::Player => {
                             let new_status = client.run(|c| c.get_status()).await?;
                             app_ev_tx.send_safe(AppEvent::StatusUpdate(new_status));
+                        }
+                        IdleEvent::Options => {
+                            let new_status = client.run(|c| c.get_status()).await?;
+
+                            let (old_repeat, old_single, old_random) = {
+                                let mut state = ctx.write().await;
+                                let old =
+                                    (state.status.repeat, state.status.single, state.status.random);
+                                state.status.repeat = new_status.repeat;
+                                state.status.single = new_status.single;
+                                state.status.random = new_status.random;
+                                state.status.consume = new_status.consume;
+                                state.status.xfade = new_status.xfade;
+                                old
+                            };
+
+                            if let Some(tx) = &mpris_tx {
+                                if old_repeat != new_status.repeat
+                                    || old_single != new_status.single
+                                {
+                                    tx.send_safe(Change::LoopStatus);
+                                }
+                                if old_random != new_status.random {
+                                    tx.send_safe(Change::Shuffle);
+                                }
+                            }
                         }
                         IdleEvent::Mixer => {
                             let new_status = client.run(|c| c.get_status()).await?;
