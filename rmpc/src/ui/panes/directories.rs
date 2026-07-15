@@ -239,7 +239,7 @@ impl BrowserPane<DirOrSong> for DirectoriesPane {
                 }
                 DirOrSong::Dir { full_path, playlist: false, .. } => {
                     dir_or_playlist_found = true;
-                    Enqueue::File { path: full_path.to_owned() }
+                    Enqueue::Directory { path: full_path.to_owned() }
                 }
                 DirOrSong::Song(song) => Enqueue::File { path: song.file.clone() },
             })
@@ -265,5 +265,34 @@ impl BrowserPane<DirOrSong> for DirectoriesPane {
         };
 
         (items, hovered_idx)
+    }
+
+    fn resolve_enqueue(&self, items: Vec<Enqueue>, ctx: &Ctx) -> Result<Vec<Enqueue>> {
+        if !items.iter().any(|item| matches!(item, Enqueue::Directory { .. })) {
+            return Ok(items);
+        }
+
+        let sort = ctx.config.directories_sort.clone();
+        ctx.query_sync(move |client| {
+            let mut resolved = Vec::with_capacity(items.len());
+            for item in items {
+                let Enqueue::Directory { path } = item else {
+                    resolved.push(item);
+                    continue;
+                };
+                // Fetch every song under the directory and add them in the same
+                // order the pane shows them, instead of letting MPD pick.
+                let songs = client
+                    .find(&[Filter::new_with_kind(Tag::File, &path, FilterKind::StartsWith)])?
+                    .into_iter()
+                    .map(DirOrSong::Song)
+                    .sorted_by(|a, b| a.with_custom_sort(&sort).cmp(&b.with_custom_sort(&sort)));
+                resolved.extend(songs.filter_map(|song| match song {
+                    DirOrSong::Song(song) => Some(Enqueue::File { path: song.file }),
+                    DirOrSong::Dir { .. } => None,
+                }));
+            }
+            Ok(resolved)
+        })
     }
 }
