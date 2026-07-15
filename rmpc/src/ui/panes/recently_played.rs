@@ -14,10 +14,10 @@ use super::Pane;
 use crate::{
     MpdQueryResult,
     config::{
-        tabs::PaneType,
+        tabs::{PaneType, StickerPaneSort},
         theme::properties::{Property, SongProperty},
     },
-    ctx::{Ctx, LAST_PLAYED_STICKER},
+    ctx::Ctx,
     shared::{
         events::ClientRequest,
         id::{self, Id},
@@ -41,7 +41,9 @@ const INIT: &str = "recently_played_init";
 const DEBOUNCE_DELAY: Duration = Duration::from_millis(50);
 
 #[derive(Debug)]
-pub struct RecentlyPlayedPane {
+pub struct StickerPane {
+    sticker: String,
+    sort: StickerPaneSort,
     stack: DirStack<DirOrSong, ListState>,
     browser: Browser<DirOrSong>,
     target_pane: PaneType,
@@ -51,12 +53,14 @@ pub struct RecentlyPlayedPane {
     needs_refresh: bool,
 }
 
-impl RecentlyPlayedPane {
+impl StickerPane {
     pub fn new(
-        _ctx: &Ctx,
+        sticker: String,
+        sort: StickerPaneSort,
         target_pane: PaneType,
         format: Vec<Property<SongProperty>>,
         limit: Option<u32>,
+        _ctx: &Ctx,
     ) -> Self {
         let browser = if format.is_empty() {
             Browser::new()
@@ -64,6 +68,8 @@ impl RecentlyPlayedPane {
             Browser::new().with_song_format(format)
         };
         Self {
+            sticker,
+            sort,
             stack: DirStack::default(),
             browser,
             target_pane,
@@ -79,19 +85,21 @@ impl RecentlyPlayedPane {
             .id(INIT)
             .replace_id(INIT)
             .target(self.target_pane.clone())
-            .query(make_fetch_callback(self.limit));
+            .query(make_fetch_callback(self.sticker.clone(), self.sort, self.limit));
     }
 
     fn fetch_debounced(&self, ctx: &Ctx) {
         let target = self.target_pane.clone();
         let limit = self.limit;
+        let sticker = self.sticker.clone();
+        let sort = self.sort;
         ctx.scheduler.schedule_replace(self.debounce_id, DEBOUNCE_DELAY, move |(_, client_tx)| {
             try_skip!(
                 client_tx.send(ClientRequest::Query(MpdQuery {
                     id: INIT,
                     replace_id: Some(INIT),
                     target: Some(target),
-                    callback: Box::new(make_fetch_callback(limit)),
+                    callback: Box::new(make_fetch_callback(sticker, sort, limit)),
                 })),
                 "Failed to send recently played debounce query"
             );
@@ -100,7 +108,7 @@ impl RecentlyPlayedPane {
     }
 }
 
-impl Pane for RecentlyPlayedPane {
+impl Pane for StickerPane {
     fn render(&mut self, frame: &mut Frame, area: Rect, ctx: &Ctx) -> Result<()> {
         self.browser.render(area, frame.buffer_mut(), &mut self.stack, ctx);
         Ok(())
@@ -173,7 +181,7 @@ impl Pane for RecentlyPlayedPane {
     }
 }
 
-impl BrowserPane<DirOrSong> for RecentlyPlayedPane {
+impl BrowserPane<DirOrSong> for StickerPane {
     fn stack(&self) -> &DirStack<DirOrSong, ListState> {
         &self.stack
     }
@@ -218,14 +226,29 @@ impl BrowserPane<DirOrSong> for RecentlyPlayedPane {
     }
 }
 
+impl From<StickerPaneSort> for StickerSort {
+    fn from(value: StickerPaneSort) -> Self {
+        match value {
+            StickerPaneSort::Uri => StickerSort::Uri,
+            StickerPaneSort::UriDesc => StickerSort::UriDesc,
+            StickerPaneSort::ValueIntDesc => StickerSort::ValueIntDesc,
+            StickerPaneSort::ValueInt => StickerSort::ValueInt,
+            StickerPaneSort::ValueDesc => StickerSort::ValueDesc,
+            StickerPaneSort::Value => StickerSort::Value,
+        }
+    }
+}
+
 fn make_fetch_callback(
+    sticker: String,
+    sort: StickerPaneSort,
     limit: Option<u32>,
 ) -> impl FnOnce(&mut Client<'_>) -> Result<MpdQueryResult> + Send + 'static {
     move |client| {
         let uris: Vec<String> = client
-            .find_stickers("", LAST_PLAYED_STICKER, StickerFindOptions {
+            .find_stickers("", &sticker, StickerFindOptions {
                 filter: None,
-                sort: Some(StickerSort::ValueIntDesc),
+                sort: Some(sort.into()),
                 window: limit.map(|l| (0, l)),
             })?
             .0
