@@ -16,7 +16,7 @@ use progress_bar::ProgressBarPane;
 use property::PropertyPane;
 use queue::QueuePane;
 use ratatui::{Frame, layout::Layout, prelude::Rect, style::Color, text::Span, widgets::Block};
-use recently_played::RecentlyPlayedPane;
+use recently_played::StickerPane;
 use rmpc_mpd::commands::{Song, State, status::OnOffOneshot, volume::Bound};
 use search::SearchPane;
 use strum::{Display, IntoDiscriminant};
@@ -296,13 +296,15 @@ impl<'panes> PaneContainer<'panes> {
                     pane.pane.clone(),
                     Box::new(VolumePane::new(kind.clone())) as Box<dyn BoxedPane>,
                 )),
-                PaneType::RecentlyPlayed { format, limit } => Some((
+                PaneType::Sticker { sticker, format, limit, sort } => Some((
                     pane.pane.clone(),
-                    Box::new(RecentlyPlayedPane::new(
-                        ctx,
+                    Box::new(StickerPane::new(
+                        sticker.clone(),
+                        *sort,
                         pane.pane.clone(),
                         format.clone(),
                         *limit,
+                        ctx,
                     )) as Box<dyn BoxedPane>,
                 )),
                 _ => None,
@@ -346,7 +348,7 @@ impl<'panes> PaneContainer<'panes> {
                     .get_mut(pane)
                     .with_context(|| format!("expected pane to be defined {p:?}"))?,
             )),
-            p @ PaneType::RecentlyPlayed { .. } => Ok(Panes::Others(
+            p @ PaneType::Sticker { .. } => Ok(Panes::Others(
                 self.others
                     .get_mut(pane)
                     .with_context(|| format!("expected pane to be defined {p:?}"))?,

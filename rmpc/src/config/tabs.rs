@@ -149,6 +149,17 @@ impl TryFrom<BrowserTagConfigFile> for BrowserTagConfig {
     }
 }
 
+#[derive(Debug, Default, PartialEq, Eq, Clone, Copy, Serialize, Deserialize, Hash)]
+pub enum StickerPaneSort {
+    #[default]
+    Uri,
+    UriDesc,
+    Value,
+    ValueDesc,
+    ValueInt,
+    ValueIntDesc,
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 #[allow(clippy::large_enum_variant)]
 pub enum PaneTypeFile {
@@ -161,11 +172,14 @@ pub enum PaneTypeFile {
     Albums,
     AlbumArtists,
     Playlists,
-    RecentlyPlayed {
+    Sticker {
+        sticker: String,
         #[serde(default)]
         format: Option<Vec<PropertyFile<SongPropertyFile>>>,
         #[serde(default)]
         limit: Option<u32>,
+        #[serde(default)]
+        sort: StickerPaneSort,
     },
     Search,
     AlbumArt,
@@ -209,9 +223,11 @@ pub enum PaneType {
     AlbumArtists,
     Albums,
     Playlists,
-    RecentlyPlayed {
+    Sticker {
+        sticker: String,
         format: Vec<Property<SongProperty>>,
         limit: Option<u32>,
+        sort: StickerPaneSort,
     },
     Search,
     AlbumArt,
@@ -241,7 +257,7 @@ pub const PANES_ALLOWED_IN_BOTH_TAB_AND_LAYOUT: [PaneTypeDiscriminants; 2] =
     [PaneTypeDiscriminants::Property, PaneTypeDiscriminants::Empty];
 
 #[cfg(debug_assertions)]
-pub const UNFOSUSABLE_TABS: [PaneTypeDiscriminants; 12] = [
+pub const UNFOCUSABLE_TABS: [PaneTypeDiscriminants; 12] = [
     PaneTypeDiscriminants::AlbumArt,
     PaneTypeDiscriminants::Lyrics,
     PaneTypeDiscriminants::ProgressBar,
@@ -257,7 +273,7 @@ pub const UNFOSUSABLE_TABS: [PaneTypeDiscriminants; 12] = [
 ];
 
 #[cfg(not(debug_assertions))]
-pub const UNFOSUSABLE_TABS: [PaneTypeDiscriminants; 11] = [
+pub const UNFOCUSABLE_TABS: [PaneTypeDiscriminants; 11] = [
     PaneTypeDiscriminants::AlbumArt,
     PaneTypeDiscriminants::Lyrics,
     PaneTypeDiscriminants::ProgressBar,
@@ -273,7 +289,7 @@ pub const UNFOSUSABLE_TABS: [PaneTypeDiscriminants; 11] = [
 
 impl Pane {
     pub fn is_focusable(&self) -> bool {
-        !UNFOSUSABLE_TABS.contains(&PaneTypeDiscriminants::from(&self.pane))
+        !UNFOCUSABLE_TABS.contains(&PaneTypeDiscriminants::from(&self.pane))
     }
 }
 
@@ -291,13 +307,15 @@ impl TryFrom<PaneTypeFile> for PaneType {
             PaneTypeFile::AlbumArtists => PaneType::AlbumArtists,
             PaneTypeFile::Albums => PaneType::Albums,
             PaneTypeFile::Playlists => PaneType::Playlists,
-            PaneTypeFile::RecentlyPlayed { format, limit } => PaneType::RecentlyPlayed {
+            PaneTypeFile::Sticker { sticker, format, limit, sort } => PaneType::Sticker {
+                sticker,
                 format: format
                     .unwrap_or_default()
                     .into_iter()
                     .map(|p| p.convert())
                     .try_collect()?,
                 limit,
+                sort,
             },
             PaneTypeFile::Search => PaneType::Search,
             PaneTypeFile::AlbumArt => PaneType::AlbumArt,
@@ -1306,7 +1324,7 @@ pub(crate) fn validate_tabs(layout: &SizedPaneOrSplit, tabs: &Tabs) -> Result<()
     ensure!(
         !layout_panes.iter().all(|pane| pane.is_focusable()),
         "Only non-focusable panes are supported in the layout. Possible values: {}",
-        UNFOSUSABLE_TABS.iter().join(", ")
+        UNFOCUSABLE_TABS.iter().join(", ")
     );
     ensure!(
         layout_panes.iter().filter(|pane| pane.pane == PaneType::TabContent).count() == 1,
