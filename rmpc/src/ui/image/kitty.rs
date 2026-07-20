@@ -226,9 +226,10 @@ fn transfer_image_data(
     let mut iter = content.chars().peekable();
 
     let first: String = iter.by_ref().take(4096).collect();
+    let m = i32::from(iter.peek().is_some());
     tmux_write!(
         w,
-        "\x1b_Gi=1,f=32,U=1,t=d,a=T,m=1,q=2,o=z,s={img_width},v={img_height};{first}\x1b\\"
+        "\x1b_Gi=1,f=32,U=1,t=d,a=T,m={m},q=2,o=z,s={img_width},v={img_height};{first}\x1b\\"
     )?;
 
     while iter.peek().is_some() {

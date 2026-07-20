@@ -55,6 +55,8 @@ All notable changes to this project will be documented in this file.
 
 ### Fixed
 
+- Kitty image backend never displaying images whose encoded data fits into a single 4096 byte
+  chunk, because the first chunk always claimed more data would follow (`m=1`)
 - Benign error log when reading a sticker that does not exist
 - Theme hot reload not working when it was set using the `theme.ron` form
 - Issue with Iterm2 image protocol not rendering images sometimes
