@@ -537,7 +537,7 @@ impl Pane for QueuePane {
                 self.queue.unmark_all();
             }
             UiEvent::QueueChanged => {
-                self.queue.items.clone_from(&ctx.queue);
+                remap_marks_by_id(&mut self.queue, &ctx.queue);
             }
             UiEvent::SongChanged => {
                 if let Some(idx) = ctx.current_song_index()
@@ -1445,5 +1445,82 @@ impl QueueRow {
         );
 
         row.style(row_style)
+    }
+}
+
+/// Replace the queue's items with `new_items`, keeping existing marks on the
+/// same songs (matched by id) and dropping marks whose songs are gone.
+///
+/// Marks are stored as indices into `items`; without this remap, replacing
+/// `items` would leave those indices pointing at whatever songs slid into
+/// those slots (e.g. deleting the first two marked songs slides the rest up,
+/// so the marks appear to "move" to the next block instead of clearing).
+fn remap_marks_by_id(queue: &mut Dir<Song, TableState>, new_items: &[Song]) {
+    let marked_ids: HashSet<u32> = queue.marked_items().map(|s| s.id).collect();
+    queue.items.clear();
+    queue.items.extend_from_slice(new_items);
+    if !marked_ids.is_empty() {
+        let remapped = queue
+            .items
+            .iter()
+            .enumerate()
+            .filter(|(_, s)| marked_ids.contains(&s.id))
+            .map(|(i, _)| i)
+            .collect();
+        *queue.marked_mut() = remapped;
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use ratatui::widgets::TableState;
+    use rmpc_mpd::commands::Song;
+
+    use super::remap_marks_by_id;
+    use crate::ui::dirstack::Dir;
+
+    fn song(id: u32) -> Song {
+        Song { id, file: format!("song{id}"), ..Default::default() }
+    }
+
+    fn marked(queue: &Dir<Song, TableState>) -> Vec<usize> {
+        queue.marked().iter().copied().collect()
+    }
+
+    #[test]
+    fn marks_follow_their_songs_when_earlier_songs_are_removed() {
+        // ids 10,11,12,13,14; mark the first three (10,11,12).
+        let mut queue: Dir<Song, TableState> = Dir::new((10..15).map(song).collect());
+        queue.marked_mut().extend([0, 1, 2]);
+
+        // Remove songs 10 and 11 -> the rest slide up to indices 0,1,2.
+        let new_items: Vec<Song> = vec![song(12), song(13), song(14)];
+        remap_marks_by_id(&mut queue, &new_items);
+
+        // Only song 12 survives among the marked; it now sits at index 0.
+        assert_eq!(marked(&queue), vec![0]);
+    }
+
+    #[test]
+    fn marks_follow_their_songs_when_the_queue_is_reordered() {
+        let mut queue: Dir<Song, TableState> = Dir::new((10..15).map(song).collect());
+        queue.marked_mut().extend([0, 1, 2]); // songs 10,11,12
+
+        // Reverse the queue: 12,11,10 now sit at indices 2,3,4.
+        let new_items: Vec<Song> = (10..15).rev().map(song).collect();
+        remap_marks_by_id(&mut queue, &new_items);
+
+        assert_eq!(marked(&queue), vec![2, 3, 4]);
+    }
+
+    #[test]
+    fn all_marks_dropped_when_every_marked_song_is_gone() {
+        let mut queue: Dir<Song, TableState> = Dir::new((10..13).map(song).collect());
+        queue.marked_mut().extend([0, 1]); // songs 10,11
+
+        let new_items: Vec<Song> = vec![song(20), song(21)];
+        remap_marks_by_id(&mut queue, &new_items);
+
+        assert!(marked(&queue).is_empty());
     }
 }
