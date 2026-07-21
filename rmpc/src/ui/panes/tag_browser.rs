@@ -632,6 +632,39 @@ mod tests {
             .expect("expected to find album_a dir")
     }
 
+    /// Mirrors the levels the `Browser(root_tag: ...)` config shorthand builds
+    /// in `tabs.rs`: a second (album) level grouped by `[Album, date]`. The
+    /// album level must render real album titles, not empty display names
+    /// (which would show as "Untitled").
+    #[rstest]
+    fn root_tag_shorthand_album_level_shows_titles(mut ctx: Ctx, config: Config) {
+        ctx.config = std::sync::Arc::new(config);
+        let album_level = BrowserTagConfig {
+            group_by: vec![vec![SongProperty::Album, SongProperty::Other("date".to_string())]],
+            sort_by: None,
+            format: vec![Property {
+                kind: PropertyKindOrText::Property(SongProperty::Album),
+                style: None,
+                default: Some(Box::new(Property {
+                    kind: PropertyKindOrText::Text("<no album>".to_string()),
+                    style: None,
+                    default: None,
+                })),
+            }],
+            skip: CollapseLevel::default(),
+        };
+        let mut pane =
+            TagBrowserPane::new(vec![tag("artist"), album_level], PaneType::Artists, &ctx);
+
+        pane.process_songs(
+            "artist".to_string(),
+            vec![song("album_a", "2020"), song("album_b", "2021")],
+            &ctx,
+        );
+
+        assert_eq!(pane_albums(&pane), vec!["album_a", "album_b"]);
+    }
+
     #[rstest]
     fn albums_no_date_sort_name(mut ctx: Ctx, config: Config) {
         ctx.config = std::sync::Arc::new(config);
