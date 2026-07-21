@@ -360,7 +360,15 @@ impl TryFrom<PaneTypeFile> for PaneType {
                                     SongProperty::Other("date".to_string()),
                                 ]],
                                 sort_by: None,
-                                format: vec![],
+                                format: vec![Property {
+                                    kind: PropertyKindOrText::Property(SongProperty::Album),
+                                    style: None,
+                                    default: Some(Box::new(Property {
+                                        kind: PropertyKindOrText::Text("<no album>".to_string()),
+                                        style: None,
+                                        default: None,
+                                    })),
+                                }],
                                 skip: CollapseLevel::default(),
                             },
                         ],
