@@ -163,6 +163,11 @@ where
 
         (items, idx)
     }
+    // Panes that enqueue directories override this to expand them into their
+    // songs, ordered the way the pane displays them. Others pass through.
+    fn resolve_enqueue(&self, items: Vec<Enqueue>, _ctx: &Ctx) -> Result<Vec<Enqueue>> {
+        Ok(items)
+    }
     fn show_info(&self, item: &T, ctx: &Ctx) -> Result<()> {
         Ok(())
     }
@@ -599,6 +604,7 @@ where
             CommonAction::PaneLeft => {}
             CommonAction::AddOptions { kind: AddKind::Action(options) } => {
                 let (enqueue, hovered_idx) = self.enqueue_items(options.all);
+                let enqueue = self.resolve_enqueue(enqueue, ctx)?;
                 if !enqueue.is_empty() {
                     let queue_len = ctx.queue.len();
                     let current_song_idx = ctx.current_song_index();
