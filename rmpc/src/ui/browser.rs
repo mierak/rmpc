@@ -1,4 +1,4 @@
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 
 use anyhow::Result;
 use enum_map::EnumMap;
@@ -332,6 +332,7 @@ where
                     self.stack_mut().current_mut().select_idx(idx_to_select, ctx.config.scrolloff);
                     if let Some(item) = self.stack().current().selected() {
                         let (items, _) = self.enqueue(std::iter::once(item));
+                        let items = self.resolve_enqueue(items, ctx)?;
                         if !items.is_empty() {
                             ctx.command(move |_, client| {
                                 client.enqueue_multiple(items, None, None, false)?;
@@ -620,13 +621,21 @@ where
                 }
             }
             CommonAction::AddOptions { kind: AddKind::Modal(items) } => {
-                let opts = items
-                    .iter()
-                    .map(|(label, opts)| {
-                        let enqueue = self.enqueue_items(opts.all);
-                        (label.to_owned(), *opts, enqueue)
-                    })
-                    .collect_vec();
+                // Options that share `all` resolve to the same items, so resolve
+                // once per value instead of once per option.
+                let mut resolved: HashMap<bool, (Vec<Enqueue>, Option<usize>)> = HashMap::new();
+                let mut opts = Vec::with_capacity(items.len());
+                for (label, options) in items {
+                    let enqueue = if let Some(enqueue) = resolved.get(&options.all) {
+                        enqueue.clone()
+                    } else {
+                        let (enqueue, hovered_idx) = self.enqueue_items(options.all);
+                        let enqueue = (self.resolve_enqueue(enqueue, ctx)?, hovered_idx);
+                        resolved.insert(options.all, enqueue.clone());
+                        enqueue
+                    };
+                    opts.push((label, options, enqueue));
+                }
 
                 modal!(ctx, create_add_modal(opts, ctx));
             }
@@ -803,10 +812,11 @@ where
             .items(false)
             .map(|(_, item)| self.list_songs_in_item(item.to_owned()))
             .collect_vec();
+        let (current_items, _) = self.enqueue_items(false);
+        let current_items = self.resolve_enqueue(current_items, ctx)?;
 
         let modal = MenuModal::new(ctx)
             .list_section(ctx, |mut section| {
-                let (current_items, _) = self.enqueue_items(false);
                 if !current_items.is_empty() {
                     let cloned_items = current_items.clone();
                     section.add_item("Add to queue", move |ctx| {
