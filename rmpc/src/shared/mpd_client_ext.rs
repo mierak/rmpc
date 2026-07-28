@@ -109,6 +109,7 @@ pub enum MpdDelete {
 #[derive(Debug, Clone)]
 pub enum Enqueue {
     File { path: String },
+    Directory { path: String },
     Playlist { name: String },
     Find { filter: Vec<(Tag, FilterKind, String)> },
 }
@@ -162,7 +163,9 @@ impl<T: MpdClient + MpdCommand + ProtoClient> MpdClientExt for T {
             self.send_start_cmd_list()?;
             for item in &items[i..] {
                 match item {
-                    Enqueue::File { path } => self.send_add(path, position),
+                    Enqueue::File { path } | Enqueue::Directory { path } => {
+                        self.send_add(path, position)
+                    }
                     Enqueue::Playlist { name } => self.send_load_playlist(name, position),
                     Enqueue::Find { filter } => self.send_find_add(
                         &filter
@@ -451,7 +454,7 @@ impl<T: MpdClient + MpdCommand + ProtoClient> MpdClientExt for T {
         let mut uris = Vec::new();
         for item in items {
             match item {
-                Enqueue::File { path } => uris.push(path),
+                Enqueue::File { path } | Enqueue::Directory { path } => uris.push(path),
                 Enqueue::Playlist { name } => {
                     let playlist = self.list_playlist(&name)?.0;
                     uris.extend(playlist);
@@ -482,7 +485,7 @@ impl<T: MpdClient + MpdCommand + ProtoClient> MpdClientExt for T {
         let mut uris = Vec::new();
         for item in items {
             match item {
-                Enqueue::File { path } => uris.push(path),
+                Enqueue::File { path } | Enqueue::Directory { path } => uris.push(path),
                 Enqueue::Playlist { name } => {
                     let playlist = self.list_playlist(&name)?.0;
                     uris.extend(playlist);

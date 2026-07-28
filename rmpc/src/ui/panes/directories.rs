@@ -12,7 +12,7 @@ use rmpc_mpd::{
 use super::Pane;
 use crate::{
     MpdQueryResult,
-    config::tabs::PaneType,
+    config::{sort_mode::SortOptions, tabs::PaneType},
     ctx::Ctx,
     shared::{keys::ActionEvent, mouse_event::MouseEvent, mpd_client_ext::Enqueue},
     ui::{
@@ -239,7 +239,7 @@ impl BrowserPane<DirOrSong> for DirectoriesPane {
                 }
                 DirOrSong::Dir { full_path, playlist: false, .. } => {
                     dir_or_playlist_found = true;
-                    Enqueue::File { path: full_path.to_owned() }
+                    Enqueue::Directory { path: full_path.to_owned() }
                 }
                 DirOrSong::Song(song) => Enqueue::File { path: song.file.clone() },
             })
@@ -265,5 +265,191 @@ impl BrowserPane<DirOrSong> for DirectoriesPane {
         };
 
         (items, hovered_idx)
+    }
+
+    fn resolve_enqueue(&self, items: Vec<Enqueue>, ctx: &Ctx) -> Result<Vec<Enqueue>> {
+        if !items.iter().any(|item| matches!(item, Enqueue::Directory { .. })) {
+            return Ok(items);
+        }
+
+        let sort = ctx.config.directories_sort.clone();
+        let playlist_mode = ctx.config.show_playlists_in_browser;
+        ctx.query_sync(move |client| {
+            let mut list_dir = |path: &str| -> Result<Vec<DirOrSong>> {
+                Ok(client
+                    .lsinfo(Some(path))?
+                    .0
+                    .into_iter()
+                    .filter_map(|entry| entry.into_dir_or_song(playlist_mode))
+                    .collect())
+            };
+
+            let mut resolved = Vec::with_capacity(items.len());
+            for item in items {
+                match item {
+                    Enqueue::Directory { path } => {
+                        resolve_directory(&path, &sort, &mut list_dir, &mut resolved)?;
+                    }
+                    other => resolved.push(other),
+                }
+            }
+            Ok(resolved)
+        })
+    }
+}
+
+// Expand a directory the way the pane shows it: sort each level on its own and
+// descend depth first, so songs stay grouped by their directory instead of
+// being flattened into a single sort. Songs, subdirectories and playlists at a
+// level are all handled.
+fn resolve_directory<F>(
+    path: &str,
+    sort: &SortOptions,
+    list_dir: &mut F,
+    out: &mut Vec<Enqueue>,
+) -> Result<()>
+where
+    F: FnMut(&str) -> Result<Vec<DirOrSong>>,
+{
+    let mut entries = list_dir(path)?;
+    entries.sort_by(|a, b| a.with_custom_sort(sort).cmp(&b.with_custom_sort(sort)));
+    for entry in entries {
+        match entry {
+            DirOrSong::Song(song) => out.push(Enqueue::File { path: song.file }),
+            DirOrSong::Dir { full_path, playlist: true, .. } => {
+                out.push(Enqueue::Playlist { name: full_path });
+            }
+            DirOrSong::Dir { full_path, playlist: false, .. } => {
+                resolve_directory(&full_path, sort, list_dir, out)?;
+            }
+        }
+    }
+    Ok(())
+}
+
+#[cfg(test)]
+#[allow(clippy::unwrap_used)]
+mod tests {
+    use std::collections::HashMap;
+
+    use rmpc_mpd::commands::{Song, metadata_tag::MetadataTag};
+
+    use super::resolve_directory;
+    use crate::{
+        config::{
+            sort_mode::{SortMode, SortOptions},
+            theme::properties::SongProperty,
+        },
+        shared::mpd_client_ext::Enqueue,
+        ui::dir_or_song::DirOrSong,
+    };
+
+    fn song(file: &str, track: &str) -> DirOrSong {
+        DirOrSong::Song(Song {
+            id: 0,
+            file: file.to_string(),
+            duration: None,
+            metadata: HashMap::from([(
+                "track".to_string(),
+                MetadataTag::Single(track.to_string()),
+            )]),
+            last_modified: chrono::Utc::now(),
+            added: None,
+        })
+    }
+
+    fn dir(full_path: &str) -> DirOrSong {
+        DirOrSong::Dir {
+            name: full_path.rsplit('/').next().unwrap_or(full_path).to_string(),
+            display_name: None,
+            full_path: full_path.to_string(),
+            last_modified: chrono::Utc::now(),
+            playlist: false,
+            metadata: HashMap::new(),
+        }
+    }
+
+    fn playlist(full_path: &str) -> DirOrSong {
+        DirOrSong::Dir {
+            name: full_path.to_string(),
+            display_name: None,
+            full_path: full_path.to_string(),
+            last_modified: chrono::Utc::now(),
+            playlist: true,
+            metadata: HashMap::new(),
+        }
+    }
+
+    fn sort_by_track() -> SortOptions {
+        SortOptions {
+            mode: SortMode::Format(vec![SongProperty::Track]),
+            group_by_type: true,
+            reverse: false,
+            ignore_leading_the: false,
+            fold_case: true,
+        }
+    }
+
+    fn resolve(root: &str, tree: &HashMap<&str, Vec<DirOrSong>>) -> Vec<String> {
+        let mut list_dir = |path: &str| -> anyhow::Result<Vec<DirOrSong>> {
+            Ok(tree.get(path).cloned().unwrap_or_default())
+        };
+        let mut out = Vec::new();
+        resolve_directory(root, &sort_by_track(), &mut list_dir, &mut out).unwrap();
+        out.into_iter()
+            .map(|item| match item {
+                Enqueue::File { path } => path,
+                Enqueue::Playlist { name } => name,
+                other => panic!("unexpected enqueue entry: {other:?}"),
+            })
+            .collect()
+    }
+
+    // Artist/ holds Album1 and Album2, each with tracks out of order. Adding
+    // Artist keeps every album's tracks together and sorted within the album
+    // instead of interleaving track 1 of both albums, then track 2, etc.
+    #[test]
+    fn groups_songs_by_directory() {
+        let tree = HashMap::from([
+            ("Artist", vec![dir("Artist/Album2"), dir("Artist/Album1")]),
+            ("Artist/Album1", vec![
+                song("Artist/Album1/2.flac", "2"),
+                song("Artist/Album1/1.flac", "1"),
+            ]),
+            ("Artist/Album2", vec![
+                song("Artist/Album2/2.flac", "2"),
+                song("Artist/Album2/1.flac", "1"),
+            ]),
+        ]);
+
+        assert_eq!(resolve("Artist", &tree), vec![
+            "Artist/Album1/1.flac",
+            "Artist/Album1/2.flac",
+            "Artist/Album2/1.flac",
+            "Artist/Album2/2.flac",
+        ]);
+    }
+
+    // A level mixing a subdirectory, loose songs and a playlist keeps the pane's
+    // order: with group_by_type the directory expands first, then the songs,
+    // then the playlist.
+    #[test]
+    fn handles_mixed_directory() {
+        let tree = HashMap::from([
+            ("Mixed", vec![
+                song("Mixed/2.flac", "2"),
+                playlist("Mixed/list"),
+                dir("Mixed/Sub"),
+                song("Mixed/1.flac", "1"),
+            ]),
+            ("Mixed/Sub", vec![song("Mixed/Sub/a.flac", "1")]),
+        ]);
+
+        assert_eq!(resolve("Mixed", &tree), vec![
+            "Mixed/Sub/a.flac",
+            "Mixed/1.flac",
+            "Mixed/2.flac",
+            "Mixed/list",
+        ]);
     }
 }
