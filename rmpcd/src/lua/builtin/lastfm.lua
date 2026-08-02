@@ -311,7 +311,7 @@ end
 
 M.song_change = function(self, old, new)
     if new ~= nil and (self.update_now_playing or false) then
-        lastfm_update_now_playing(self.api_key, self.shared_secret, self.session_key, new, new.duration)
+        lastfm_update_now_playing(self.api_key, self.shared_secret, self.session_key, new, new.duration / 1000)
     end
 
     local current_time = os.time()
