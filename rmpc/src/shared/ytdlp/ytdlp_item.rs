@@ -37,6 +37,8 @@ pub enum YtDlpHost {
     NicoVideo,
 }
 
+const EXCLUDED_EXTS: &[&str] = &["lrc", "jpg", "jpeg", "png", "webp", "part", "ytdl"];
+
 impl YtDlpItem {
     pub fn to_url(&self) -> String {
         self.kind.watch_url(&self.id)
@@ -46,12 +48,19 @@ impl YtDlpItem {
         root.join(self.kind.cache_dir_name())
     }
 
+    fn is_cached_candidate(&self, path: &Path) -> bool {
+        path.file_stem().is_some_and(|stem| stem == OsStr::new(&self.filename))
+            && path.extension().is_none_or(|ext| {
+                !EXCLUDED_EXTS.contains(&ext.to_string_lossy().to_lowercase().as_str())
+            })
+    }
+
     pub fn get_cached(&self, cache_dir: &Path) -> Option<PathBuf> {
         WalkDir::new(self.cache_subdir(cache_dir))
             .into_iter()
             .filter_map(Result::ok)
             .filter(|e| e.file_type().is_file())
-            .find(|e| e.path().file_stem().is_some_and(|stem| stem == OsStr::new(&self.filename)))
+            .find(|e| self.is_cached_candidate(e.path()))
             .map(|entry| entry.into_path())
     }
 
@@ -60,7 +69,7 @@ impl YtDlpItem {
             .into_iter()
             .filter_map(Result::ok)
             .filter(|e| e.file_type().is_file())
-            .filter(|e| e.path().file_stem().is_some_and(|stem| stem == OsStr::new(&self.filename)))
+            .filter(|e| self.is_cached_candidate(e.path()))
             .map(|entry| entry.into_path());
 
         for file in files {

@@ -80,6 +80,7 @@ keybinds
 - Loading a playlist when with missing songs will now load the existing songs instead of nothing
 - The borders of browser panes are nolonger affected by the scrollbar track being set
 - Adding a directory to the queue now orders its songs by `directories_sort` instead of relying on MPD's default order
+- `addyt` sometimes failing when files with identical file name already exists it the dir
 
 ## [0.11.0] - 2026-02-01
 

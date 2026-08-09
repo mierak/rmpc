@@ -100,6 +100,7 @@ impl YtDlp {
         cache.push(format!("{}.%(ext)s", id.filename));
 
         let mut command = Command::new("yt-dlp");
+        command.arg("--print").arg("after_move:RMPC_FILEPATH::%(filepath)s");
         command.arg("-x");
         command.arg("--embed-thumbnail");
         command.arg("--embed-metadata");
@@ -137,12 +138,13 @@ impl YtDlp {
             return Err(YtDlpDownloadError::YtDlpError { stdout, stderr, code: exit_code });
         }
 
-        // yt-dlp for some reason does not respect output file template when
-        // doing post processing with ffmpeg. This results in the file
-        // having different extensions than the one specified so we work
-        // around it by trying to find the file in the cache directory as that
-        // should still be reliable.
-        match id.get_cached(&self.cache_dir) {
+        let printed_path = stdout
+            .lines()
+            .find_map(|line| line.strip_prefix("RMPC_FILEPATH::"))
+            .map(|path| PathBuf::from(path.trim()));
+
+        match printed_path.filter(|path| path.is_file()).or_else(|| id.get_cached(&self.cache_dir))
+        {
             Some(file_path) => Ok(YtDlpDownloadResult {
                 file_path,
                 stderr,
