@@ -1,35 +1,17 @@
-use std::{
-    collections::HashSet,
-    path::{Path, PathBuf},
-    sync::Arc,
-};
+use std::collections::HashSet;
 
-use anyhow::{Context, Result, bail};
-use mlua::{IntoLua, Lua, LuaSerdeExt, Table};
+use anyhow::Result;
+use mlua::{IntoLua, Lua, LuaSerdeExt};
 use rmpc_mpd::commands::IdleEvent;
-use tokio::sync::{
-    RwLock,
-    mpsc::{UnboundedReceiver, UnboundedSender},
-};
+use tokio::sync::mpsc::{UnboundedReceiver, UnboundedSender};
 use tracing::{debug, error, trace};
 
-use crate::{
-    async_client::AsyncClient,
-    lua::{
-        self,
-        lualib::{
-            mpd::types::{Song, State, Status},
-            plugin::{
-                ON_IDLE,
-                ON_MESSAGE,
-                ON_RECONNECT,
-                ON_SHUTDOWN,
-                ON_SONG_CHANGE,
-                ON_STATE_CHANGE,
-            },
-        },
-        plugin::{entry::LuaPluginEntry, triggers::Triggers},
+use crate::lua::{
+    lualib::{
+        mpd::types::{Song, State, Status},
+        plugin::{ON_IDLE, ON_MESSAGE, ON_RECONNECT, ON_SHUTDOWN, ON_SONG_CHANGE, ON_STATE_CHANGE},
     },
+    plugin::triggers::Triggers,
 };
 
 #[derive(derive_more::Debug)]
@@ -65,7 +47,7 @@ pub enum PluginEvent {
 
 #[derive(derive_more::Debug)]
 pub struct LuaPlugin {
-    pub path: PathBuf,
+    pub name: String,
     pub triggers: Triggers,
     pub subscribed_channels: HashSet<String>,
     #[debug(skip)]
@@ -74,128 +56,34 @@ pub struct LuaPlugin {
     pub handle: tokio::task::JoinHandle<()>,
 }
 
-const LASTFM: &str = include_str!("../builtin/lastfm.lua");
-const NOTIFY: &str = include_str!("../builtin/notify.lua");
-const PLAYCOUNT: &str = include_str!("../builtin/playcount.lua");
-const LYRICS: &str = include_str!("../builtin/lyrics.lua");
-
-fn get_builtin(name: &str) -> Option<&'static str> {
-    match name {
-        "lastfm.lua" => Some(LASTFM),
-        "notify.lua" => Some(NOTIFY),
-        "playcount.lua" => Some(PLAYCOUNT),
-        "lyrics.lua" => Some(LYRICS),
-        _ => None,
-    }
-}
-
 impl LuaPlugin {
-    pub async fn load(
-        cfg_dir: &Path,
-        plugin: &Arc<RwLock<LuaPluginEntry>>,
-        client: &Arc<AsyncClient>,
-    ) -> Result<LuaPlugin> {
-        let plugin = plugin.read().await;
-        let mut components = plugin.path.components();
-        if components.next().is_some_and(|c| c.as_os_str() == "#builtin") {
-            if let Some(name) = components.next().map(|p| p.as_os_str().to_string_lossy())
-                && let Some(content) = get_builtin(&name)
-            {
-                let name = format!("#builtin/{name}");
-                return Self::load_single(content, &name, cfg_dir, &plugin, client).await;
-            }
-
-            bail!("Invalid builtin plugin path: {}", plugin.path.display());
-        }
-
-        let plugin_path = cfg_dir.join(&plugin.path);
-        let content = std::fs::read(&plugin_path).with_context(|| {
-            format!("Invalid or missing plugin path: {}", plugin_path.display())
-        })?;
-
-        Self::load_single(content, plugin.path.to_string_lossy().as_ref(), cfg_dir, &plugin, client)
-            .await
-    }
-
-    async fn load_single(
-        content: impl AsRef<[u8]>,
-        name: &str,
-        cfg_dir: &Path,
-        plugin: &LuaPluginEntry,
-        client: &Arc<AsyncClient>,
-    ) -> Result<Self> {
-        let lua = lua::create(cfg_dir, client, None)?;
-        let (tx, rx) = tokio::sync::mpsc::unbounded_channel();
-        {
-            let tx = tx.clone();
-            lua.set_app_data(tx);
-        }
-
-        let state: Table = lua.load(content.as_ref()).set_name(name).eval_async().await?;
-
-        let song_change = state.contains_key(ON_SONG_CHANGE)?;
-        let state_change = state.contains_key(ON_STATE_CHANGE)?;
-        let message = state.contains_key(ON_MESSAGE)?;
-        let idle = state.contains_key(ON_IDLE)?;
-        let shutdown = state.contains_key(ON_SHUTDOWN)?;
-        let mut triggers = Triggers::empty();
-        if song_change {
-            triggers |= Triggers::SongChange;
-        }
-        if state_change {
-            triggers |= Triggers::StateChange;
-        }
-        if message {
-            triggers |= Triggers::Message;
-        }
-        if idle {
-            triggers |= Triggers::Idle;
-        }
-        if shutdown {
-            triggers |= Triggers::Shutdown;
-        }
-
-        if triggers.is_empty() {
-            bail!("Plugin must have at least one trigger");
-        }
-
-        if let Some(setup) = state.get::<Option<mlua::Function>>("setup")? {
-            let args = lua.to_value(&serde_json::from_str::<serde_json::Value>(&plugin.args)?)?;
-            setup.call_async::<()>((&state, args)).await?;
-        }
-
-        let subscribed_channels = state.get::<Option<Vec<String>>>("subscribed_channels")?;
-        let subscribed_channels = if let Some(channels) = subscribed_channels {
-            channels.into_iter().collect()
-        } else {
-            HashSet::new()
-        };
-
-        let handle = tokio::task::spawn({
-            let name = name.to_string();
-            async move { Self::actor_loop(name, &lua, &state, rx).await }
-        });
-
-        return Ok(Self { path: plugin.path.clone(), triggers, subscribed_channels, tx, handle });
-    }
-
-    async fn actor_loop(
+    pub fn new(
         name: String,
-        lua: &Lua,
-        result: &mlua::Table,
+        triggers: Triggers,
+        subscribed_channels: HashSet<String>,
+        tx: UnboundedSender<PluginEvent>,
+        lua: Lua,
+        result: mlua::Table,
         mut rx: UnboundedReceiver<PluginEvent>,
-    ) {
-        while let Some(event) = rx.recv().await {
-            trace!(name, ?event, "Received plugin event");
-            let cont = Self::handle_event(&name, lua, result, event).await;
-            match cont {
-                Ok(true) => {}
-                Ok(false) => break,
-                Err(err) => {
-                    error!(err = ?err, "Error handling plugin event");
+    ) -> Self {
+        let handle = tokio::task::spawn({
+            let name = name.clone();
+            async move {
+                while let Some(event) = rx.recv().await {
+                    trace!(name, ?event, "Received plugin event");
+                    let cont = Self::handle_event(&name, &lua, &result, event).await;
+                    match cont {
+                        Ok(true) => {}
+                        Ok(false) => break,
+                        Err(err) => {
+                            error!(err = ?err, "Error handling plugin event");
+                        }
+                    }
                 }
             }
-        }
+        });
+
+        LuaPlugin { name, triggers, subscribed_channels, tx, handle }
     }
 
     #[inline]
