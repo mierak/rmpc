@@ -1,16 +1,16 @@
 use std::{
+    fs::TryLockError,
     path::Path,
     sync::Arc,
     time::{SystemTime, UNIX_EPOCH},
 };
 
-use anyhow::{Result, bail};
+use anyhow::Result;
 use clap::{Parser, Subcommand};
 use rmpc_mpd::{
     commands::{IdleEvent, Status},
     mpd_client::MpdClient,
 };
-use rmpc_shared::paths::{rmpcd_cache_dir, rmpcd_config_dir};
 use serde::Serialize;
 use serde_json::json;
 use tokio::sync::RwLock;
@@ -20,8 +20,10 @@ use tracing_subscriber::{EnvFilter, Registry, layer::SubscriberExt};
 
 use crate::{
     async_client::AsyncClient,
-    ctx::{ALBUM_ART_CACHE_DIR, Ctx},
-    lua::plugin::{LuaPlugin, PluginStore},
+    ctx::Ctx,
+    lua::{eval_config, plugin::PluginStore},
+    paths::Paths,
+    pkg::Lockfile,
 };
 
 mod async_client;
@@ -32,6 +34,8 @@ mod kv_bridge;
 mod lua;
 mod mpd_ext;
 mod mpris;
+mod paths;
+mod pkg;
 
 #[derive(Parser, Debug)]
 #[command(version, about)]
@@ -46,6 +50,16 @@ enum Command {
     /// Sets up a new config directory with example init.lua and .luarc.json
     /// config file for `LuaLS`
     Init,
+    Pkg {
+        #[command(subcommand)]
+        command: PkgCommand,
+    },
+}
+
+#[derive(Subcommand, Clone, Debug, PartialEq)]
+#[clap(rename_all = "lower")]
+enum PkgCommand {
+    Upgrade,
 }
 
 fn init_logging(level: &str) -> Result<(WorkerGuard, WorkerGuard)> {
@@ -91,8 +105,33 @@ fn init_logging(level: &str) -> Result<(WorkerGuard, WorkerGuard)> {
 #[tokio::main]
 async fn main() -> Result<()> {
     let args = Args::parse();
+    Paths::init()?;
+
+    let lock_handle = match std::fs::File::options()
+        .write(true)
+        .create(true)
+        .truncate(true)
+        .open(Paths::runtime_dir().join("instance.lock"))
+    {
+        Ok(v) => v,
+        Err(err) => {
+            eprintln!("Failed to open lock file: {err:?}");
+            std::process::exit(1);
+        }
+    };
+
+    match lock_handle.try_lock() {
+        Ok(()) => {}
+        Err(TryLockError::WouldBlock) => {
+            eprintln!("Another instance of rmpcd is already running, exiting...");
+            std::process::exit(1);
+        }
+        err @ Err(_) => err?,
+    }
+
     match args.command {
         Some(Command::Init) => run_init()?,
+        Some(Command::Pkg { command }) => pkg::run_pkg(command).await?,
         None => run().await?,
     }
 
@@ -102,19 +141,14 @@ async fn main() -> Result<()> {
 fn run_init() -> Result<()> {
     let _log_guards = init_logging("info")?;
 
-    let Some(cfg_dir) = rmpcd_config_dir() else {
-        error!("Could not determine config directory");
-        std::process::exit(1);
-    };
+    let cfg_dir = Paths::config_dir();
+    let init_lua_path = cfg_dir.join("init.lua");
 
-    if cfg_dir.exists() {
+    if init_lua_path.exists() {
         warn!("Config directory already exists at '{}', exiting...", cfg_dir.display());
         std::process::exit(1);
     }
 
-    std::fs::create_dir_all(&cfg_dir)?;
-
-    let init_lua_path = cfg_dir.join("init.lua");
     let default_config = include_str!("../../assets/rmpcd/example_init.lua");
     std::fs::write(&init_lua_path, default_config)?;
 
@@ -170,32 +204,30 @@ async fn run() -> Result<()> {
         },
     ));
 
-    let Some(cfg_dir) = rmpcd_config_dir() else {
-        bail!("Could not determine config directory");
-    };
+    let cfg_dir = Paths::config_dir();
 
-    let Some(cache_dir) = rmpcd_cache_dir() else {
-        bail!("Could not determine cache directory");
-    };
-
-    let albumart_dir = cache_dir.join(ALBUM_ART_CACHE_DIR);
-    prepare_album_art_cache_dir(albumart_dir.as_path()).await?;
-
-    let plugins: Arc<RwLock<Vec<_>>> = Arc::new(RwLock::new(Vec::new()));
-    let lua = lua::create(&cfg_dir, &mpd, Some(&plugins))?;
-    let lua_config = lua::eval_config(&lua, &cfg_dir).await?;
+    let (_lua, lua_config, plugins) = eval_config(Some(mpd.clone())).await?;
+    prepare_album_art_cache_dir(Paths::albumart_cache_dir()).await?;
 
     if let Err(err) = lua::type_def_eject::eject() {
         error!(err = ?err, "Failed to eject Lua type definitions");
     }
 
     let mut plugin_store = PluginStore::new();
+    let mut lockfile = Lockfile::read_or_default().await?;
     for plugin in plugins.read().await.iter() {
-        info!(path = ?plugin.read().await.path, "Loading plugin");
-        let plugin = LuaPlugin::load(&cfg_dir, plugin, &mpd).await?;
-        info!(?plugin, "Successfully loaded plugin");
-        plugin_store.insert(plugin.triggers, plugin);
+        info!(path = ?plugin.read().await, "Loading plugin");
+        match lua::plugin::load(cfg_dir, plugin, &mpd, &mut lockfile).await {
+            Ok(plugin) => {
+                info!(?plugin, "Successfully loaded plugin");
+                plugin_store.insert(plugin.triggers, plugin);
+            }
+            Err(err) => {
+                error!(err = ?err, "Failed to load plugin");
+            }
+        }
     }
+    lockfile.write().await?;
 
     let address = lua_config.get::<String>("address")?;
     let password = lua_config.get::<Option<String>>("password")?;
@@ -222,7 +254,6 @@ async fn run() -> Result<()> {
         status: status.clone(),
         queue,
         album_art: None,
-        cache_dir,
         last_written_album_art_song_uri: None,
     }));
 
@@ -247,8 +278,6 @@ enum AppEvent {
 }
 
 async fn prepare_album_art_cache_dir(dir: &Path) -> Result<()> {
-    tokio::fs::create_dir_all(dir).await?;
-
     let max_age = std::time::Duration::from_secs(60 * 60 * 24 * 7); // 7 days
     let now = SystemTime::now();
 

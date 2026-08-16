@@ -36,6 +36,10 @@ pub fn cache_dir() -> Option<PathBuf> {
         .or_else(|| home_dir().map(|home| home.join(".cache")))
 }
 
+pub fn runtime_dir() -> Option<PathBuf> {
+    ENV.var_os("XDG_RUNTIME_DIR").map(PathBuf::from).filter(|p| p.is_absolute())
+}
+
 pub fn rmpc_config_dir() -> Option<PathBuf> {
     config_dir().map(|config_dir| config_dir.join("rmpc"))
 }

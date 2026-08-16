@@ -6,6 +6,11 @@
 ---@field install fun(path: "#builtin.notify"): NotifyPlugin
 ---@field install fun(path: "#builtin.playcount"): PlaycountPlugin
 ---@field install fun(path: "#builtin.lyrics"): LyricsPlugin
+---@field install fun(spec: RmpcdPluginSpec): LyricsPlugin
+
+---@class RmpcdPluginSpec
+---@field url string
+---@field branch string | nil
 
 ---@generic Args
 ---@class RmpcdPlugin<Args>

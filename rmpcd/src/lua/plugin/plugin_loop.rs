@@ -3,7 +3,6 @@ use std::collections::HashMap;
 use anyhow::Result;
 use rmpc_mpd::commands::IdleEvent;
 use tokio::sync::mpsc::UnboundedReceiver;
-use tracing::{error, trace, warn};
 
 use crate::{
     ext::SenderExt,
@@ -44,12 +43,12 @@ pub async fn init(
     store: PluginStore<LuaPlugin>,
 ) -> Result<()> {
     loop {
-        trace!("Waiting for plugin events...");
+        tracing::trace!("Waiting for plugin events...");
         let Some(ev) = rx.recv().await else {
-            warn!("Plugin task ended");
+            tracing::warn!("Plugin task ended");
             break;
         };
-        trace!("Received plugin event: {:?}", ev);
+        tracing::trace!("Received plugin event: {:?}", ev);
 
         match &ev {
             PluginsEvent::SongChange { old, new } => {
@@ -99,14 +98,14 @@ pub async fn init(
 
                 // Remove all plugins from the registry and join them
                 for plugin in store.into_iter() {
-                    trace!(path = ?plugin.path, "Shutting down plugin");
+                    tracing::trace!(name = ?plugin.name, "Shutting down plugin");
                     if let Err(err) = plugin.handle.await {
-                        error!(err = ?err, path = ?plugin.path, "Failed to join plugin task");
+                        tracing::error!(err = ?err, name = ?plugin.name, "Failed to join plugin task");
                     }
-                    trace!(path = ?plugin.path, "Plugin task shutdown successfully");
+                    tracing::trace!(name = ?plugin.name, "Plugin task shutdown successfully");
                 }
 
-                trace!("All plugins shut down, exiting plugin loop");
+                tracing::trace!("All plugins shut down, exiting plugin loop");
                 break;
             }
         }

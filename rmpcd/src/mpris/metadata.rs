@@ -5,7 +5,7 @@ use sha2::{Digest, Sha256};
 use url::Url;
 use zbus::zvariant::{ObjectPath, OwnedObjectPath, Value};
 
-use crate::ctx::{ALBUM_ART_CACHE_DIR, Ctx};
+use crate::{ctx::Ctx, paths::Paths};
 
 pub trait SongExt {
     fn to_mpris_id(&self) -> OwnedObjectPath;
@@ -28,7 +28,7 @@ impl Ctx {
         let mut hasher = Sha256::new();
         hasher.update(song_uri.as_bytes());
         let file_name = format!("{:x}", hasher.finalize());
-        self.cache_dir.join(ALBUM_ART_CACHE_DIR).join(file_name)
+        Paths::albumart_cache_dir().join(file_name)
     }
 
     async fn clear_current_album_art_file(&self) {

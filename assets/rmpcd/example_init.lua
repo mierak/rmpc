@@ -40,4 +40,7 @@ local config = {
 -- 	debounce_delay = 1000,
 -- })
 
+-- Install the last played time tracking plugin from git repo using the integrated plugin manager.
+-- rmpcd.install({ url = "https://github.com/rmpc-org/rmpcd-lastplayed.git" })
+
 return config
