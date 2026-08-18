@@ -53,6 +53,7 @@ use crate::{
                 StatusProperty,
                 Transform,
                 WidgetProperty,
+                hashed_color,
             },
         },
     },
@@ -525,6 +526,13 @@ impl Property<SongProperty> {
                             .and_then(|d| d.as_string(song, tag_separator, strategy, ctx))
                     })
             }
+            PropertyKindOrText::Transform(Transform::Hash { content, .. }) => {
+                content.as_string(song, tag_separator, strategy, ctx).or_else(|| {
+                    self.default
+                        .as_ref()
+                        .and_then(|d| d.as_string(song, tag_separator, strategy, ctx))
+                })
+            }
         }
     }
 }
@@ -827,6 +835,31 @@ impl Property<PropertyKind> {
                             remaining_len = remaining_len.saturating_sub(remaining);
                         }
                         Some(Either::Right(buf.into()))
+                    }
+                    None => self.default_as_span(song, ctx, tag_separator, strategy),
+                }
+            }
+            PropertyKindOrText::Transform(Transform::Hash { content, colors }) => {
+                match content.as_span(song, ctx, tag_separator, strategy) {
+                    Some(Either::Left(mut span)) => {
+                        if let Some(color) = hashed_color(span.content.as_ref(), colors) {
+                            span.style = span.style.fg(color);
+                        }
+                        Some(Either::Left(span))
+                    }
+                    Some(Either::Right(mut spans)) => {
+                        let mut content = String::new();
+                        for span in &spans {
+                            content.push_str(span.content.as_ref());
+                        }
+
+                        if let Some(color) = hashed_color(&content, colors) {
+                            for span in &mut spans {
+                                span.style = span.style.fg(color);
+                            }
+                        }
+
+                        Some(Either::Right(spans))
                     }
                     None => self.default_as_span(song, ctx, tag_separator, strategy),
                 }
@@ -1199,6 +1232,73 @@ mod format_tests {
                 result.map(|line| line.spans.iter().map(|s| s.content.clone()).collect::<String>()),
                 Some(expected)
             );
+        }
+    }
+
+    mod hash {
+        use ratatui::style::Color;
+
+        use super::*;
+        use crate::config::theme::properties::Transform;
+
+        fn hash_of(text: &str, colors: Vec<Color>) -> Property<PropertyKind> {
+            Property::<PropertyKind> {
+                kind: PropertyKindOrText::Transform(Transform::Hash {
+                    content: Box::new(Property {
+                        kind: PropertyKindOrText::Text(text.into()),
+                        style: None,
+                        default: None,
+                    }),
+                    colors,
+                }),
+                style: None,
+                default: None,
+            }
+        }
+
+        fn single_span<'a>(result: Option<Either<Span<'a>, Vec<Span<'a>>>>) -> Span<'a> {
+            match result {
+                Some(Either::Left(span)) => span,
+                other => panic!("expected a single span, got {other:?}"),
+            }
+        }
+
+        #[rstest]
+        fn keeps_the_content(ctx: Ctx) {
+            let format = hash_of("hello", vec![Color::Red, Color::Green, Color::Blue]);
+            let span = single_span(format.as_span(None, &ctx, "", TagResolutionStrategy::All));
+
+            assert_eq!(span.content.as_ref(), "hello");
+        }
+
+        #[rstest]
+        fn colors_deterministically_from_the_palette(ctx: Ctx) {
+            let colors = vec![Color::Red, Color::Green, Color::Blue];
+            let fg_of = |text: &str| {
+                let format = hash_of(text, colors.clone());
+                single_span(format.as_span(None, &ctx, "", TagResolutionStrategy::All)).style.fg
+            };
+
+            let chosen = fg_of("2024").expect("a color should be applied");
+            assert!(colors.contains(&chosen), "{chosen:?} is not part of the palette");
+            assert_eq!(fg_of("2024"), Some(chosen), "same content must map to the same color");
+        }
+
+        #[rstest]
+        fn empty_palette_leaves_the_style_untouched(ctx: Ctx) {
+            // The bare text span the transform wraps, with no color applied.
+            let plain = Property::<PropertyKind> {
+                kind: PropertyKindOrText::Text("hello".into()),
+                style: None,
+                default: None,
+            };
+            let expected =
+                single_span(plain.as_span(None, &ctx, "", TagResolutionStrategy::All)).style;
+
+            let format = hash_of("hello", Vec::new());
+            let styled = single_span(format.as_span(None, &ctx, "", TagResolutionStrategy::All));
+
+            assert_eq!(styled.style, expected);
         }
     }
 
