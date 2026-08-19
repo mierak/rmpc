@@ -990,6 +990,8 @@ pub enum CommonActionFile {
     Save {
         #[serde(default)]
         kind: SaveKind,
+        #[serde(default)]
+        current: bool,
     },
     DeleteFromPlaylist {
         #[serde(default)]
@@ -1046,6 +1048,7 @@ pub enum CommonAction {
     },
     Save {
         kind: SaveKind,
+        current: bool,
     },
     DeleteFromPlaylist {
         kind: DeleteKind,
@@ -1168,9 +1171,11 @@ impl ToDescription for CommonAction {
 
                 buf.into()
             },
-            CommonAction::Save { kind: SaveKind::Modal { all, duplicates_strategy } } => {
+            CommonAction::Save { kind: SaveKind::Modal { all, duplicates_strategy }, current } => {
                 let mut buf = String::from("Open a modal popup with options to save ");
-                if *all {
+                if *current {
+                    buf.push_str("the currently playing song");
+                } else if *all {
                     buf.push_str("all items");
                 } else {
                     buf.push_str("the item under cursor");
@@ -1187,9 +1192,11 @@ impl ToDescription for CommonAction {
 
                 buf.into()
             },
-            CommonAction::Save { kind: SaveKind::Playlist { name, all, duplicates_strategy } } => {
+            CommonAction::Save { kind: SaveKind::Playlist { name, all, duplicates_strategy }, current } => {
                 let mut buf = String::from("Save ");
-                if *all {
+                if *current {
+                    buf.push_str("the currently playing song");
+                } else if *all {
                     buf.push_str("all items");
                 } else {
                     buf.push_str("the item under cursor");
@@ -1356,7 +1363,7 @@ impl TryFrom<CommonActionFile> for CommonAction {
                 }
                 CommonAction::Rate { kind, current, min_rating, max_rating }
             }
-            CommonActionFile::Save { kind } => CommonAction::Save { kind },
+            CommonActionFile::Save { kind, current } => CommonAction::Save { kind, current },
             CommonActionFile::DeleteFromPlaylist { kind } => {
                 CommonAction::DeleteFromPlaylist { kind }
             }
