@@ -33,7 +33,12 @@ use crate::{
     config::{
         Config,
         cli::{Args, Command},
-        keys::{CommonAction, GlobalAction, Key, actions::{RateKind, SaveKind}},
+        keys::{
+            CommonAction,
+            GlobalAction,
+            Key,
+            actions::{RateKind, SaveKind},
+        },
         tabs::{PaneType, SizedPaneOrSplit, TabName},
         theme::level_styles::LevelStyles,
     },
@@ -786,12 +791,8 @@ impl<'ui> Ui<'ui> {
                         let song_paths = vec![song.file.clone()];
                         match kind {
                             SaveKind::Modal { duplicates_strategy, .. } => {
-                                match create_save_modal(
-                                    song_paths,
-                                    None,
-                                    *duplicates_strategy,
-                                    ctx,
-                                ) {
+                                match create_save_modal(song_paths, None, *duplicates_strategy, ctx)
+                                {
                                     Ok(modal) => {
                                         modal!(ctx, modal);
                                     }

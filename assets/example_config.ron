@@ -119,6 +119,7 @@
             "oi":         ShowInfo,
             "<C-x>":      ContextMenu(),
             "<C-s>s":     Save(kind: Modal(all: false, duplicates_strategy: Ask)),
+            "<C-s>c": Save(kind: Modal(all: false, duplicates_strategy: Ask), current: true),
             "<C-s>a":     Save(kind: Modal(all: true, duplicates_strategy: Ask)),
             "r":          Rate(),
             "Y":          CopyToClipboard(kind: Modal([
