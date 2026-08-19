@@ -479,8 +479,12 @@ impl SearchPane {
                     event.abandon();
                 }
                 CommonAction::Rate { .. } => {}
+                CommonAction::Save { kind: _, current: true } => {
+                    event.abandon();
+                }
                 CommonAction::Save {
                     kind: SaveKind::Playlist { name, all: true, duplicates_strategy },
+                    current: false,
                 } => {
                     let song_paths: Vec<String> =
                         self.items(true).map(|(_, song)| song.file.clone()).collect();
@@ -491,7 +495,10 @@ impl SearchPane {
 
                     add_to_playlist_or_show_modal(name, song_paths, duplicates_strategy, ctx);
                 }
-                CommonAction::Save { kind: SaveKind::Modal { all: true, duplicates_strategy } } => {
+                CommonAction::Save {
+                    kind: SaveKind::Modal { all: true, duplicates_strategy },
+                    current: false,
+                } => {
                     let song_paths: Vec<String> =
                         self.items(true).map(|(_, song)| song.file.clone()).collect();
                     if song_paths.is_empty() {
@@ -841,8 +848,12 @@ impl SearchPane {
                 CommonAction::Rate { kind: _, current: true, min_rating: _, max_rating: _ } => {
                     event.abandon();
                 }
+                CommonAction::Save { kind: _, current: true } => {
+                    event.abandon();
+                }
                 CommonAction::Save {
                     kind: SaveKind::Playlist { name, all, duplicates_strategy },
+                    current: false,
                 } => {
                     let song_paths: Vec<String> =
                         self.items(all).map(|(_, song)| song.file.clone()).collect();
@@ -853,7 +864,10 @@ impl SearchPane {
 
                     add_to_playlist_or_show_modal(name, song_paths, duplicates_strategy, ctx);
                 }
-                CommonAction::Save { kind: SaveKind::Modal { all, duplicates_strategy } } => {
+                CommonAction::Save {
+                    kind: SaveKind::Modal { all, duplicates_strategy },
+                    current: false,
+                } => {
                     let song_paths: Vec<_> =
                         self.items(all).map(|(_, song)| song.file.clone()).collect();
                     if song_paths.is_empty() {

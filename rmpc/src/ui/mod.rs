@@ -33,7 +33,12 @@ use crate::{
     config::{
         Config,
         cli::{Args, Command},
-        keys::{CommonAction, GlobalAction, Key, actions::RateKind},
+        keys::{
+            CommonAction,
+            GlobalAction,
+            Key,
+            actions::{RateKind, SaveKind},
+        },
         tabs::{PaneType, SizedPaneOrSplit, TabName},
         theme::level_styles::LevelStyles,
     },
@@ -55,7 +60,11 @@ use crate::{
     ui::{
         image::facade::EncodeData,
         input::{InputEvent, InputResultEvent},
-        modals::{downloads::DownloadsModal, info_list_modal::SongCtx, menu::create_rating_modal},
+        modals::{
+            downloads::DownloadsModal,
+            info_list_modal::SongCtx,
+            menu::{add_to_playlist_or_show_modal, create_rating_modal, create_save_modal},
+        },
     },
 };
 
@@ -771,6 +780,34 @@ impl<'ui> Ui<'ui> {
                                     client.set_sticker(&uri, LIKE_STICKER, "1")?;
                                     Ok(())
                                 });
+                            }
+                        }
+                    } else {
+                        status_error!("No song is currently playing");
+                    }
+                }
+                CommonAction::Save { kind, current: true } => {
+                    if let Some(song) = ctx.current_song() {
+                        let song_paths = vec![song.file.clone()];
+                        match kind {
+                            SaveKind::Modal { duplicates_strategy, .. } => {
+                                match create_save_modal(song_paths, None, *duplicates_strategy, ctx)
+                                {
+                                    Ok(modal) => {
+                                        modal!(ctx, modal);
+                                    }
+                                    Err(err) => {
+                                        status_error!("Failed to open save modal: {err}");
+                                    }
+                                }
+                            }
+                            SaveKind::Playlist { name, duplicates_strategy, .. } => {
+                                add_to_playlist_or_show_modal(
+                                    name.clone(),
+                                    song_paths,
+                                    *duplicates_strategy,
+                                    ctx,
+                                );
                             }
                         }
                     } else {
