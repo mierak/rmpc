@@ -102,7 +102,8 @@ impl Modal for OutputsModal {
             .border_set(border::ROUNDED)
             .border_style(ctx.config.as_border_style())
             .title_alignment(ratatui::prelude::Alignment::Center)
-            .title("Outputs");
+            .title("Outputs")
+            .title_bottom(" Enter toggles; all enabled outputs play at once ");
 
         let table_area = popup_area.inner(Margin { horizontal: 1, vertical: 1 });
 
