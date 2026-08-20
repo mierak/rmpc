@@ -400,7 +400,7 @@ mod tests {
 
         let result = index.find_entry(&song);
 
-        assert!(result.unwrap().0.to_string_lossy() == "1");
+        assert_eq!(result.unwrap().0.to_string_lossy(), "1");
     }
 
     #[test]
@@ -431,7 +431,7 @@ mod tests {
 
         let result = index.find_entry(&song);
 
-        assert!(result.unwrap().0.to_string_lossy() == "should match");
+        assert_eq!(result.unwrap().0.to_string_lossy(), "should match");
     }
 
     #[test]
@@ -462,7 +462,7 @@ mod tests {
 
         let result = index.find_entry(&song);
 
-        assert!(result.unwrap().0.to_string_lossy() == "should match");
+        assert_eq!(result.unwrap().0.to_string_lossy(), "should match");
     }
 
     #[test]
@@ -495,7 +495,7 @@ mod tests {
 
         let result = index.find_entry(&song);
 
-        assert!(result.unwrap().0.to_string_lossy() == "no length");
+        assert_eq!(result.unwrap().0.to_string_lossy(), "no length");
     }
 
     #[test]
@@ -526,6 +526,6 @@ mod tests {
 
         let result = index.find_entry(&song);
 
-        assert!(result.unwrap().0.to_string_lossy() == "no album");
+        assert_eq!(result.unwrap().0.to_string_lossy(), "no album");
     }
 }

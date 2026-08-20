@@ -48,10 +48,10 @@ mod tests {
 
     #[test]
     fn test_queue_position_fromstr() {
-        assert!("+0".parse::<QueuePosition>().unwrap() == QueuePosition::RelativeAdd(0));
-        assert!("-0".parse::<QueuePosition>().unwrap() == QueuePosition::RelativeSub(0));
-        assert!("-15".parse::<QueuePosition>().unwrap() == QueuePosition::RelativeSub(15));
-        assert!("0".parse::<QueuePosition>().unwrap() == QueuePosition::Absolute(0));
-        assert!("15".parse::<QueuePosition>().unwrap() == QueuePosition::Absolute(15));
+        assert_eq!("+0".parse::<QueuePosition>().unwrap(), QueuePosition::RelativeAdd(0));
+        assert_eq!("-0".parse::<QueuePosition>().unwrap(), QueuePosition::RelativeSub(0));
+        assert_eq!("-15".parse::<QueuePosition>().unwrap(), QueuePosition::RelativeSub(15));
+        assert_eq!("0".parse::<QueuePosition>().unwrap(), QueuePosition::Absolute(0));
+        assert_eq!("15".parse::<QueuePosition>().unwrap(), QueuePosition::Absolute(15));
     }
 }
