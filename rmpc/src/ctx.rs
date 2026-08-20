@@ -33,7 +33,7 @@ use crate::{
         keys::KeyResolver,
         lrc::{Lrc, LrcIndex},
         macros::{status_error, status_warn},
-        mpd_client_ext::MpdClientExt,
+        mpd_client_ext::{MpdClientExt, PartitionedOutput},
         mpd_query::MpdQuerySync,
         ring_vec::RingVec,
         ytdlp::YtDlpManager,
@@ -55,6 +55,7 @@ pub struct Ctx {
     #[cfg(not(test))]
     current_song: Option<Song>,
     pub(crate) queue: Vec<Song>,
+    pub(crate) outputs: Vec<PartitionedOutput>,
     #[cfg(test)]
     pub(crate) stickers: HashMap<String, HashMap<String, String>>,
     #[cfg(not(test))]
@@ -106,6 +107,7 @@ impl Ctx {
         let status = client.get_status()?;
         let queue = client.playlist_info()?.unwrap_or_default();
         let current_song = client.get_current_song()?;
+        let outputs = client.current_partition_outputs()?;
         let cached_queue_time_total = queue.iter().filter_map(|s| s.duration).sum();
 
         if !supported_commands.contains("albumart") || !supported_commands.contains("readpicture") {
@@ -126,6 +128,7 @@ impl Ctx {
             config: std::sync::Arc::new(config),
             status,
             queue,
+            outputs,
             current_song,
             stickers: HashMap::new(),
             active_tab,

@@ -148,6 +148,21 @@ pub enum StatusPropertyFile {
     SampleRate(),
     Bits(),
     Channels(),
+    ActiveOutputs {
+        #[serde(default = "defaults::default_output_separator")]
+        separator: String,
+    },
+    ActiveOutput {
+        name: String,
+        #[serde(default = "defaults::default_on_label")]
+        on_label: String,
+        #[serde(default = "defaults::default_off_label")]
+        off_label: String,
+        #[serde(default)]
+        on_style: Option<StyleFile>,
+        #[serde(default)]
+        off_style: Option<StyleFile>,
+    },
 }
 
 #[derive(Debug, Clone, Display, Hash, Eq, PartialEq)]
@@ -209,6 +224,16 @@ pub enum StatusProperty {
     SampleRate(),
     Bits(),
     Channels(),
+    ActiveOutputs {
+        separator: String,
+    },
+    ActiveOutput {
+        name: String,
+        on_label: String,
+        off_label: String,
+        on_style: Option<Style>,
+        off_style: Option<Style>,
+    },
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
@@ -521,6 +546,22 @@ impl TryFrom<StatusPropertyFile> for StatusProperty {
             StatusPropertyFile::SampleRate() => StatusProperty::SampleRate(),
             StatusPropertyFile::Bits() => StatusProperty::Bits(),
             StatusPropertyFile::Channels() => StatusProperty::Channels(),
+            StatusPropertyFile::ActiveOutputs { separator } => {
+                StatusProperty::ActiveOutputs { separator }
+            }
+            StatusPropertyFile::ActiveOutput { name, on_label, off_label, on_style, off_style } => {
+                StatusProperty::ActiveOutput {
+                    name,
+                    on_label,
+                    off_label,
+                    on_style: on_style
+                        .map(|s| -> Result<_> { s.to_config_or(None, None) })
+                        .transpose()?,
+                    off_style: off_style
+                        .map(|s| -> Result<_> { s.to_config_or(None, None) })
+                        .transpose()?,
+                }
+            }
         })
     }
 }

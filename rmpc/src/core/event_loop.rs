@@ -26,6 +26,7 @@ use crate::{
         mpd_client_ext::MpdClientExt,
         mpd_query::{
             EXTERNAL_COMMAND,
+            GLOBAL_OUTPUTS_UPDATE,
             GLOBAL_QUEUE_UPDATE,
             GLOBAL_STATUS_UPDATE,
             GLOBAL_STICKERS_UPDATE,
@@ -648,6 +649,10 @@ fn main_task<B: Backend + std::io::Write>(
                             ctx.status.volume = volume;
                             render_wanted = true;
                         }
+                        (GLOBAL_OUTPUTS_UPDATE, None, MpdQueryResult::Outputs(outputs)) => {
+                            ctx.outputs = outputs;
+                            render_wanted = true;
+                        }
                         (GLOBAL_QUEUE_UPDATE, None, MpdQueryResult::Queue(queue)) => {
                             ctx.queue = queue.unwrap_or_default();
                             ctx.cached_queue_time_total =
@@ -775,7 +780,12 @@ fn main_task<B: Backend + std::io::Write>(
                     }
                 }
                 AppEvent::Reconnected => {
-                    for ev in [IdleEvent::Player, IdleEvent::Playlist, IdleEvent::Options] {
+                    for ev in [
+                        IdleEvent::Player,
+                        IdleEvent::Playlist,
+                        IdleEvent::Options,
+                        IdleEvent::Output,
+                    ] {
                         handle_idle_event(ev, &ctx);
                     }
                     if let Err(err) = ui.on_event(UiEvent::Reconnected, &mut ctx) {
@@ -931,7 +941,15 @@ fn handle_idle_event(event: IdleEvent, ctx: &Ctx) {
                 })
             });
         }
-        IdleEvent::Output => {}
+        IdleEvent::Output => {
+            // A plain outputs fetch: it reflects whatever partition the
+            // connection is on and never switches partitions, which would
+            // raise another output idle event on this same connection and
+            // loop.
+            ctx.query().id(GLOBAL_OUTPUTS_UPDATE).replace_id("outputs").query(move |client| {
+                Ok(MpdQueryResult::Outputs(client.current_partition_outputs()?))
+            });
+        }
         IdleEvent::Partition
         | IdleEvent::Subscription
         | IdleEvent::Message

@@ -69,6 +69,7 @@ pub fn ctx(
         status: Status::default(),
         config: std::sync::Arc::new(config),
         queue: Vec::default(),
+        outputs: Vec::default(),
         stickers: HashMap::new(),
         active_tab: TabName::from("test_tab"),
         app_event_sender: app_event_channel.0.clone(),
