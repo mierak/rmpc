@@ -23,21 +23,15 @@ pub struct Song {
 
 impl Song {
     pub fn samplerate(&self) -> Option<u32> {
-        self.metadata.get("format").and_then(|audio| {
-            audio.first().split(':').next().and_then(|rate_str| rate_str.parse().ok())
-        })
+        self.metadata.get("format").and_then(|audio| super::parse_audio_format(audio.first()).0)
     }
 
     pub fn bits(&self) -> Option<u32> {
-        self.metadata.get("format").and_then(|audio| {
-            audio.first().split(':').nth(1).and_then(|bits_str| bits_str.parse().ok())
-        })
+        self.metadata.get("format").and_then(|audio| super::parse_audio_format(audio.first()).1)
     }
 
     pub fn channels(&self) -> Option<u32> {
-        self.metadata.get("format").and_then(|audio| {
-            audio.first().split(':').nth(2).and_then(|channels_str| channels_str.parse().ok())
-        })
+        self.metadata.get("format").and_then(|audio| super::parse_audio_format(audio.first()).2)
     }
 }
 
@@ -90,5 +84,46 @@ impl FromMpd for Song {
             }
         }
         Ok(LineHandled::Yes)
+    }
+}
+
+#[cfg(test)]
+#[allow(clippy::unwrap_used)]
+mod tests {
+    use rstest::rstest;
+
+    use super::Song;
+    use crate::commands::metadata_tag::MetadataTag;
+
+    // Same grammar as the status "audio" field; songs carry it in the
+    // "Format" metadata key. See the table in status.rs for the source of
+    // the strings.
+    #[rstest]
+    #[case("44100:16:2", Some(44100), Some(16), Some(2))]
+    #[case("44100:f:2", Some(44100), None, Some(2))]
+    #[case("dsd64:2", Some(2_822_400), Some(1), Some(2))]
+    #[case("384000:dsd:2", Some(3_072_000), Some(1), Some(2))]
+    #[case("*:*:*", None, None, None)]
+    fn format_metadata_parses(
+        #[case] format: &str,
+        #[case] samplerate: Option<u32>,
+        #[case] bits: Option<u32>,
+        #[case] channels: Option<u32>,
+    ) {
+        let mut song = Song::default();
+        song.metadata.insert("format".to_owned(), MetadataTag::Single(format.to_owned()));
+
+        assert_eq!(song.samplerate(), samplerate);
+        assert_eq!(song.bits(), bits);
+        assert_eq!(song.channels(), channels);
+    }
+
+    #[test]
+    fn format_metadata_absent() {
+        let song = Song::default();
+
+        assert_eq!(song.samplerate(), None);
+        assert_eq!(song.bits(), None);
+        assert_eq!(song.channels(), None);
     }
 }
