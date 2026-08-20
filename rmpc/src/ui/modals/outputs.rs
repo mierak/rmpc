@@ -173,7 +173,7 @@ impl Modal for OutputsModal {
 
     fn on_event(&mut self, event: &mut UiEvent, ctx: &Ctx) -> Result<()> {
         match event {
-            UiEvent::Output => self.refresh_outputs(ctx),
+            UiEvent::Output | UiEvent::Reconnected => self.refresh_outputs(ctx),
             _ => {}
         }
         Ok(())
