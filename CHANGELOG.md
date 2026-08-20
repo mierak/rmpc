@@ -6,6 +6,7 @@ All notable changes to this project will be documented in this file.
 
 ### Added
 
+- Added `ActiveOutputs` and `ActiveOutput` status properties showing the enabled outputs
 - Added `current` option to `Save()` keybind to save the currently playing song
 - Added a new vertical volume slider pane.
 - **Breaking** `ExternalCommand` can now have arguments supplied at runtime. This will break your

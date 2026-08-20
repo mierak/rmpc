@@ -81,6 +81,10 @@ pub fn default_thousands_separator() -> String {
     ",".to_string()
 }
 
+pub fn default_output_separator() -> String {
+    ", ".to_string()
+}
+
 pub fn rating_options() -> Vec<i32> {
     vec![0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
 }

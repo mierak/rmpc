@@ -718,6 +718,34 @@ impl Property<PropertyKind> {
                 StatusProperty::Channels() => {
                     status.channels().map(|v| Either::Left(Span::styled(v.to_string(), style)))
                 }
+                StatusProperty::ActiveOutputs { separator } => {
+                    let outputs = ctx
+                        .outputs
+                        .iter()
+                        .filter(|output| output.enabled && output.is_on_current_partition())
+                        .map(|output| output.name.as_str())
+                        .join(separator);
+                    if outputs.is_empty() {
+                        self.default_as_span(song, ctx, tag_separator, strategy)
+                    } else {
+                        Some(Either::Left(Span::styled(outputs, style)))
+                    }
+                }
+                StatusProperty::ActiveOutput { name, on_label, off_label, on_style, off_style } => {
+                    // An output that exists but sits on another partition is
+                    // not playing here, so it renders the off label; only an
+                    // unknown name falls through to the default.
+                    ctx.outputs.iter().find(|output| &output.name == name).map_or_else(
+                        || self.default_as_span(song, ctx, tag_separator, strategy),
+                        |output| {
+                            let on = output.enabled && output.is_on_current_partition();
+                            Some(Either::Left(Span::styled(
+                                if on { on_label } else { off_label },
+                                if on { on_style } else { off_style }.unwrap_or(style),
+                            )))
+                        },
+                    )
+                }
             },
             PropertyKindOrText::Property(PropertyKind::Widget(w)) => match w {
                 WidgetProperty::Volume => {
@@ -1437,6 +1465,11 @@ mod format_tests {
 
     mod correct_values {
         use super::*;
+        use crate::shared::mpd_client_ext::{
+            PartitionedOutput,
+            PartitionedOutputKind,
+            PartitionedOutputKind::{CurrentPartition, OtherPartition},
+        };
 
         #[rstest]
         #[case(SongProperty::Title, "title")]
@@ -1524,6 +1557,162 @@ mod format_tests {
             assert_eq!(
                 result,
                 Some(either::Either::<Span<'_>, Vec<Span<'_>>>::Left(Span::raw(expected)))
+            );
+        }
+
+        fn output(name: &str, enabled: bool, kind: PartitionedOutputKind) -> PartitionedOutput {
+            PartitionedOutput {
+                id: 0,
+                name: name.to_owned(),
+                enabled,
+                plugin: "pipewire".to_owned(),
+                kind,
+            }
+        }
+
+        #[rstest]
+        fn active_outputs_resolves_to_joined_enabled_names(mut ctx: Ctx) {
+            ctx.outputs = vec![
+                output("S/PDIF", true, CurrentPartition),
+                output("Speakers", false, CurrentPartition),
+                output("upstairs", true, OtherPartition),
+                output("my_fifo", true, CurrentPartition),
+            ];
+            let format = Property::<PropertyKind> {
+                kind: PropertyKindOrText::Property(PropertyKind::Status(
+                    StatusProperty::ActiveOutputs { separator: "+".to_string() },
+                )),
+                style: None,
+                default: None,
+            };
+
+            let result = format.as_span(None, &ctx, "", TagResolutionStrategy::All);
+
+            assert_eq!(
+                result,
+                Some(either::Either::<Span<'_>, Vec<Span<'_>>>::Left(Span::raw("S/PDIF+my_fifo")))
+            );
+        }
+
+        #[rstest]
+        fn active_outputs_falls_back_to_default_when_none_enabled(mut ctx: Ctx) {
+            ctx.outputs = vec![output("S/PDIF", false, CurrentPartition)];
+            let format = Property::<PropertyKind> {
+                kind: PropertyKindOrText::Property(PropertyKind::Status(
+                    StatusProperty::ActiveOutputs { separator: ", ".to_string() },
+                )),
+                style: None,
+                default: Some(Box::new(Property::<PropertyKind> {
+                    kind: PropertyKindOrText::Text("no output".to_string()),
+                    style: None,
+                    default: None,
+                })),
+            };
+
+            let result = format.as_span(None, &ctx, "", TagResolutionStrategy::All);
+
+            assert_eq!(
+                result,
+                Some(either::Either::<Span<'_>, Vec<Span<'_>>>::Left(Span::raw("no output")))
+            );
+        }
+
+        fn output_lamp(name: &str) -> StatusProperty {
+            StatusProperty::ActiveOutput {
+                name: name.to_owned(),
+                on_label: format!("{name} on"),
+                off_label: format!("{name} off"),
+                on_style: None,
+                off_style: None,
+            }
+        }
+
+        #[rstest]
+        #[case(true, "S/PDIF on")]
+        #[case(false, "S/PDIF off")]
+        fn active_output_lamp_follows_enabled_state(
+            mut ctx: Ctx,
+            #[case] enabled: bool,
+            #[case] expected: &str,
+        ) {
+            ctx.outputs = vec![output("S/PDIF", enabled, CurrentPartition)];
+            let format = Property::<PropertyKind> {
+                kind: PropertyKindOrText::Property(PropertyKind::Status(output_lamp("S/PDIF"))),
+                style: None,
+                default: None,
+            };
+
+            let result = format.as_span(None, &ctx, "", TagResolutionStrategy::All);
+
+            assert_eq!(
+                result,
+                Some(either::Either::<Span<'_>, Vec<Span<'_>>>::Left(Span::raw(expected)))
+            );
+        }
+
+        #[rstest]
+        fn active_output_lamp_with_empty_off_label_renders_nothing(mut ctx: Ctx) {
+            ctx.outputs = vec![output("Speakers", false, CurrentPartition)];
+            let format = Property::<PropertyKind> {
+                kind: PropertyKindOrText::Property(PropertyKind::Status(
+                    StatusProperty::ActiveOutput {
+                        name: "Speakers".to_owned(),
+                        on_label: " SPKR".to_owned(),
+                        off_label: String::new(),
+                        on_style: None,
+                        off_style: None,
+                    },
+                )),
+                style: None,
+                default: None,
+            };
+
+            let result = format.as_span(None, &ctx, "", TagResolutionStrategy::All);
+
+            assert_eq!(
+                result,
+                Some(either::Either::<Span<'_>, Vec<Span<'_>>>::Left(Span::raw("")))
+            );
+        }
+
+        #[rstest]
+        fn active_output_lamp_shows_off_label_for_output_on_other_partition(mut ctx: Ctx) {
+            ctx.outputs = vec![output("upstairs", true, OtherPartition)];
+            let format = Property::<PropertyKind> {
+                kind: PropertyKindOrText::Property(PropertyKind::Status(output_lamp("upstairs"))),
+                style: None,
+                default: None,
+            };
+
+            let result = format.as_span(None, &ctx, "", TagResolutionStrategy::All);
+
+            assert_eq!(
+                result,
+                Some(either::Either::<Span<'_>, Vec<Span<'_>>>::Left(Span::raw("upstairs off")))
+            );
+        }
+
+        #[rstest]
+        fn active_output_lamp_falls_back_when_output_unknown(mut ctx: Ctx) {
+            ctx.outputs = vec![
+                output("S/PDIF", true, CurrentPartition),
+                output("upstairs", true, OtherPartition),
+            ];
+            let format = Property::<PropertyKind> {
+                kind: PropertyKindOrText::Property(PropertyKind::Status(output_lamp("basement"))),
+                style: None,
+                default: Some(Box::new(Property::<PropertyKind> {
+                    kind: PropertyKindOrText::Text("?".to_string()),
+                    style: None,
+                    default: None,
+                })),
+            };
+
+            let result = format.as_span(None, &ctx, "", TagResolutionStrategy::All);
+
+            assert_eq!(
+                result,
+                Some(either::Either::<Span<'_>, Vec<Span<'_>>>::Left(Span::raw("?")))
             );
         }
 
