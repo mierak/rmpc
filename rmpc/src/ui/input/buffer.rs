@@ -613,7 +613,7 @@ mod test {
             let res = input.handle_input(Some(InputEvent::PopRight));
             match res {
                 InputResultEvent::Pop => {
-                    assert!(input.value == " done");
+                    assert_eq!(input.value, " done");
                     assert_eq!(input.cursor, 1);
                 }
                 _ => panic!("Expected Pop"),
@@ -773,7 +773,7 @@ mod test {
 
             match res {
                 InputResultEvent::Pop => {
-                    assert!(input.value == "foo,!");
+                    assert_eq!(input.value, "foo,!");
                     assert_eq!(input.cursor, 4);
                 }
                 _ => panic!("Expected Pop event"),
