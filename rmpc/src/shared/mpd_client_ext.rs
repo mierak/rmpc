@@ -71,6 +71,7 @@ pub trait MpdClientExt {
         &mut self,
         current_partition: &str,
     ) -> Result<Vec<PartitionedOutput>, MpdError>;
+    fn current_partition_outputs(&mut self) -> Result<Vec<PartitionedOutput>, MpdError>;
     fn create_playlist(&mut self, name: &str, items: Vec<String>) -> Result<(), MpdError>;
     fn next_keep_state(&mut self, keep: bool, state: State) -> Result<(), MpdError>;
     fn prev_keep_state(&mut self, keep: bool, state: State) -> Result<(), MpdError>;
@@ -278,22 +279,7 @@ impl<T: MpdClient + MpdCommand + ProtoClient> MpdClientExt for T {
         current_partition: &str,
     ) -> Result<Vec<PartitionedOutput>, MpdError> {
         if current_partition == "default" {
-            Ok(self
-                .outputs()?
-                .0
-                .into_iter()
-                .map(|output| PartitionedOutput {
-                    id: output.id,
-                    name: output.name,
-                    enabled: if output.plugin == "dummy" { false } else { output.enabled },
-                    kind: if output.plugin == "dummy" {
-                        PartitionedOutputKind::OtherPartition
-                    } else {
-                        PartitionedOutputKind::CurrentPartition
-                    },
-                    plugin: output.plugin,
-                })
-                .collect())
+            self.current_partition_outputs()
         } else {
             // MPD lists all outputs only on the default partition so we have to
             // switch to it, list the outputs and then switch back. We also have to
@@ -338,6 +324,28 @@ impl<T: MpdClient + MpdCommand + ProtoClient> MpdClientExt for T {
 
             Ok(result)
         }
+    }
+
+    // A plain outputs command reflects the partition the connection is on
+    // and never switches partitions. Outputs moved to another partition
+    // show up as the dummy plugin.
+    fn current_partition_outputs(&mut self) -> Result<Vec<PartitionedOutput>, MpdError> {
+        Ok(self
+            .outputs()?
+            .0
+            .into_iter()
+            .map(|output| PartitionedOutput {
+                id: output.id,
+                name: output.name,
+                enabled: if output.plugin == "dummy" { false } else { output.enabled },
+                kind: if output.plugin == "dummy" {
+                    PartitionedOutputKind::OtherPartition
+                } else {
+                    PartitionedOutputKind::CurrentPartition
+                },
+                plugin: output.plugin,
+            })
+            .collect())
     }
 
     fn create_playlist(&mut self, name: &str, items: Vec<String>) -> Result<(), MpdError> {
@@ -659,6 +667,12 @@ pub struct PartitionedOutput {
     pub enabled: bool,
     pub plugin: String,
     pub kind: PartitionedOutputKind,
+}
+
+impl PartitionedOutput {
+    pub fn is_on_current_partition(&self) -> bool {
+        matches!(self.kind, PartitionedOutputKind::CurrentPartition)
+    }
 }
 
 #[derive(Debug, Clone, Copy)]
