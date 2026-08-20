@@ -19,6 +19,7 @@ use super::{
         SongPropertyFile,
         Transform,
         TransformFile,
+        parse_colors,
     },
     style::ToConfigOr,
 };
@@ -287,6 +288,12 @@ impl PropertyFile<SongPropertyFile> {
                         .map(|r| -> Result<_> { Ok((r.r#match, r.replace.convert()?)) })
                         .try_collect()?,
                 }),
+                PropertyKindFileOrText::Transform(TransformFile::Hash { content, colors }) => {
+                    PropertyKindOrText::Transform(Transform::Hash {
+                        content: Box::new((*content).convert()?),
+                        colors: parse_colors(colors)?,
+                    })
+                }
                 PropertyKindFileOrText::Sticker(value) => PropertyKindOrText::Sticker(value),
                 PropertyKindFileOrText::Property(prop) => PropertyKindOrText::Property(prop.into()),
                 PropertyKindFileOrText::Group(group) => {
