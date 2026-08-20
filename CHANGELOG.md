@@ -57,6 +57,11 @@ All notable changes to this project will be documented in this file.
 
 ### Fixed
 
+- `Bits()` reporting the channel count as bit depth during DSD playback. MPD formats DSD audio as
+  `dsd64:2` or `384000:dsd:2`, neither of which parsed; DSD now reports its real sample rate,
+  1 bit and the channel count, and the float bit depth marker (`f`) no longer breaks the other fields
+- `SampleRate()`, `Bits()` and `Channels()` status properties ignoring their `default:`, unlike
+  `Bitrate` and `Crossfade`
 - Kitty image backend never displaying images whose encoded data fits into a single 4096 byte
   chunk, because the first chunk always claimed more data would follow (`m=1`)
 - Benign error log when reading a sticker that does not exist

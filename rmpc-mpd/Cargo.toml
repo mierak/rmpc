@@ -21,6 +21,7 @@ socket2 = { workspace = true }
 strum = { workspace = true }
 
 [dev-dependencies]
+rmpc-shared = { path = "../rmpc-shared", features = ["test-impl"] }
 rstest = "0.26.1"
 test-case = "3.3.1"
 
