@@ -103,7 +103,7 @@ end
 local function download_debounced(_self, _song) end
 
 M.setup = function(self, args)
-    self.enabled = (args.enabled ~= nil) and args.enabled or true
+    self.enabled = args.enabled == nil or args.enabled
 
     if args.lyrics_dir ~= nil then
         self.lyrics_dir = args.lyrics_dir

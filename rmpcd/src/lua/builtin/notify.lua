@@ -36,9 +36,9 @@ end
 local function notify_debounced(_new_song, _with_album_art, _album_art_path) end
 
 M.setup = function(self, args)
-    self.with_album_art = (args.with_album_art ~= nil) and args.with_album_art or true
+    self.with_album_art = args.with_album_art == nil or args.with_album_art
     self.album_art_path = args.album_art_path or "/tmp/rmpcd-notify-album-art"
-    self.enabled = (args.enabled ~= nil) and args.enabled or true
+    self.enabled = args.enabled == nil or args.enabled
 
     local notify_send = util.which("notify-send")
     if not notify_send then
@@ -63,7 +63,7 @@ M.song_change = function(self, _old_song, new_song)
         return
     end
 
-    notify_debounced(new_song, self.with_album_art or true, self.album_art_path)
+    notify_debounced(new_song, self.with_album_art, self.album_art_path)
 end
 
 M.subscribed_channels = { "rmpcd.notify" }
