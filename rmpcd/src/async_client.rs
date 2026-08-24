@@ -92,7 +92,11 @@ fn worker_loop(
         let mut shutting_down = false;
         let reconnect_base_delay = Duration::from_millis(500);
         let reconnect_max_delay = Duration::from_secs(16);
-        let mut skip_recv = false;
+        // Start in idle rather than waiting for a first command. MPD closes a
+        // connected client that is neither idle nor sending after
+        // connection_timeout (60s by default), and nothing guarantees a command
+        // arrives before then now that plugins load after the connect.
+        let mut skip_recv = true;
 
         'outer: while !shutting_down {
             if !skip_recv {
