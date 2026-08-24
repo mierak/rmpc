@@ -21,7 +21,7 @@
 ---@field message fun(self, channel: string, message: string)|nil
 ---@field idle_event fun(self, event: IdleEvent)|nil
 ---@field shutdown fun(self)|nil
----@field reconnect fun(self)|nil
+---@field reconnect fun(self)|nil Called after the connection to MPD is re-established. Channels from `subscribed_channels` are resubscribed before this runs.
 
 ---@type RmpcdGlobal
 ---@diagnostic disable-next-line: lowercase-global

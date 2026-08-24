@@ -1,8 +1,10 @@
 use std::{
+    collections::HashSet,
     io::Write,
     sync::{
         Arc,
         Mutex as StdMutex,
+        PoisonError,
         atomic::{AtomicU8, Ordering},
     },
     thread,
@@ -50,6 +52,26 @@ struct Shared {
     #[debug(skip)]
     interrupt_stream: StdMutex<Option<MpdStream>>,
     idle_state: AtomicU8,
+    /// Channels this client is subscribed to. MPD forgets subscriptions when
+    /// the connection goes away, so they have to be restored on reconnect.
+    subscriptions: StdMutex<HashSet<String>>,
+}
+
+fn resubscribe(client: &mut MpdClient, shared: &Shared) {
+    let channels: Vec<String> = shared
+        .subscriptions
+        .lock()
+        .unwrap_or_else(PoisonError::into_inner)
+        .iter()
+        .cloned()
+        .collect();
+
+    for channel in channels {
+        match client.subscribe(&channel) {
+            Ok(()) => info!(channel, "Resubscribed to channel"),
+            Err(err) => error!(channel, error = ?err, "Failed to resubscribe to channel"),
+        }
+    }
 }
 
 fn preempt_idle(shared: &Shared) {
@@ -162,6 +184,7 @@ fn worker_loop(
                                     }
                                 }
                                 info!("Reconnected to MPD");
+                                resubscribe(&mut client, &shared);
                                 on_reconnect();
                                 continue 'outer;
                             }
@@ -195,6 +218,7 @@ impl AsyncClient {
         let shared = Arc::new(Shared {
             interrupt_stream: StdMutex::new(None),
             idle_state: AtomicU8::new(IDLE_STATE_NOT_IDLE),
+            subscriptions: StdMutex::new(HashSet::new()),
         });
 
         let init =
@@ -247,6 +271,32 @@ impl AsyncClient {
             .await
             .map_err(|err| MpdError::Generic(format!("Timed out waiting for response: {err}")))?
             .map_err(|err| MpdError::Generic(format!("Worker dropped response: {err}")))?
+    }
+
+    pub async fn subscribe(&self, channel: String) -> Result<(), MpdError> {
+        let shared = Arc::clone(&self.shared);
+
+        // Recorded inside the closure so it happens on the worker thread, in the
+        // same step as the command. Doing it after run() returns leaves a window
+        // where a reconnect can snapshot the set before the caller records, and
+        // run()'s timeout can abandon a command that later executes anyway.
+        self.run(move |c| {
+            c.subscribe(&channel)?;
+            shared.subscriptions.lock().unwrap_or_else(PoisonError::into_inner).insert(channel);
+            Ok(())
+        })
+        .await
+    }
+
+    pub async fn unsubscribe(&self, channel: String) -> Result<(), MpdError> {
+        let shared = Arc::clone(&self.shared);
+
+        self.run(move |c| {
+            c.unsubscribe(&channel)?;
+            shared.subscriptions.lock().unwrap_or_else(PoisonError::into_inner).remove(&channel);
+            Ok(())
+        })
+        .await
     }
 
     pub fn skip_to_idle(&self) {
