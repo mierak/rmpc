@@ -52,21 +52,15 @@ pub struct Status {
 
 impl Status {
     pub fn samplerate(&self) -> Option<u32> {
-        self.audio
-            .as_ref()
-            .and_then(|audio| audio.split(':').next().and_then(|rate_str| rate_str.parse().ok()))
+        self.audio.as_ref().and_then(|audio| super::parse_audio_format(audio).0)
     }
 
     pub fn bits(&self) -> Option<u32> {
-        self.audio
-            .as_ref()
-            .and_then(|audio| audio.split(':').nth(1).and_then(|bits_str| bits_str.parse().ok()))
+        self.audio.as_ref().and_then(|audio| super::parse_audio_format(audio).1)
     }
 
     pub fn channels(&self) -> Option<u32> {
-        self.audio.as_ref().and_then(|audio| {
-            audio.split(':').nth(2).and_then(|channels_str| channels_str.parse().ok())
-        })
+        self.audio.as_ref().and_then(|audio| super::parse_audio_format(audio).2)
     }
 }
 
@@ -202,5 +196,53 @@ impl std::str::FromStr for State {
             "pause" => Ok(Self::Pause),
             _ => Err(anyhow!("Invalid State: '{s}'")),
         }
+    }
+}
+
+#[cfg(test)]
+#[allow(clippy::unwrap_used)]
+mod tests {
+    use rstest::rstest;
+
+    use super::Status;
+
+    // Format strings exactly as MPD's AudioFormat.cxx ToString() emits them:
+    // PCM "rate:bits:channels", float bits as "f", wildcards as "*", DSD as
+    // the "dsdNN:channels" shortcut (NN * 44100 bit rate) or, for rates not
+    // divisible by 44100, "rate:dsd:channels" where rate is MPD's internal
+    // byte rate (bit rate / 8).
+    #[rstest]
+    #[case("44100:16:2", Some(44100), Some(16), Some(2))]
+    #[case("96000:24:2", Some(96000), Some(24), Some(2))]
+    #[case("44100:f:2", Some(44100), None, Some(2))]
+    #[case("44100:*:2", Some(44100), None, Some(2))]
+    #[case("*:*:*", None, None, None)]
+    #[case("dsd64:2", Some(2_822_400), Some(1), Some(2))]
+    #[case("dsd128:2", Some(5_644_800), Some(1), Some(2))]
+    #[case("dsd512:2", Some(22_579_200), Some(1), Some(2))]
+    #[case("dsd64:*", Some(2_822_400), Some(1), None)]
+    #[case("384000:dsd:2", Some(3_072_000), Some(1), Some(2))]
+    #[case("*:dsd:2", None, Some(1), Some(2))]
+    #[case("garbage", None, None, None)]
+    fn audio_format_parses(
+        #[case] audio: &str,
+        #[case] samplerate: Option<u32>,
+        #[case] bits: Option<u32>,
+        #[case] channels: Option<u32>,
+    ) {
+        let status = Status { audio: Some(audio.to_owned()), ..Default::default() };
+
+        assert_eq!(status.samplerate(), samplerate);
+        assert_eq!(status.bits(), bits);
+        assert_eq!(status.channels(), channels);
+    }
+
+    #[test]
+    fn audio_format_absent() {
+        let status = Status::default();
+
+        assert_eq!(status.samplerate(), None);
+        assert_eq!(status.bits(), None);
+        assert_eq!(status.channels(), None);
     }
 }

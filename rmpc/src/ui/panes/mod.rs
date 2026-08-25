@@ -709,15 +709,18 @@ impl Property<PropertyKind> {
                     ctx.input.mode().discriminant().to_string(),
                     style,
                 ))),
-                StatusProperty::SampleRate() => {
-                    status.samplerate().map(|v| Either::Left(Span::styled(v.to_string(), style)))
-                }
-                StatusProperty::Bits() => {
-                    status.bits().map(|v| Either::Left(Span::styled(v.to_string(), style)))
-                }
-                StatusProperty::Channels() => {
-                    status.channels().map(|v| Either::Left(Span::styled(v.to_string(), style)))
-                }
+                StatusProperty::SampleRate() => status.samplerate().map_or_else(
+                    || self.default_as_span(song, ctx, tag_separator, strategy),
+                    |v| Some(Either::Left(Span::styled(v.to_string(), style))),
+                ),
+                StatusProperty::Bits() => status.bits().map_or_else(
+                    || self.default_as_span(song, ctx, tag_separator, strategy),
+                    |v| Some(Either::Left(Span::styled(v.to_string(), style))),
+                ),
+                StatusProperty::Channels() => status.channels().map_or_else(
+                    || self.default_as_span(song, ctx, tag_separator, strategy),
+                    |v| Some(Either::Left(Span::styled(v.to_string(), style))),
+                ),
             },
             PropertyKindOrText::Property(PropertyKind::Widget(w)) => match w {
                 WidgetProperty::Volume => {
@@ -1481,6 +1484,9 @@ mod format_tests {
         #[case(StatusProperty::Duration, "2:03")]
         #[case(StatusProperty::Crossfade, "3")]
         #[case(StatusProperty::Bitrate, "123")]
+        #[case(StatusProperty::SampleRate(), "2822400")]
+        #[case(StatusProperty::Bits(), "1")]
+        #[case(StatusProperty::Channels(), "2")]
         fn status_property_resolves_correctly(
             mut ctx: Ctx,
             #[case] prop: StatusProperty,
@@ -1516,6 +1522,7 @@ mod format_tests {
                 duration: Duration::from_secs(123),
                 xfade: Some(3),
                 state: State::Play,
+                audio: Some("dsd64:2".to_string()),
                 ..Default::default()
             };
 
@@ -1524,6 +1531,31 @@ mod format_tests {
             assert_eq!(
                 result,
                 Some(either::Either::<Span<'_>, Vec<Span<'_>>>::Left(Span::raw(expected)))
+            );
+        }
+
+        #[rstest]
+        #[case(StatusProperty::Bitrate)]
+        #[case(StatusProperty::SampleRate())]
+        #[case(StatusProperty::Bits())]
+        #[case(StatusProperty::Channels())]
+        fn status_property_falls_back_to_default(mut ctx: Ctx, #[case] prop: StatusProperty) {
+            let format = Property::<PropertyKind> {
+                kind: PropertyKindOrText::Property(PropertyKind::Status(prop)),
+                style: None,
+                default: Some(Box::new(Property::<PropertyKind> {
+                    kind: PropertyKindOrText::Text("default".to_string()),
+                    style: None,
+                    default: None,
+                })),
+            };
+            ctx.status = Status::default();
+
+            let result = format.as_span(None, &ctx, "", TagResolutionStrategy::All);
+
+            assert_eq!(
+                result,
+                Some(either::Either::<Span<'_>, Vec<Span<'_>>>::Left(Span::raw("default")))
             );
         }
 
