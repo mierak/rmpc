@@ -4,7 +4,6 @@ use std::{
     sync::{
         Arc,
         Mutex as StdMutex,
-        PoisonError,
         atomic::{AtomicU8, Ordering},
     },
     thread,
@@ -52,16 +51,14 @@ struct Shared {
     #[debug(skip)]
     interrupt_stream: StdMutex<Option<MpdStream>>,
     idle_state: AtomicU8,
-    /// Channels this client is subscribed to. MPD forgets subscriptions when
-    /// the connection goes away, so they have to be restored on reconnect.
-    subscriptions: StdMutex<HashSet<String>>,
+    subscribed_channels: StdMutex<HashSet<String>>,
 }
 
 fn resubscribe(client: &mut MpdClient, shared: &Shared) {
     let channels: Vec<String> = shared
-        .subscriptions
+        .subscribed_channels
         .lock()
-        .unwrap_or_else(PoisonError::into_inner)
+        .expect("Failed to lock subscribed channels")
         .iter()
         .cloned()
         .collect();
@@ -218,7 +215,7 @@ impl AsyncClient {
         let shared = Arc::new(Shared {
             interrupt_stream: StdMutex::new(None),
             idle_state: AtomicU8::new(IDLE_STATE_NOT_IDLE),
-            subscriptions: StdMutex::new(HashSet::new()),
+            subscribed_channels: StdMutex::new(HashSet::new()),
         });
 
         let init =
@@ -276,13 +273,13 @@ impl AsyncClient {
     pub async fn subscribe(&self, channel: String) -> Result<(), MpdError> {
         let shared = Arc::clone(&self.shared);
 
-        // Recorded inside the closure so it happens on the worker thread, in the
-        // same step as the command. Doing it after run() returns leaves a window
-        // where a reconnect can snapshot the set before the caller records, and
-        // run()'s timeout can abandon a command that later executes anyway.
         self.run(move |c| {
             c.subscribe(&channel)?;
-            shared.subscriptions.lock().unwrap_or_else(PoisonError::into_inner).insert(channel);
+            shared
+                .subscribed_channels
+                .lock()
+                .expect("Failed to lock subscribed channels")
+                .insert(channel);
             Ok(())
         })
         .await
@@ -293,7 +290,11 @@ impl AsyncClient {
 
         self.run(move |c| {
             c.unsubscribe(&channel)?;
-            shared.subscriptions.lock().unwrap_or_else(PoisonError::into_inner).remove(&channel);
+            shared
+                .subscribed_channels
+                .lock()
+                .expect("Failed to lock subscribed channels")
+                .remove(&channel);
             Ok(())
         })
         .await
