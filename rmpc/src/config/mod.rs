@@ -84,6 +84,7 @@ pub struct Config {
     pub browser_song_sort: Arc<SortOptions>,
     pub show_playlists_in_browser: ShowPlaylistsMode,
     pub directories_sort: Arc<SortOptions>,
+    pub directories_hidden_dirs: Arc<Vec<String>>,
     pub cava: Cava,
     pub auto_open_downloads: bool,
     pub extra_yt_dlp_args: Vec<String>,
@@ -156,6 +157,7 @@ pub struct ConfigFile {
     pub browser_song_sort: Vec<SongPropertyFile>,
     pub show_playlists_in_browser: ShowPlaylistsMode,
     pub directories_sort: SortModeFile,
+    pub directories_hidden_dirs: Vec<String>,
     pub cava: CavaFile,
     pub extra_yt_dlp_args: Vec<String>,
     pub auto_open_downloads: bool,
@@ -232,6 +234,7 @@ impl Default for ConfigFile {
             reflect_changes_to_playlist: false,
             cava: CavaFile::default(),
             show_playlists_in_browser: ShowPlaylistsMode::default(),
+            directories_hidden_dirs: Vec::new(),
             extra_yt_dlp_args: Vec::new(),
             auto_open_downloads: true,
             duration_format: "%m:%S".to_string(),
@@ -339,6 +342,7 @@ impl ConfigFile {
                 Arc::new(arr.into_iter().map(|v| tilde_expand(&v).into_owned()).collect_vec())
             }),
             show_playlists_in_browser: self.show_playlists_in_browser,
+            directories_hidden_dirs: Arc::new(self.directories_hidden_dirs),
             browser_song_sort: Arc::new(SortOptions {
                 mode: SortMode::Format(
                     self.browser_song_sort.iter().cloned().map(SongProperty::from).collect_vec(),
