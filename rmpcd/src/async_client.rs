@@ -1,5 +1,4 @@
 use std::{
-    collections::HashSet,
     io::Write,
     sync::{
         Arc,
@@ -21,6 +20,8 @@ use tokio::{
     time::timeout,
 };
 use tracing::{error, info, trace, warn};
+
+use crate::subscribed_channels::SubscribedChannels;
 
 pub type MpdClient = rmpc_mpd::client::Client<'static>;
 pub type MpdError = rmpc_mpd::errors::MpdError;
@@ -51,19 +52,11 @@ struct Shared {
     #[debug(skip)]
     interrupt_stream: StdMutex<Option<MpdStream>>,
     idle_state: AtomicU8,
-    subscribed_channels: StdMutex<HashSet<String>>,
+    subscribed_channels: SubscribedChannels,
 }
 
 fn resubscribe(client: &mut MpdClient, shared: &Shared) {
-    let channels: Vec<String> = shared
-        .subscribed_channels
-        .lock()
-        .expect("Failed to lock subscribed channels")
-        .iter()
-        .cloned()
-        .collect();
-
-    for channel in channels {
+    for channel in shared.subscribed_channels.list() {
         match client.subscribe(&channel) {
             Ok(()) => info!(channel, "Resubscribed to channel"),
             Err(err) => error!(channel, error = ?err, "Failed to resubscribe to channel"),
@@ -219,7 +212,7 @@ impl AsyncClient {
         let shared = Arc::new(Shared {
             interrupt_stream: StdMutex::new(None),
             idle_state: AtomicU8::new(IDLE_STATE_NOT_IDLE),
-            subscribed_channels: StdMutex::new(HashSet::new()),
+            subscribed_channels: SubscribedChannels::default(),
         });
 
         let init =
@@ -278,12 +271,18 @@ impl AsyncClient {
         let shared = Arc::clone(&self.shared);
 
         self.run(move |c| {
-            c.subscribe(&channel)?;
-            shared
-                .subscribed_channels
-                .lock()
-                .expect("Failed to lock subscribed channels")
-                .insert(channel);
+            match shared.subscribed_channels.increment(&channel) {
+                1 => {
+                    if let Err(err) = c.subscribe(&channel) {
+                        shared.subscribed_channels.decrement(&channel);
+                        return Err(err);
+                    }
+                }
+                count => {
+                    trace!(channel, count, "Channel already subscribed to, increased refcount");
+                }
+            }
+
             Ok(())
         })
         .await
@@ -293,12 +292,21 @@ impl AsyncClient {
         let shared = Arc::clone(&self.shared);
 
         self.run(move |c| {
-            c.unsubscribe(&channel)?;
-            shared
-                .subscribed_channels
-                .lock()
-                .expect("Failed to lock subscribed channels")
-                .remove(&channel);
+            match shared.subscribed_channels.decrement(&channel) {
+                Some(0) => {
+                    if let Err(err) = c.unsubscribe(&channel) {
+                        shared.subscribed_channels.increment(&channel);
+                        return Err(err);
+                    }
+                }
+                Some(remaining) => {
+                    trace!(channel, remaining, "Channel still has other subscribers");
+                }
+                None => {
+                    warn!(channel, "Not subscribed to channel, ignoring");
+                }
+            }
+
             Ok(())
         })
         .await

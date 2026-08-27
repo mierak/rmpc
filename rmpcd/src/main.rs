@@ -36,6 +36,7 @@ mod mpd_ext;
 mod mpris;
 mod paths;
 mod pkg;
+mod subscribed_channels;
 
 #[derive(Parser, Debug)]
 #[command(version, about)]
