@@ -11,7 +11,7 @@ pub fn init(lua: &Lua, mpd: &Table, client: &Arc<AsyncClient>) -> Result<()> {
     let subscribe = lua.create_async_function(move |lua, channel: String| {
         let client = Arc::clone(&c);
         async move {
-            match client.run(move |c| c.subscribe(&channel)).await {
+            match client.subscribe(channel).await {
                 Ok(()) => true.into_lua_multi(&lua),
                 Err(err) => {
                     tracing::error!(err = ?err, "Failed to subscribe to a channel");
@@ -25,7 +25,7 @@ pub fn init(lua: &Lua, mpd: &Table, client: &Arc<AsyncClient>) -> Result<()> {
     let unsubscribe = lua.create_async_function(move |lua, channel: String| {
         let client = Arc::clone(&c);
         async move {
-            match client.run(move |c| c.unsubscribe(&channel)).await {
+            match client.unsubscribe(channel).await {
                 Ok(()) => true.into_lua_multi(&lua),
                 Err(err) => {
                     tracing::error!(err = ?err, "Failed to unsubscribe from a channel");

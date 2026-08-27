@@ -242,8 +242,7 @@ async fn run() -> Result<()> {
         plugin_store.all().flat_map(|p| &p.subscribed_channels).chain(subscribed_channels.iter())
     {
         info!(channel, "Subscribing to channel");
-        let channel = channel.clone();
-        mpd.run(move |c| c.subscribe(&channel)).await?;
+        mpd.subscribe(channel.clone()).await?;
     }
 
     let status = mpd.run(|c| c.get_status()).await?;

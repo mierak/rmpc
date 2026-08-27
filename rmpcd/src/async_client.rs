@@ -1,4 +1,5 @@
 use std::{
+    collections::HashSet,
     io::Write,
     sync::{
         Arc,
@@ -50,6 +51,24 @@ struct Shared {
     #[debug(skip)]
     interrupt_stream: StdMutex<Option<MpdStream>>,
     idle_state: AtomicU8,
+    subscribed_channels: StdMutex<HashSet<String>>,
+}
+
+fn resubscribe(client: &mut MpdClient, shared: &Shared) {
+    let channels: Vec<String> = shared
+        .subscribed_channels
+        .lock()
+        .expect("Failed to lock subscribed channels")
+        .iter()
+        .cloned()
+        .collect();
+
+    for channel in channels {
+        match client.subscribe(&channel) {
+            Ok(()) => info!(channel, "Resubscribed to channel"),
+            Err(err) => error!(channel, error = ?err, "Failed to resubscribe to channel"),
+        }
+    }
 }
 
 fn preempt_idle(shared: &Shared) {
@@ -166,6 +185,7 @@ fn worker_loop(
                                     }
                                 }
                                 info!("Reconnected to MPD");
+                                resubscribe(&mut client, &shared);
                                 on_reconnect();
                                 continue 'outer;
                             }
@@ -199,6 +219,7 @@ impl AsyncClient {
         let shared = Arc::new(Shared {
             interrupt_stream: StdMutex::new(None),
             idle_state: AtomicU8::new(IDLE_STATE_NOT_IDLE),
+            subscribed_channels: StdMutex::new(HashSet::new()),
         });
 
         let init =
@@ -251,6 +272,36 @@ impl AsyncClient {
             .await
             .map_err(|err| MpdError::Generic(format!("Timed out waiting for response: {err}")))?
             .map_err(|err| MpdError::Generic(format!("Worker dropped response: {err}")))?
+    }
+
+    pub async fn subscribe(&self, channel: String) -> Result<(), MpdError> {
+        let shared = Arc::clone(&self.shared);
+
+        self.run(move |c| {
+            c.subscribe(&channel)?;
+            shared
+                .subscribed_channels
+                .lock()
+                .expect("Failed to lock subscribed channels")
+                .insert(channel);
+            Ok(())
+        })
+        .await
+    }
+
+    pub async fn unsubscribe(&self, channel: String) -> Result<(), MpdError> {
+        let shared = Arc::clone(&self.shared);
+
+        self.run(move |c| {
+            c.unsubscribe(&channel)?;
+            shared
+                .subscribed_channels
+                .lock()
+                .expect("Failed to lock subscribed channels")
+                .remove(&channel);
+            Ok(())
+        })
+        .await
     }
 
     pub fn skip_to_idle(&self) {
