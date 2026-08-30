@@ -4,6 +4,7 @@ use itertools::Itertools;
 use ratatui::{
     style::Style,
     text::{Line, Span},
+    widgets::ListItem,
 };
 use rmpc_mpd::commands::Song;
 use unicode_segmentation::UnicodeSegmentation;
@@ -158,121 +159,103 @@ impl SongExt for Song {
         let separator = Span::from(": ");
         let start_of_line_spacer = Span::from(" ");
 
-        let mut info_group = PreviewGroup::new(Some(" --- [Info]"), Some(group_style));
+        // Build one " Label: value" list row. Returns a 'static item so it can
+        // live in a PreviewGroup regardless of `self`'s lifetime.
+        let row = |label: &str, value: String| -> ListItem<'static> {
+            Line::from(vec![
+                start_of_line_spacer.clone(),
+                Span::styled(label.to_string(), key_style),
+                separator.clone(),
+                Span::from(value),
+            ])
+            .into()
+        };
 
-        let file = Line::from(vec![
-            start_of_line_spacer.clone(),
-            Span::styled("File", key_style),
-            separator.clone(),
-            Span::from(self.file.clone()),
-        ]);
-        info_group.push(file.into());
+        // Keys promoted to the Info section as friendly-named rows. They are
+        // excluded from the Tags catch-all below so nothing is duplicated and
+        // nothing is lost. `format` is decoded into the audio rows; `duration`
+        // is handled via `self.duration`.
+        const PROMOTED: &[&str] = &[
+            "title",
+            "artist",
+            "albumartist",
+            "album",
+            "disc",
+            "track",
+            "date",
+            "genre",
+            "composer",
+            "performer",
+            "conductor",
+            "comment",
+            "duration",
+            "format",
+        ];
 
+        let mut info_group = PreviewGroup::new(Some("\u{f05a} Info"), Some(group_style));
+
+        info_group.push(row("File", self.file.clone()));
         if let Some(file_name) = self.file_name() {
-            info_group.push(
-                Line::from(vec![
-                    start_of_line_spacer.clone(),
-                    Span::styled("Filename", key_style),
-                    separator.clone(),
-                    Span::from(file_name.into_owned()),
-                ])
-                .into(),
-            );
+            info_group.push(row("Filename", file_name.into_owned()));
+        }
+        if let Some(ext) = self.file_ext() {
+            info_group.push(row("Codec", ext.to_uppercase()));
         }
 
-        if let Some(title) = self.metadata.get("title") {
-            title.for_each(|item| {
-                info_group.push(
-                    Line::from(vec![
-                        start_of_line_spacer.clone(),
-                        Span::styled("Title", key_style),
-                        separator.clone(),
-                        Span::from(item.to_owned()),
-                    ])
-                    .into(),
-                );
-            });
-        }
-        if let Some(artist) = self.metadata.get("artist") {
-            artist.for_each(|item| {
-                info_group.push(
-                    Line::from(vec![
-                        start_of_line_spacer.clone(),
-                        Span::styled("Artist", key_style),
-                        separator.clone(),
-                        Span::from(item.to_owned()),
-                    ])
-                    .into(),
-                );
-            });
-        }
-
-        if let Some(album) = self.metadata.get("album") {
-            album.for_each(|item| {
-                info_group.push(
-                    Line::from(vec![
-                        start_of_line_spacer.clone(),
-                        Span::styled("Album", key_style),
-                        separator.clone(),
-                        Span::from(item.to_owned()),
-                    ])
-                    .into(),
-                );
-            });
+        // Friendly-named, possibly multi-valued metadata fields, in display order.
+        for (label, key) in [
+            ("Title", "title"),
+            ("Artist", "artist"),
+            ("Album Artist", "albumartist"),
+            ("Album", "album"),
+            ("Disc", "disc"),
+            ("Track", "track"),
+            ("Date", "date"),
+            ("Genre", "genre"),
+            ("Composer", "composer"),
+            ("Performer", "performer"),
+            ("Conductor", "conductor"),
+            ("Comment", "comment"),
+        ] {
+            if let Some(tag) = self.metadata.get(key) {
+                tag.for_each(|item| info_group.push(row(label, item.to_owned())));
+            }
         }
 
         if let Some(duration) = &self.duration {
-            info_group.push(
-                Line::from(vec![
-                    start_of_line_spacer.clone(),
-                    Span::styled("Duration", key_style),
-                    separator.clone(),
-                    Span::from(ctx.config.duration_format.format(duration)),
-                ])
-                .into(),
-            );
+            info_group.push(row("Duration", ctx.config.duration_format.format(duration)));
         }
 
-        info_group.push(
-            Line::from(vec![
-                start_of_line_spacer.clone(),
-                Span::styled("Last Modified", key_style),
-                separator.clone(),
-                Span::from(self.last_modified.to_string()),
-            ])
-            .into(),
-        );
+        // Decoded audio properties (from the `format` tag: rate:bits:channels).
+        if let Some(rate) = self.samplerate() {
+            info_group.push(row("Sample Rate", format!("{rate} Hz")));
+        }
+        if let Some(bits) = self.bits() {
+            info_group.push(row("Bit Depth", format!("{bits} bit")));
+        }
+        if let Some(channels) = self.channels() {
+            let label = match channels {
+                1 => "Mono".to_string(),
+                2 => "Stereo".to_string(),
+                n => format!("{n} channels"),
+            };
+            info_group.push(row("Channels", label));
+        }
 
+        info_group.push(row("Last Modified", self.last_modified.to_string()));
         if let Some(added) = &self.added {
-            info_group.push(
-                Line::from(vec![
-                    start_of_line_spacer.clone(),
-                    Span::styled("Added", key_style),
-                    separator.clone(),
-                    Span::from(added.to_string()),
-                ])
-                .into(),
-            );
+            info_group.push(row("Added", added.to_string()));
         }
 
-        let mut tags_group = PreviewGroup::new(Some(" --- [Tags]"), Some(group_style));
+        // Tags: every remaining metadata key not already promoted to Info, sorted.
+        let mut tags_group = PreviewGroup::new(Some("\u{f02c} Tags"), Some(group_style));
         for (k, v) in self
             .metadata
             .iter()
-            .filter(|(key, _)| !["title", "album", "artist", "duration"].contains(&(*key).as_str()))
+            .filter(|(key, _)| !PROMOTED.contains(&key.to_lowercase().as_str()))
             .sorted_by_key(|(key, _)| *key)
         {
-            v.for_each(|item| {
-                tags_group.push(
-                    Line::from(vec![
-                        start_of_line_spacer.clone(),
-                        Span::styled(k.clone(), key_style),
-                        separator.clone(),
-                        Span::from(item.to_owned()),
-                    ])
-                    .into(),
-                );
-            });
+            v.for_each(|item| tags_group.push(row(k.as_str(), item.to_owned())));
         }
 
         let mut result = vec![info_group, tags_group];
@@ -281,18 +264,10 @@ impl SongExt for Song {
         if let Some(stickers) = stickers
             && !stickers.is_empty()
         {
-            let mut stickers_group = PreviewGroup::new(Some(" --- [Stickers]"), Some(group_style));
+            let mut stickers_group = PreviewGroup::new(Some("\u{f249} Stickers"), Some(group_style));
 
             for (k, v) in stickers.iter().sorted_by_key(|(key, _)| *key) {
-                stickers_group.push(
-                    Line::from(vec![
-                        start_of_line_spacer.clone(),
-                        Span::styled(k.clone(), key_style),
-                        separator.clone(),
-                        Span::from(v.to_owned()),
-                    ])
-                    .into(),
-                );
+                stickers_group.push(row(k.as_str(), v.to_owned()));
             }
 
             result.push(stickers_group);

@@ -11,6 +11,9 @@ pub struct Search {
     pub search_button: bool,
     pub custom_query: bool,
     pub mode: FilterKindFile,
+    /// Retained for config backward-compatibility; the search bar now uses
+    /// fixed scope chips (Title/Artist/Album/Any) instead of per-tag fields.
+    #[allow(dead_code)]
     pub tags: Vec<SearchableTag>,
 }
 
@@ -30,13 +33,12 @@ pub struct SearchFile {
 
 #[derive(Debug, Default, Clone)]
 pub struct SearchableTag {
-    pub label: String,
+    #[allow(dead_code)]
     pub value: String,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct SearchableTagFile {
-    label: String,
     value: String,
 }
 
@@ -56,12 +58,12 @@ impl TryFrom<SearchFile> for Search {
             mode: value.mode,
             custom_query: value.custom_query,
             tags: if value.tags.is_empty() {
-                vec![SearchableTag { label: "Any Tag".to_string(), value: "any".to_string() }]
+                vec![SearchableTag { value: "any".to_string() }]
             } else {
                 value
                     .tags
                     .into_iter()
-                    .map(|SearchableTagFile { value, label }| SearchableTag { label, value })
+                    .map(|SearchableTagFile { value, .. }| SearchableTag { value })
                     .collect_vec()
             },
         })
@@ -77,16 +79,13 @@ impl Default for SearchFile {
             mode: FilterKindFile::Contains,
             custom_query: false,
             tags: [
-                SearchableTagFile { value: "any".to_string(), label: "Any Tag".to_string() },
-                SearchableTagFile { value: "artist".to_string(), label: "Artist".to_string() },
-                SearchableTagFile { value: "album".to_string(), label: "Album".to_string() },
-                SearchableTagFile {
-                    value: "albumartist".to_string(),
-                    label: "Album Artist".to_string(),
-                },
-                SearchableTagFile { value: "title".to_string(), label: "Title".to_string() },
-                SearchableTagFile { value: "filename".to_string(), label: "Filename".to_string() },
-                SearchableTagFile { value: "genre".to_string(), label: "Genre".to_string() },
+                SearchableTagFile { value: "any".to_string() },
+                SearchableTagFile { value: "artist".to_string() },
+                SearchableTagFile { value: "album".to_string() },
+                SearchableTagFile { value: "albumartist".to_string() },
+                SearchableTagFile { value: "title".to_string() },
+                SearchableTagFile { value: "filename".to_string() },
+                SearchableTagFile { value: "genre".to_string() },
             ]
             .to_vec(),
         }

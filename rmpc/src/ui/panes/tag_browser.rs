@@ -13,17 +13,25 @@ use super::Pane;
 use crate::{
     MpdQueryResult,
     config::{
+        album_art::ImageMethod,
         sort_mode::{SortMode, SortOptions},
         tabs::{BrowserTagConfig, CollapseLevel, PaneType},
         theme::properties::SongProperty,
     },
     ctx::Ctx,
-    shared::{cmp::StringCompare, id, keys::ActionEvent, mouse_event::MouseEvent},
+    shared::{
+        cmp::StringCompare,
+        id,
+        keys::ActionEvent,
+        mouse_event::MouseEvent,
+        mpd_client_ext::MpdClientExt,
+    },
     ui::{
         UiEvent,
         browser::BrowserPane,
         dir_or_song::DirOrSong,
-        dirstack::{DirStack, DirStackItem, Path, WalkDirStackItem},
+        dirstack::{DirStack, DirState, DirStackItem, Path, WalkDirStackItem},
+        image::facade::AlbumArtFacade,
         input::InputResultEvent,
         song_ext::SongExt,
         widgets::browser::{Browser, BrowserArea},
@@ -35,13 +43,18 @@ pub struct TagBrowserPane {
     stack: DirStack<DirOrSong, ListState>,
     tags: Vec<BrowserTagConfig>,
     target_pane: PaneType,
-    browser: Browser<DirOrSong>,
+    pub(crate) browser: Browser<DirOrSong>,
     initialized: bool,
+    album_art: AlbumArtFacade,
+    crisp: bool,
+    has_cover: bool,
+    shown_cover: Option<String>,
 }
 
 const INIT: &str = "init";
 const INIT_GROUPED: &str = "init_grouped";
 const FETCH_SONGS: &str = "fetch_songs";
+const PREVIEW_COVER: &str = "tag_browser_preview_cover";
 
 struct SongGroup {
     id: String,
@@ -51,13 +64,27 @@ struct SongGroup {
 }
 
 impl TagBrowserPane {
-    pub fn new(tags: Vec<BrowserTagConfig>, target_pane: PaneType, _ctx: &Ctx) -> Self {
+    pub fn new(tags: Vec<BrowserTagConfig>, target_pane: PaneType, ctx: &Ctx) -> Self {
+        let crisp = matches!(
+            ctx.config.album_art.method,
+            ImageMethod::Kitty
+                | ImageMethod::Iterm2
+                | ImageMethod::Sixel
+                | ImageMethod::UeberzugWayland
+                | ImageMethod::UeberzugX11
+        );
+        let mut browser = Browser::new();
+        browser.preview_cover = crisp;
         Self {
             tags,
             target_pane,
             stack: DirStack::default(),
-            browser: Browser::new(),
+            browser,
             initialized: false,
+            album_art: AlbumArtFacade::new(ctx),
+            crisp,
+            has_cover: false,
+            shown_cover: None,
         }
     }
 
@@ -283,12 +310,55 @@ impl TagBrowserPane {
             })
             .collect()
     }
+
+    fn fetch_selected_cover(&mut self, ctx: &Ctx) {
+        if !self.crisp {
+            return;
+        }
+        let Some(item) = self.stack.current().selected() else {
+            return;
+        };
+        let key = match item {
+            DirOrSong::Song(song) => song.file.clone(),
+            DirOrSong::Dir { display_name, name, .. } => {
+                display_name.as_ref().unwrap_or(name).clone()
+            }
+        };
+        if self.shown_cover.as_ref() == Some(&key) {
+            return;
+        }
+        self.shown_cover = Some(key.clone());
+        let order = ctx.config.album_art.order;
+        let item = item.clone();
+        let target = self.target_pane.clone();
+        ctx.query().id(PREVIEW_COVER).replace_id(PREVIEW_COVER).target(target).query(
+            move |client| {
+                let cover = match &item {
+                    DirOrSong::Song(song) => client.find_album_art(&song.file, order)?,
+                    DirOrSong::Dir { display_name, name, .. } => {
+                        let album = display_name.as_ref().unwrap_or(name).as_str();
+                        match client.find_one(&[Filter::new(Tag::Album, album)])? {
+                            Some(song) => client.find_album_art(&song.file, order)?,
+                            None => None,
+                        }
+                    }
+                };
+                Ok(MpdQueryResult::AlbumArt(cover))
+            },
+        );
+    }
 }
 
 impl Pane for TagBrowserPane {
     fn render(&mut self, frame: &mut Frame, area: Rect, ctx: &Ctx) -> Result<()> {
         self.browser.render(area, frame.buffer_mut(), &mut self.stack, ctx);
-
+        if self.crisp {
+            let cover_rect = self.browser.areas[BrowserArea::Cover];
+            if cover_rect.width > 0 && cover_rect.height > 0 {
+                self.album_art.set_size(cover_rect);
+            }
+        }
+        self.fetch_selected_cover(ctx);
         Ok(())
     }
 
@@ -301,7 +371,7 @@ impl Pane for TagBrowserPane {
         Ok(())
     }
 
-    fn on_event(&mut self, event: &mut UiEvent, _is_visible: bool, ctx: &Ctx) -> Result<()> {
+    fn on_event(&mut self, event: &mut UiEvent, is_visible: bool, ctx: &Ctx) -> Result<()> {
         match event {
             UiEvent::Database => {
                 self.stack = DirStack::default();
@@ -311,7 +381,41 @@ impl Pane for TagBrowserPane {
                 self.initialized = false;
                 self.before_show(ctx)?;
             }
+            UiEvent::ImageEncoded { id, data } if *id == self.album_art.id() => {
+                self.album_art.display(std::mem::take(data), ctx)?;
+            }
+            UiEvent::ImageEncodeFailed { id, err } if *id == self.album_art.id() => {
+                self.album_art.image_processing_failed(err, ctx)?;
+            }
+            UiEvent::Displayed if is_visible && self.crisp && self.has_cover => {
+                self.album_art.show_current(ctx)?;
+            }
+            UiEvent::Exit => {
+                self.album_art.cleanup()?;
+            }
             _ => {}
+        }
+        Ok(())
+    }
+
+    fn on_hide(&mut self, ctx: &Ctx) -> Result<()> {
+        self.shown_cover = None;
+        self.has_cover = false;
+        self.album_art.hide(ctx)
+    }
+
+    fn resize(&mut self, _area: Rect, ctx: &Ctx) -> Result<()> {
+        // The preview cover renders out-of-band at a rect computed during
+        // render(); a terminal resize clears the whole screen (event loop) but
+        // fetch_selected_cover() early-returns when the selection is unchanged,
+        // so the cover would not be re-shown. Reset the cache and re-fetch so it
+        // re-renders at the new geometry (mirrors AlbumsGridPane::resize).
+        if self.crisp {
+            self.shown_cover = None;
+            self.has_cover = false;
+            self.album_art.hide(ctx)?;
+            self.fetch_selected_cover(ctx);
+            ctx.render()?;
         }
         Ok(())
     }
@@ -370,6 +474,15 @@ impl Pane for TagBrowserPane {
                 }
                 ctx.render()?;
             }
+            (PREVIEW_COVER, MpdQueryResult::AlbumArt(Some(bytes))) => {
+                self.has_cover = true;
+                self.album_art.show(bytes, ctx)?;
+            }
+            (PREVIEW_COVER, MpdQueryResult::AlbumArt(None)) => {
+                self.has_cover = false;
+                self.album_art.hide(ctx)?;
+                ctx.render()?;
+            }
             _ => {}
         }
         Ok(())
@@ -387,6 +500,10 @@ impl BrowserPane<DirOrSong> for TagBrowserPane {
 
     fn browser_areas(&self) -> EnumMap<BrowserArea, Rect> {
         self.browser.areas
+    }
+
+    fn preview_scroll_mut(&mut self) -> Option<&mut DirState<ListState>> {
+        Some(&mut self.browser.preview_scroll)
     }
 
     fn list_songs_in_item(
