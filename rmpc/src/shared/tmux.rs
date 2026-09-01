@@ -325,7 +325,14 @@ macro_rules! tmux_write {
 }
 macro_rules! tmux_write_bytes {
     ( $w:ident, $data:expr ) => {{
-        if *crate::tmux::IS_TMUX {
+        use crate::{config::album_art::ImageMethod, shared::terminal::TERMINAL};
+        let skip_passthrough = if let Some(backend) = TERMINAL.resolved_backend.get() {
+            matches!(backend, ImageMethod::Sixel) && *TERMINAL.sixel
+        } else {
+            false
+        };
+
+        if *crate::tmux::IS_TMUX && !skip_passthrough {
             $w.write_all("\x1bPtmux;".as_bytes())?;
 
             for b in $data {
