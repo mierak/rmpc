@@ -282,9 +282,10 @@ impl<T: MpdClient + MpdCommand + ProtoClient> MpdClientExt for T {
             self.current_partition_outputs()
         } else {
             // MPD lists all outputs only on the default partition so we have to
-            // switch to it, list the outputs and then switch back. We also have to
-            // list outputs on the current partition to find out which output is
-            // actually enabled on the current partition.
+            // switch to it, list the outputs and then switch back. We also have
+            // to list outputs on the current partition to find out
+            // which output is actually enabled on the current
+            // partition.
             self.send_start_cmd_list_ok()?;
             self.send_switch_to_partition("default")?;
             self.send_outputs()?;
@@ -537,14 +538,16 @@ impl<T: MpdClient + MpdCommand + ProtoClient> MpdClientExt for T {
             Ok(()) => {}
             Err(MpdError::Mpd(err)) if err.is_no_exist() => {
                 let Some(cache_dir) = cache_dir else {
-                    // This should not happen, the download should only happen when
-                    // cache_dir is defined in the first place.
+                    // This should not happen, the download should only happen
+                    // when cache_dir is defined in the
+                    // first place.
                     log::error!(err:?; "MPD reported error when adding files from yt-dlp cache dir, but cache_dir is not configured");
                     return Err(MpdError::Mpd(err))?;
                 };
                 let Some(cfg) = &self.config() else {
-                    // This should not happen either, music_directory is required for
-                    // MPD to work and rmpc needs socket connection to use yt-dpl so it
+                    // This should not happen either, music_directory is
+                    // required for MPD to work and rmpc
+                    // needs socket connection to use yt-dpl so it
                     // should always have permission to access the config.
                     log::error!(err:?; "MPD reported error when adding files from yt-dlp cache dir, but cannot get music_directory from MPD");
                     return Err(MpdError::Mpd(err))?;
@@ -554,9 +557,9 @@ impl<T: MpdClient + MpdCommand + ProtoClient> MpdClientExt for T {
                 log::warn!(cache_dir:?, music_directory:?; "MPD reported noexist error when adding files from yt-dlp cache dir. Will try again after issuing database update.");
 
                 let Ok(update_dir) = cache_dir.strip_prefix(music_directory) else {
-                    // Rethrow the original error. The cache_dir is not inside the
-                    // music_directory so there is no reason to try to issue update to
-                    // mpd.
+                    // Rethrow the original error. The cache_dir is not inside
+                    // the music_directory so there is no
+                    // reason to try to issue update to mpd.
                     return Err(MpdError::Mpd(err))?;
                 };
 

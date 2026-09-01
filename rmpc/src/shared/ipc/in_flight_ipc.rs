@@ -31,7 +31,8 @@ impl InFlightIpcCommand {
 
         read.read_line(&mut buf)?;
         if buf.trim().starts_with(IPC_RESPONSE_ERROR) {
-            // trim "error: " from the start of the line end newline from the end
+            // trim "error: " from the start of the line end newline from the
+            // end
             buf.drain(..IPC_RESPONSE_ERROR.len() + ": ".len());
             buf.trim_end_in_place();
             return Err(IpcCommandError::CommandFailure(buf));

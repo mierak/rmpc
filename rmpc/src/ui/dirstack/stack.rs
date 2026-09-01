@@ -67,7 +67,8 @@ where
     }
 
     pub fn previous(&self) -> Option<&Dir<T, S>> {
-        // If path is empty, meaning we are at root, there is no previous directory...
+        // If path is empty, meaning we are at root, there is no previous
+        // directory...
         if self.path.is_empty() {
             None
         } else {
@@ -78,7 +79,8 @@ where
     }
 
     pub fn previous_mut(&mut self) -> Option<&mut Dir<T, S>> {
-        // If path is empty, meaning we are at root, there is no previous directory...
+        // If path is empty, meaning we are at root, there is no previous
+        // directory...
         if self.path.is_empty() {
             None
         } else {
@@ -104,8 +106,8 @@ where
         self.current().selected().map(DirStackItem::as_path).map(|current| self.path.join(current))
     }
 
-    // Returns items of the directory that is pointed to by the currently selected
-    // item if any
+    // Returns items of the directory that is pointed to by the currently
+    // selected item if any
     pub fn next_dir_items(&self) -> Option<&Vec<T>> {
         self.next_path().and_then(|path| self.dirs.get(&path).map(|d| &d.items))
     }
@@ -138,8 +140,8 @@ where
     pub fn enter(&mut self) {
         if let Some(next_path) = self.next_path() {
             self.path = next_path;
-            // Ensure that the new path exists even if empty - it might get filled
-            // asynchronously
+            // Ensure that the new path exists even if empty - it might get
+            // filled asynchronously
             if !self.dirs.contains_key(&self.path) {
                 self.dirs.insert(self.path.clone(), Dir::default());
             }

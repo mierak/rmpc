@@ -137,7 +137,8 @@ impl Pane for VolumePane {
                             / f32::from(self.area.height - 1)
                     }
                 };
-                // Safe conversion: clamped to 0-100 range and rounded, so cast is always valid
+                // Safe conversion: clamped to 0-100 range and rounded, so cast
+                // is always valid
                 let new_volume = (volume_ratio * 100.0).clamp(0.0, 100.0).round() as u32;
 
                 ctx.command(move |_, client| {
@@ -188,7 +189,8 @@ impl Pane for VolumePane {
                             / f32::from(self.area.height - 1)
                     }
                 };
-                // Safe conversion: clamped to 0-100 range and rounded, so cast is always valid
+                // Safe conversion: clamped to 0-100 range and rounded, so cast
+                // is always valid
                 let new_volume = (volume_ratio * 100.0).clamp(0.0, 100.0).round() as u32;
 
                 ctx.command(move |_, client| {

@@ -177,8 +177,8 @@ fn main() -> Result<()> {
                     // use stdout here in case a user pipes the debug info to a
                     // file/clipboard so its copied to the github issue as well
                     if let ConfigReadError::ConfigNotFound = err {
-                        // Do not print error when config was not found, this is fine for
-                        // debuginfo
+                        // Do not print error when config was not found, this is
+                        // fine for debuginfo
                         println!("\nWarning:");
                         println!("No config file was found. Using default values.");
                     } else {
@@ -361,7 +361,8 @@ fn main() -> Result<()> {
             let ConfigResult { config, config_path, theme_path } = read_config_and_theme(&args)
                 .unwrap_or_else(|err| {
                     if let ConfigReadError::ConfigNotFound = err {
-                        // Config not being found is not considered an error. But the user should
+                        // Config not being found is not considered an error.
+                        // But the user should
                         // still be warned to setup their config file.
                         status_warn!("No config file was found. Using default values.",);
                     } else {

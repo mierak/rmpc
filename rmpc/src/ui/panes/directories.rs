@@ -254,8 +254,8 @@ impl BrowserPane<DirOrSong> for DirectoriesPane {
         let hovered_idx = if dir_or_playlist_found {
             None
         } else {
-            // We are not adding any playlists or directories so autoplay on hovered item
-            // can work
+            // We are not adding any playlists or directories so autoplay on
+            // hovered item can work
             if let Some(curr) = self.stack().current().selected() {
                 items
                     .iter()
@@ -436,9 +436,9 @@ mod tests {
         ]);
     }
 
-    // A level mixing a subdirectory, loose songs and a playlist keeps the pane's
-    // order: with group_by_type the directory expands first, then the songs,
-    // then the playlist.
+    // A level mixing a subdirectory, loose songs and a playlist keeps the
+    // pane's order: with group_by_type the directory expands first, then
+    // the songs, then the playlist.
     #[test]
     fn handles_mixed_directory() {
         let tree = HashMap::from([

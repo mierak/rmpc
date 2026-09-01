@@ -80,8 +80,9 @@ fn main_task<B: Backend + std::io::Write>(
     let mut reconcile_pending: EnumMap<IdleEvent, bool> = EnumMap::default();
     let reconcile_id: EnumMap<IdleEvent, Id> = enum_map! { _ => id::new() };
 
-    // Tmux hooks have to be initialized after ui, because ueberzugpp replaces all
-    // hooks on its init instead of simply appending and might break rmpc's hooks
+    // Tmux hooks have to be initialized after ui, because ueberzugpp replaces
+    // all hooks on its init instead of simply appending and might break
+    // rmpc's hooks
     let mut tmux = match crate::shared::tmux::TmuxHooks::new() {
         Ok(Some(val)) => Some(val),
         Ok(None) => None,
@@ -174,9 +175,11 @@ fn main_task<B: Backend + std::io::Write>(
                     handle_idle_event(ev, &ctx);
                 }
                 AppEvent::ConfigChanged { config: mut new_config, keep_old_theme } => {
-                    // Technical limitation. Keep the old image backend because it was not rechecked
-                    // anyway. Sending the escape sequences to determine image support would mess up
-                    // the terminal output at this point.
+                    // Technical limitation. Keep the old image backend because
+                    // it was not rechecked anyway. Sending
+                    // the escape sequences to determine image support would
+                    // mess up the terminal output at this
+                    // point.
                     new_config.album_art.method = ctx.config.album_art.method;
                     if keep_old_theme {
                         new_config.theme = ctx.config.theme.clone();
@@ -197,7 +200,8 @@ fn main_task<B: Backend + std::io::Write>(
                     if ctx.config.enable_lyrics_hot_reload != lyrics_watcher.is_some()
                         && ctx.config.enable_lyrics_index
                     {
-                        // IIFE may be better expressed with try blocks when it becomes stable
+                        // IIFE may be better expressed with try blocks when it
+                        // becomes stable
                         lyrics_watcher = (|| {
                             if !ctx.config.enable_lyrics_hot_reload {
                                 return None;
@@ -217,8 +221,8 @@ fn main_task<B: Backend + std::io::Write>(
                         continue;
                     }
 
-                    // Need to clear the terminal to avoid artifacts from album art and other
-                    // elements
+                    // Need to clear the terminal to avoid artifacts from album
+                    // art and other elements
                     if let Err(err) = terminal.clear() {
                         log::error!(error:? = err; "Failed to clear terminal after config change");
                         continue;
@@ -254,8 +258,8 @@ fn main_task<B: Backend + std::io::Write>(
                         log::error!(error:? = err; "UI failed to handle config changed event");
                     }
 
-                    // Need to clear the terminal to avoid artifacts from album art and other
-                    // elements
+                    // Need to clear the terminal to avoid artifacts from album
+                    // art and other elements
                     if let Err(err) = terminal.clear() {
                         log::error!(error:? = err; "Failed to clear terminal after config change");
                         continue;
@@ -527,7 +531,8 @@ fn main_task<B: Backend + std::io::Write>(
                             if ctx.config.reflect_changes_to_playlist
                                 && matches!(source_event, Some(IdleEvent::Playlist))
                             {
-                                // Try to reflect changes to saved playlist if any was loaded both
+                                // Try to reflect changes to saved playlist if
+                                // any was loaded both
                                 // before and after the update
                                 if let (Some(current_playlist), Some(new_playlist)) =
                                     (current_playlist, new_playlist)
@@ -896,9 +901,10 @@ fn handle_idle_event(event: IdleEvent, ctx: &Ctx) {
                 .replace_id("playlist")
                 .query(move |client| Ok(MpdQueryResult::Queue(client.playlist_info()?)));
 
-            // Do not replace because we want to update currently loaded playlist if any
-            // Also have to query every time because the current song position may change
-            // during queue update (shuffle, move, ...)
+            // Do not replace because we want to update currently loaded
+            // playlist if any Also have to query every time because
+            // the current song position may change during queue
+            // update (shuffle, move, ...)
             ctx.query().id(GLOBAL_STATUS_UPDATE).replace_id("status_from_playlist").query(
                 move |client| {
                     let (status, current_song) = client.get_status_and_current_song()?;

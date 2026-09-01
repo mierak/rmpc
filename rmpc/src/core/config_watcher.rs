@@ -155,8 +155,9 @@ pub(crate) fn init(
                     continue;
                 };
 
-                // Persist the current theme name for future file events to only trigger when
-                // the currently active theme changes
+                // Persist the current theme name for future file events to only
+                // trigger when the currently active theme
+                // changes
                 if let Some(theme_path) = theme_path
                     && let Ok(path) = theme_path.strip_prefix(&config_directory2)
                 {

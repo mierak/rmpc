@@ -213,8 +213,9 @@ impl LrcMetadata {
                 break; // EOF
             }
             // if this line has a timestamp, stop reading
-            // We are looking for lines that start with [ and have a timestamp in them
-            // reading all the way to the end of the file is not necessary
+            // We are looking for lines that start with [ and have a timestamp
+            // in them reading all the way to the end of the file is
+            // not necessary
             let trimmed = line.trim();
             if !trimmed.is_empty()
                 && trimmed.starts_with('[')
@@ -260,8 +261,9 @@ impl FromStr for Lrc {
             length: metadata.length,
         };
 
-        // Process only lines starting from where lyrics begin (skip already-parsed
-        // metadata) since we dont want to parse metadata again
+        // Process only lines starting from where lyrics begin (skip
+        // already-parsed metadata) since we dont want to parse metadata
+        // again
         for line in s.lines().skip(lyrics_start_line) {
             let line_content = line.trim();
             if line_content.is_empty() || line_content.starts_with('#') {
@@ -288,9 +290,11 @@ impl FromStr for Lrc {
                         }
                     }
                     TagParseResult::Metadata(_, _) | TagParseResult::Invalid => {
-                        // Found a non-timestamp tag, stop here and treat everything
-                        // from this position as lyrics content. This is the conservative
-                        // approach that handles [00:10.00][Intro] Welcome correctly.
+                        // Found a non-timestamp tag, stop here and treat
+                        // everything from this position
+                        // as lyrics content. This is the conservative
+                        // approach that handles [00:10.00][Intro] Welcome
+                        // correctly.
                         break;
                     }
                 }

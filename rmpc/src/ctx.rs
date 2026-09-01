@@ -172,8 +172,9 @@ impl Ctx {
             match self.stickers_supported {
                 StickersSupport::Unsupported => {
                     self.stickers_supported = StickersSupport::UnsupportedAndChecked;
-                    // Shoot a dummy sticker request to MPD to see what error we get to determine
-                    // what exactly is wrong.
+                    // Shoot a dummy sticker request to MPD to see what error we
+                    // get to determine what exactly is
+                    // wrong.
                     self.command(|_, client| {
                         if let Err(err) = client.sticker("", "test") {
                             status_error!(

@@ -204,8 +204,8 @@ impl CavaPane {
     }
 
     fn try_clear_fifo(config: &Cava) {
-        // Attempt to clear MPD's fifo to keep the visualiser in sync with the current
-        // track's audio data
+        // Attempt to clear MPD's fifo to keep the visualiser in sync with the
+        // current track's audio data
         if !matches!(config.input.method, CavaInputMethod::Fifo) {
             return;
         }

@@ -249,9 +249,10 @@ pub mod utils {
         #[test_case("$NOT_SET", "$NOT_SET")]
         #[test_case("no/$NOT_SET/path", "no/$NOT_SET/path")]
         #[test_case("basic/path", "basic/path")]
-        // NOTE: current implementation only expands vars that are the entire part.
-        // This is different from how shells do it, but I can't think of a use case for
-        // it in paths #[test_case("no$HOME$VALUE", "no/home/some_userpath")]
+        // NOTE: current implementation only expands vars that are the entire
+        // part. This is different from how shells do it, but I can't
+        // think of a use case for it in paths
+        // #[test_case("no$HOME$VALUE", "no/home/some_userpath")]
         fn env_var_expansion(input: &str, expected: &str) {
             let _lock = ENV.lock();
 

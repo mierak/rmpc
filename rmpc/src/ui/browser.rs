@@ -621,8 +621,9 @@ where
                 }
             }
             CommonAction::AddOptions { kind: AddKind::Modal(items) } => {
-                // Options that share `all` resolve to the same items, so resolve
-                // once per value instead of once per option.
+                // Options that share `all` resolve to the same items, so
+                // resolve once per value instead of once per
+                // option.
                 let mut resolved: HashMap<bool, (Vec<Enqueue>, Option<usize>)> = HashMap::new();
                 let mut opts = Vec::with_capacity(items.len());
                 for (label, options) in items {
@@ -931,10 +932,12 @@ where
                 if section.items.is_empty() { None } else { Some(section) }
             })
             .list_section(ctx, |mut section| {
-                // TODO Deletion cannot be currently done as we need to clear the marked items
-                // after the deletion occurs but do not have access to the pane's state in the
-                // callback. An event should be dispatched upon deletion to clear the items or
-                // better yet, the marked items need to be refactored directly into the
+                // TODO Deletion cannot be currently done as we need to clear
+                // the marked items after the deletion occurs
+                // but do not have access to the pane's state in the
+                // callback. An event should be dispatched upon deletion to
+                // clear the items or better yet, the marked
+                // items need to be refactored directly into the
                 // `DirStackItem` directly.
 
                 // if !to_delete.is_empty() {

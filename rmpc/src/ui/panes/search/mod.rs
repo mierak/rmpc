@@ -242,8 +242,8 @@ impl SearchPane {
             && stickers_supported
             && (rating_filter.is_some() || liked_filter.is_some())
         {
-            // Filters are empty, but rating filters are set - show all songs with the
-            // wanted rating
+            // Filters are empty, but rating filters are set - show all songs
+            // with the wanted rating
             ctx.query().id(SEARCH).replace_id(SEARCH).target(PaneType::Search).query(
                 move |client| {
                     // empty URI returns all songs with the sticker
@@ -305,8 +305,8 @@ impl SearchPane {
                 },
             );
         } else if filter.is_empty() {
-            // Filters are empty, stickers are either not supported or not set - clear
-            // current results
+            // Filters are empty, stickers are either not supported or not set -
+            // clear current results
             let _ = std::mem::take(&mut self.songs_dir);
         } else {
             // Search normally
@@ -1116,7 +1116,8 @@ impl Pane for SearchPane {
                 self.column_areas[BrowserArea::Current] = current_area;
                 self.inputs.render(current_area, frame.buffer_mut(), ctx);
 
-                // Render only the part of the preview that is actually supposed to be shown
+                // Render only the part of the preview that is actually supposed
+                // to be shown
                 let offset = self.songs_dir.state.offset();
                 let items = self.songs_dir.to_list_items_range(
                     offset..offset + previous_area.height as usize,

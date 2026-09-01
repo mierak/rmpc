@@ -117,11 +117,13 @@ impl TagBrowserPane {
                 //
                 match &tag.sort_by {
                     Some(_) => {
-                        // Pick tags from the first song in the group. This is not a perfect
-                        // solution in case there are songs with different
+                        // Pick tags from the first song in the group. This is
+                        // not a perfect solution in
+                        // case there are songs with different
                         // tag values within the same group, but
-                        // it's hard to come up with a better solution and it should
-                        // work well in most cases. Only time this is an issue is when
+                        // it's hard to come up with a better solution and it
+                        // should work well in most
+                        // cases. Only time this is an issue is when
                         // sort tags are not a subset of the grouping tags.
                         a.songs[0].with_custom_sort(&opts).cmp(&b.songs[0].with_custom_sort(&opts))
                     }

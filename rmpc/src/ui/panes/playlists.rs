@@ -208,9 +208,10 @@ impl Pane for PlaylistsPane {
 
                         let selected_song = self.stack().current().selected_with_idx();
 
-                        // Get the actually selected playlist after the resolution. If none is
-                        // selected then it means that we have no more playlists to go into so we
-                        // end here
+                        // Get the actually selected playlist after the
+                        // resolution. If none is
+                        // selected then it means that we have no more playlists
+                        // to go into so we end here
                         let Some(new_playlist) = new_stack.current().selected() else {
                             return Ok(());
                         };
@@ -223,9 +224,11 @@ impl Pane for PlaylistsPane {
                             Ok(client.list_playlist_info(&playlist, None)?)
                         })?;
 
-                        // Calculate next path based on the playlist that was selected, can be
-                        // either the same playlist by name or the same index. If no playllist is
-                        // selected, ie the stack is empty, we end here
+                        // Calculate next path based on the playlist that was
+                        // selected, can be either the
+                        // same playlist by name or the same index. If no
+                        // playllist is selected, ie the
+                        // stack is empty, we end here
                         let Some(next_path) = new_stack.next_path() else {
                             log::debug!(stack:? = new_stack; "No playlist selected after reinit, not entering");
                             return Ok(());
