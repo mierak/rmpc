@@ -306,7 +306,13 @@ impl SongExt for Song {
     }
 
     fn file_ext(&self) -> Option<Cow<'_, str>> {
-        std::path::Path::new(&self.file).extension().map(|ext| ext.to_string_lossy())
+        std::path::Path::new(&self.file).extension().map(|ext| ext.to_string_lossy()).or_else(
+            || {
+                self.metadata.get("realuri").and_then(|uri| {
+                    std::path::Path::new(uri.first()).extension().map(|ext| ext.to_string_lossy())
+                })
+            },
+        )
     }
 
     fn format<'song>(
@@ -663,5 +669,45 @@ impl SongExt for Song {
         }
 
         Some(line)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use std::collections::HashMap;
+
+    use rmpc_mpd::commands::Song;
+    use rstest::rstest;
+
+    use super::SongExt;
+
+    fn song(file: &str, realuri: Option<&str>) -> Song {
+        let mut metadata = HashMap::new();
+        if let Some(realuri) = realuri {
+            metadata.insert("realuri".to_string(), realuri.into());
+        }
+        Song {
+            id: 1,
+            file: file.to_string(),
+            duration: None,
+            metadata,
+            last_modified: chrono::Utc::now(),
+            added: None,
+        }
+    }
+
+    #[rstest]
+    #[case("album/track.flac", None, Some("flac"))]
+    // relative RealUri, the form lsinfo and search report
+    #[case("album/album.cue/track0007", Some("../01 - Title.flac"), Some("flac"))]
+    // absolute RealUri, the form currentsong and playlistinfo report
+    #[case("album/album.cue/track0007", Some("/mnt/music/album/01 - Title.flac"), Some("flac"))]
+    #[case("album/track.mp3", Some("../01 - Title.flac"), Some("mp3"))]
+    #[case("album/album.cue/track0007", None, None)]
+    #[case("album/album.cue/track0007", Some("../CDImage"), None)]
+    fn file_ext(#[case] file: &str, #[case] realuri: Option<&str>, #[case] expected: Option<&str>) {
+        let song = song(file, realuri);
+
+        assert_eq!(song.file_ext().as_deref(), expected);
     }
 }

@@ -6,6 +6,8 @@ All notable changes to this project will be documented in this file.
 
 ### Added
 
+- `FileExtension` falls back to the underlying file's extension (`RealUri`, MPD 0.25) for
+  songs inside a CUE sheet
 - `directories_hidden_dirs` config option to hide directories with the given names from the
   `Directories` pane
 - Added `ActiveOutputs` and `ActiveOutput` status properties showing the enabled outputs
