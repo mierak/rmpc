@@ -94,6 +94,7 @@ keybinds
 - Adding a directory to the queue now orders its songs by `directories_sort` instead of relying on MPD's default order
 - `addyt` sometimes failing when files with identical file name already exists it the dir
 - Sixel image disappearing when switching tmux panes
+- Improve responsivness when cava cava is starting/quitting, especially when reloading config
 - MPD's error no longer parsing command index into u8 which has insufficient space
 
 ## [0.11.0] - 2026-02-01
