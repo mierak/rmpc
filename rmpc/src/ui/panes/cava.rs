@@ -1,18 +1,23 @@
 use std::{
     io::{Read, Write},
     process::{Child, Stdio},
+    sync::{
+        Arc,
+        atomic::{AtomicBool, Ordering},
+    },
     thread::JoinHandle,
     time::Duration,
 };
 
 use anyhow::{Context, Result, anyhow, bail};
-use crossbeam::channel::{Receiver, RecvError, Sender, TryRecvError};
+use crossbeam::channel::{Receiver, RecvError, Sender, TrySendError};
 use crossterm::{
     cursor::{MoveTo, RestorePosition, SavePosition},
     queue,
     style::{PrintStyledContent, Stylize},
     terminal::{BeginSynchronizedUpdate, EndSynchronizedUpdate},
 };
+use parking_lot::Mutex;
 use ratatui::{
     Frame,
     layout::Rect,
@@ -32,6 +37,7 @@ use crate::{
     shared::{
         dependencies::CAVA,
         keys::ActionEvent,
+        macros::status_error,
         terminal::{TERMINAL, TtyWriter},
     },
     status_warn,
@@ -56,22 +62,6 @@ enum CavaCommand {
     ConfigChanged { config: Cava, theme: CavaTheme },
 }
 
-struct ProcessGuard {
-    handle: Child,
-}
-
-impl Drop for ProcessGuard {
-    fn drop(&mut self) {
-        if let Err(e) = self.handle.kill() {
-            log::error!("Failed to kill cava process: {e}");
-            return;
-        }
-        if let Err(e) = self.handle.wait() {
-            log::error!("Failed to wait for cava process to die: {e}");
-        }
-    }
-}
-
 impl CavaPane {
     pub fn new(_ctx: &Ctx) -> Self {
         Self {
@@ -89,33 +79,10 @@ impl CavaPane {
     }
 
     #[inline]
-    pub fn read_cava_data(
-        height: u16,
-        read_buffer: &mut [u8],
-        columns: &mut [f32],
-        stdout: &mut impl Read,
-        stderr: &mut impl Read,
-    ) -> Result<()> {
-        if let Err(err) = stdout.read_exact(read_buffer) {
-            let mut buf = String::new();
-            stderr.read_to_string(&mut buf)?;
-            log::error!(err:?, stderr = buf.as_str(); "Cava failed");
-            bail!("Cava failed {err}");
-        }
-
-        for x in 0..columns.len() {
-            let value = u16::from_le_bytes([read_buffer[2 * x], read_buffer[2 * x + 1]]);
-            columns[x] = value as f32 * height as f32 / 65535.0f32;
-        }
-
-        Ok(())
-    }
-
-    #[inline]
     pub fn render_cava(
         writer: &TtyWriter,
         area: Rect,
-        columns: &mut [f32],
+        columns: &[f32],
         x_offset: u16,
         empty_bar_symbol: &str,
         theme: &CavaTheme,
@@ -183,72 +150,6 @@ impl CavaPane {
         Ok(())
     }
 
-    fn spawn_cava(bars: u16, config: &Cava) -> Result<ProcessGuard> {
-        let cfg_dir = std::env::temp_dir().join("rmpc");
-        std::fs::create_dir_all(&cfg_dir)?;
-        let cfg_path = cfg_dir.join(format!("cava-{}.conf", rustix::process::geteuid().as_raw()));
-        let cfg_string = config.to_cava_config_file(bars)?;
-        std::fs::write(&cfg_path, cfg_string)?;
-
-        Self::try_clear_fifo(config);
-
-        Ok(ProcessGuard {
-            handle: std::process::Command::new("cava")
-                .arg("-p")
-                .arg(cfg_path)
-                .stdout(Stdio::piped())
-                .stderr(Stdio::piped())
-                .stdin(Stdio::null())
-                .spawn()?,
-        })
-    }
-
-    fn try_clear_fifo(config: &Cava) {
-        // Attempt to clear MPD's fifo to keep the visualiser in sync with the
-        // current track's audio data
-        if !matches!(config.input.method, CavaInputMethod::Fifo) {
-            return;
-        }
-
-        let fifo_path = &config.input.source;
-        if !std::path::Path::new(fifo_path).exists() {
-            log::warn!(
-                "Cava is configured to use FIFO input, but the FIFO does not exist at the specified path: {fifo_path}. Not attempting to clear the FIFO"
-            );
-            return;
-        }
-
-        let fd = match rustix::fs::open(
-            fifo_path,
-            rustix::fs::OFlags::NONBLOCK | rustix::fs::OFlags::RDONLY | rustix::fs::OFlags::CLOEXEC,
-            rustix::fs::Mode::empty(),
-        ) {
-            Ok(fd) => fd,
-            Err(err) => {
-                log::error!(err:?; "Failed to open MPD fifo for clearing");
-                return;
-            }
-        };
-
-        log::debug!("Attempting to clear MPD fifo at path {fifo_path} before starting cava");
-        let mut file = std::fs::File::from(fd);
-        let mut buf = [0; 8096];
-        loop {
-            match file.read(&mut buf) {
-                Ok(0) => break,
-                Ok(n) => {
-                    log::trace!("Read {n} bytes from MPD fifo while clearing it");
-                }
-                Err(e) if e.kind() == std::io::ErrorKind::WouldBlock => {
-                    break;
-                }
-                Err(e) => {
-                    log::error!(e:?; "Encountered unexpected error while clearing MPD fifo");
-                }
-            }
-        }
-    }
-
     fn run_cava_loop(
         receiver: &Receiver<CavaCommand>,
         writer: &TtyWriter,
@@ -289,6 +190,14 @@ impl CavaPane {
             let bar_spacing = cava_theme.bar_spacing;
             let bars = area.width / (bar_width + bar_spacing);
 
+            if bars == 0 {
+                log::debug!(
+                    width = area.width, bar_width, bar_spacing;
+                    "Cava area is too narrow to fit a single bar, waiting for the next command"
+                );
+                continue 'outer;
+            }
+
             let total_bar_width = bars * bar_width;
             let total_spacing_width = (bars - 1) * bar_spacing;
             let total_width = total_bar_width + total_spacing_width;
@@ -298,50 +207,50 @@ impl CavaPane {
 
             log::debug!(cava_theme:?; "theme");
 
-            let mut process = Self::spawn_cava(bars, &cava_config)?;
-            let stdout =
-                process.handle.stdout.as_mut().context("Failed to spawn cava. No stdout.")?;
-            let stderr =
-                process.handle.stderr.as_mut().context("Failed to spawn cava. No stderr.")?;
-
-            let mut columns = vec![0_f32; bars as usize];
-            let mut buf = vec![0_u8; 2 * bars as usize];
-
             let bar_height = match cava_theme.orientation {
                 Orientation::Top | Orientation::Bottom => area.height,
                 Orientation::Horizontal => area.height / 2,
             };
 
-            'inner: loop {
-                Self::read_cava_data(bar_height, &mut buf, &mut columns, stdout, stderr)?;
-                Self::render_cava(
-                    writer,
-                    area,
-                    &mut columns,
-                    x_offset,
-                    &empty_bar_symbol,
-                    &cava_theme,
-                )?;
+            let process = CavaProcess::new(bars, bar_height, cava_config.clone())?;
 
-                match receiver.try_recv() {
-                    Ok(CavaCommand::Stop) => {
-                        break 'outer;
+            'inner: loop {
+                crossbeam::select! {
+                    recv(process.frame_rx) -> frame => {
+                        let Ok(columns) = frame else {
+                            log::warn!("Cava reader thread has finished, stopping cava loop");
+                            break 'inner;
+                        };
+                        Self::render_cava(
+                            writer,
+                            area,
+                            &columns,
+                            x_offset,
+                            &empty_bar_symbol,
+                            &cava_theme,
+                        )?;
                     }
-                    Ok(CavaCommand::Pause) => {
-                        break 'inner;
-                    }
-                    Ok(CavaCommand::Start { area }) => {
-                        prev_command = Some(Ok(CavaCommand::Start { area }));
-                        break 'inner;
-                    }
-                    Ok(CavaCommand::ConfigChanged { config, theme }) => {
-                        prev_command = Some(Ok(CavaCommand::ConfigChanged { config, theme }));
-                        break 'inner;
-                    }
-                    Err(TryRecvError::Empty) => {}
-                    Err(TryRecvError::Disconnected) => {
-                        log::error!("CavaCommand channel disconnected. This should never happen.");
-                        break 'outer;
+                    recv(receiver) -> msg => {
+                        match msg {
+                            Ok(CavaCommand::Stop) => {
+                                break 'outer;
+                            }
+                            Ok(CavaCommand::Pause) => {
+                                break 'inner;
+                            }
+                            Ok(CavaCommand::Start { area }) => {
+                                prev_command = Some(Ok(CavaCommand::Start { area }));
+                                break 'inner;
+                            }
+                            Ok(CavaCommand::ConfigChanged { config, theme }) => {
+                                prev_command = Some(Ok(CavaCommand::ConfigChanged { config, theme }));
+                                break 'inner;
+                            }
+                            Err(RecvError) => {
+                                log::error!("CavaCommand channel disconnected. This should never happen.");
+                                break 'outer;
+                            }
+                        }
                     }
                 }
             }
@@ -520,5 +429,208 @@ impl Pane for CavaPane {
             self.run(ctx)?;
         }
         Ok(())
+    }
+}
+
+struct CavaProcess {
+    frame_rx: Receiver<Vec<f32>>,
+    child: Arc<Mutex<Option<Child>>>,
+    running: Arc<AtomicBool>,
+}
+
+impl Drop for CavaProcess {
+    fn drop(&mut self) {
+        self.running.store(false, Ordering::SeqCst);
+
+        if let Some(child) = self.child.lock().as_mut()
+            && let Err(e) = child.kill()
+        {
+            log::error!("Failed to kill cava process: {e}");
+        }
+    }
+}
+
+impl CavaProcess {
+    fn new(bars: u16, height: u16, cava_config: Cava) -> Result<Self> {
+        let (frame_tx, frame_rx) = crossbeam::channel::bounded::<Vec<f32>>(1);
+        let child = Arc::new(Mutex::new(None));
+        let child_clone = Arc::clone(&child);
+        let running = Arc::new(AtomicBool::new(true));
+        let running_clone = Arc::clone(&running);
+
+        std::thread::Builder::new()
+            .name("cava-reader".to_string())
+            .spawn(move || {
+                let mut columns = vec![0_f32; bars as usize];
+                let mut buf = vec![0_u8; 2 * bars as usize];
+                let mut process = match Self::spawn_cava(bars, &cava_config) {
+                    Ok(p) => p,
+                    Err(err) => {
+                        status_error!(err:?; "Failed to spawn cava process");
+                        return;
+                    }
+                };
+                let mut stdout =
+                    match process.stdout.take().context("Failed to spawn cava. No stdout.") {
+                        Ok(stdout) => stdout,
+                        Err(err) => {
+                            status_error!(err:?; "Failed to spawn cava process");
+                            Self::kill_and_reap(&mut process);
+                            return;
+                        }
+                    };
+                let mut stderr =
+                    match process.stderr.take().context("Failed to spawn cava. No stderr.") {
+                        Ok(stderr) => stderr,
+                        Err(err) => {
+                            status_error!(err:?; "Failed to spawn cava process");
+                            Self::kill_and_reap(&mut process);
+                            return;
+                        }
+                    };
+
+                let mut child_lock = child_clone.lock();
+                if !running_clone.load(Ordering::SeqCst) {
+                    log::debug!("Cava was cancelled during spawn window");
+                    Self::kill_and_reap(&mut process);
+                    return;
+                }
+                *child_lock = Some(process);
+                drop(child_lock);
+
+                loop {
+                    if let Err(err) = Self::read_cava_data(
+                        height,
+                        &mut buf,
+                        &mut columns,
+                        &mut stdout,
+                        &mut stderr,
+                    ) {
+                        if running_clone.load(Ordering::SeqCst) {
+                            status_error!(err:?; "Cava process failed");
+                        } else {
+                            log::debug!("Cava reader thread stopping, cava process was shut down");
+                        }
+                        break;
+                    }
+
+                    match frame_tx.try_send(columns.clone()) {
+                        Ok(()) => {}
+                        Err(TrySendError::Full(_)) => {
+                            log::trace!("Cava frame channel is full, dropping frame");
+                        }
+                        Err(TrySendError::Disconnected(_)) => {
+                            log::debug!("Cava frame channel disconnected, stopping reader thread");
+                            break;
+                        }
+                    }
+                }
+
+                let Some(mut child) = child_clone.lock().take() else {
+                    log::debug!("Cava reader thread stopping, cava process was already shut down");
+                    return;
+                };
+                Self::kill_and_reap(&mut child);
+            })
+            .context("Failed to spawn cava reader thread")?;
+
+        Ok(Self { frame_rx, child, running })
+    }
+
+    fn kill_and_reap(child: &mut Child) {
+        if let Err(err) = child.kill() {
+            log::debug!(err:?; "Failed to kill cava process, it has likely already exited");
+        }
+        if let Err(err) = child.wait() {
+            log::error!(err:?; "Failed to reap cava process");
+        }
+    }
+
+    fn spawn_cava(bars: u16, config: &Cava) -> Result<Child> {
+        let cfg_dir = std::env::temp_dir().join("rmpc");
+        std::fs::create_dir_all(&cfg_dir)?;
+        let cfg_path = cfg_dir.join(format!("cava-{}.conf", rustix::process::geteuid().as_raw()));
+        let cfg_string = config.to_cava_config_file(bars)?;
+        std::fs::write(&cfg_path, cfg_string)?;
+
+        Self::try_clear_fifo(config);
+
+        Ok(std::process::Command::new("cava")
+            .arg("-p")
+            .arg(cfg_path)
+            .stdout(Stdio::piped())
+            .stderr(Stdio::piped())
+            .stdin(Stdio::null())
+            .spawn()?)
+    }
+
+    #[inline]
+    fn read_cava_data(
+        height: u16,
+        read_buffer: &mut [u8],
+        columns: &mut [f32],
+        stdout: &mut impl Read,
+        stderr: &mut impl Read,
+    ) -> Result<()> {
+        if let Err(err) = stdout.read_exact(read_buffer) {
+            let mut buf = String::new();
+            if let Err(err) = stderr.read_to_string(&mut buf) {
+                log::warn!(err:?; "Failed to read cava stderr");
+            }
+            bail!("Failed to read cava data: {err}. Cava stderr: '{buf}'");
+        }
+
+        for x in 0..columns.len() {
+            let value = u16::from_le_bytes([read_buffer[2 * x], read_buffer[2 * x + 1]]);
+            columns[x] = value as f32 * height as f32 / 65535.0f32;
+        }
+
+        Ok(())
+    }
+
+    fn try_clear_fifo(config: &Cava) {
+        // Attempt to clear MPD's fifo to keep the visualiser in sync with the
+        // current track's audio data
+        if !matches!(config.input.method, CavaInputMethod::Fifo) {
+            return;
+        }
+
+        let fifo_path = &config.input.source;
+        if !std::path::Path::new(fifo_path).exists() {
+            log::warn!(
+                "Cava is configured to use FIFO input, but the FIFO does not exist at the specified path: {fifo_path}. Not attempting to clear the FIFO"
+            );
+            return;
+        }
+
+        let fd = match rustix::fs::open(
+            fifo_path,
+            rustix::fs::OFlags::NONBLOCK | rustix::fs::OFlags::RDONLY | rustix::fs::OFlags::CLOEXEC,
+            rustix::fs::Mode::empty(),
+        ) {
+            Ok(fd) => fd,
+            Err(err) => {
+                log::error!(err:?; "Failed to open MPD fifo for clearing");
+                return;
+            }
+        };
+
+        log::debug!("Attempting to clear MPD fifo at path {fifo_path} before starting cava");
+        let mut file = std::fs::File::from(fd);
+        let mut buf = [0; 8096];
+        loop {
+            match file.read(&mut buf) {
+                Ok(0) => break,
+                Ok(n) => {
+                    log::trace!("Read {n} bytes from MPD fifo while clearing it");
+                }
+                Err(e) if e.kind() == std::io::ErrorKind::WouldBlock => {
+                    break;
+                }
+                Err(e) => {
+                    log::error!(e:?; "Encountered unexpected error while clearing MPD fifo");
+                }
+            }
+        }
     }
 }
