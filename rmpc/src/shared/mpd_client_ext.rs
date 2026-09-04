@@ -183,7 +183,7 @@ impl<T: MpdClient + MpdCommand + ProtoClient> MpdClientExt for T {
             match self.read_ok() {
                 Ok(()) => i = items_len,
                 Err(MpdError::Mpd(err)) => {
-                    i += 1 + err.command_list_index as usize;
+                    i += 1 + err.command_list_index;
                     errors += 1;
                 }
                 err => err?,

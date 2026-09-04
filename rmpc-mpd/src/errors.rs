@@ -136,7 +136,7 @@ impl std::str::FromStr for ErrorCode {
 #[derive(Debug, PartialEq)]
 pub struct MpdFailureResponse {
     pub code: ErrorCode,
-    pub command_list_index: u8,
+    pub command_list_index: usize,
     pub command: String,
     pub message: String,
 }
