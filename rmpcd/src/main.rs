@@ -9,7 +9,7 @@ use anyhow::Result;
 use clap::{Parser, Subcommand};
 use rmpc_mpd::{
     commands::{IdleEvent, Status},
-    mpd_client::MpdClient,
+    mpd_client::{AlbumArtOrder, MpdClient},
 };
 use serde::Serialize;
 use serde_json::json;
@@ -22,6 +22,7 @@ use crate::{
     async_client::AsyncClient,
     ctx::Ctx,
     lua::{eval_config, plugin::PluginStore},
+    mpd_ext::MpdExt,
     paths::Paths,
     pkg::Lockfile,
 };
@@ -249,11 +250,18 @@ async fn run() -> Result<()> {
     let status = mpd.run(|c| c.get_status()).await?;
     let current_song = mpd.run(|c| c.get_current_song()).await?;
     let queue = mpd.run(|c| c.playlist_info()).await?.unwrap_or_default();
+    let album_art = match &current_song {
+        Some(song) => {
+            let uri = song.file.clone();
+            mpd.run(move |c| c.find_album_art(&uri, AlbumArtOrder::EmbeddedFirst)).await?
+        }
+        None => None,
+    };
     let ctx = Arc::new(RwLock::new(Ctx {
         current_song: current_song.clone(),
         status: status.clone(),
         queue,
-        album_art: None,
+        album_art,
         last_written_album_art_song_uri: None,
     }));
 
