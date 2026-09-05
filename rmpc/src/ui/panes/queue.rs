@@ -95,6 +95,7 @@ pub struct QueuePane {
     should_center_cursor_on_current: bool,
     highlight_id: Id,
     highlight_enabled: bool,
+    new_album_indices: HashSet<usize>,
 }
 
 #[derive(Debug, Enum)]
@@ -121,8 +122,10 @@ impl QueuePane {
             should_center_cursor_on_current: ctx.config.center_current_song_on_change,
             highlight_id: id::new(),
             highlight_enabled: true,
+            new_album_indices: HashSet::new(),
         };
 
+        s.recalculate_album_indices();
         s.highlight_timeout(ctx);
 
         s
@@ -139,6 +142,16 @@ impl QueuePane {
                 .collect_vec(),
             ctx.config.theme.song_table_format.iter().map(|v| v.prop.clone()).collect_vec(),
         )
+    }
+
+    fn recalculate_album_indices(&mut self) {
+        self.new_album_indices = self
+            .queue
+            .items
+            .as_slice()
+            .to_album_ranges()
+            .map(|range| range.end.saturating_sub(1))
+            .collect();
     }
 
     fn highlight_timeout(&mut self, ctx: &Ctx) {
@@ -352,13 +365,6 @@ impl Pane for QueuePane {
 
         let marker_symbol_len = config.theme.symbols.marker.chars().count();
 
-        let new_album_indices: HashSet<usize> = self
-            .queue
-            .items
-            .as_slice()
-            .to_album_ranges()
-            .map(|range| range.end.saturating_sub(1))
-            .collect();
         let current_song_id = ctx.current_song().map(|s| s.id);
         let marked = std::mem::take(self.queue.marked_mut());
         let filter = ctx.input.value(self.queue.filter_buffer_id);
@@ -431,7 +437,7 @@ impl Pane for QueuePane {
                 }
 
                 let sep = ctx.config.theme.song_table_album_separator;
-                if new_album_indices.contains(&idx)
+                if self.new_album_indices.contains(&idx)
                     && matches!(sep, AlbumSeparator::Underline)
                     && idx != self.queue.items.len().saturating_sub(1)
                 {
@@ -536,9 +542,11 @@ impl Pane for QueuePane {
                 self.queue.filter_active = false;
                 self.queue.items.clone_from(&ctx.queue);
                 self.queue.unmark_all();
+                self.recalculate_album_indices();
             }
             UiEvent::QueueChanged => {
                 self.queue.items.clone_from(&ctx.queue);
+                self.recalculate_album_indices();
             }
             UiEvent::SongChanged => {
                 if let Some(idx) = ctx.current_song_index()
@@ -562,6 +570,7 @@ impl Pane for QueuePane {
             }
             UiEvent::Reconnected => {
                 self.before_show(ctx)?;
+                self.recalculate_album_indices();
             }
             UiEvent::ConfigChanged => {
                 let (column_widths, column_formats) = Self::init(ctx);

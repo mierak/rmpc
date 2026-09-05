@@ -100,6 +100,7 @@ keybinds
 - Improve responsivness when cava cava is starting/quitting, especially when reloading config
 - MPD's error no longer parsing command index into u8 which has insufficient space
 - AlbumArt no longer double rendering on config reload
+- Improve rendering performance of the Queue pane
 
 ## [0.11.0] - 2026-02-01
 
