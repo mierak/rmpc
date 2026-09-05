@@ -63,6 +63,8 @@ All notable changes to this project will be documented in this file.
 
 ### Fixed
 
+- rmpcd MPRIS not exposing album art for the song already playing at startup, only after the
+  first song change
 - `Bits()` reporting the channel count as bit depth during DSD playback. MPD formats DSD audio as
   `dsd64:2` or `384000:dsd:2`, neither of which parsed; DSD now reports its real sample rate,
   1 bit and the channel count, and the float bit depth marker (`f`) no longer breaks the other fields
