@@ -908,10 +908,10 @@ impl<'ui> Ui<'ui> {
                 self.modals
                     .retain(|m| m.replacement_id().is_none_or(|id| id != ERROR_CONFIG_MODAL_ID));
                 let new_len = self.modals.len();
-                if new_len == 0 {
-                    self.on_event(UiEvent::ModalClosed, ctx)?;
-                }
                 if original_len != new_len {
+                    if new_len == 0 {
+                        self.on_event(UiEvent::ModalClosed, ctx)?;
+                    }
                     ctx.render()?;
                 }
             }
@@ -919,10 +919,10 @@ impl<'ui> Ui<'ui> {
                 let original_len = self.modals.len();
                 self.modals.retain(|m| m.id() != id);
                 let new_len = self.modals.len();
-                if new_len == 0 {
-                    self.on_event(UiEvent::ModalClosed, ctx)?;
-                }
                 if original_len != new_len {
+                    if new_len == 0 {
+                        self.on_event(UiEvent::ModalClosed, ctx)?;
+                    }
                     ctx.render()?;
                 }
             }
