@@ -1,5 +1,7 @@
 mod index;
+mod lrc_parser;
 mod lyrics;
+pub mod lyricsfile_parser;
 
 use std::{path::PathBuf, time::Duration};
 
@@ -35,6 +37,20 @@ pub(crate) fn get_lrc_path(lyrics_dir: &str, song_file: &str) -> Result<PathBuf>
     path.push(song_file);
     let Some(stem) = path.file_stem().map(|stem| format!("{}.lrc", stem.to_string_lossy())) else {
         bail!("No file stem for lyrics path: {}", path.display());
+    };
+
+    path.pop();
+    path.push(stem);
+    Ok(path)
+}
+
+pub(crate) fn get_lyricsfile_path(lyrics_dir: &str, song_file: &str) -> Result<PathBuf> {
+    let mut path: PathBuf = PathBuf::from(lyrics_dir);
+    path.push(song_file);
+    let Some(stem) =
+        path.file_stem().map(|stem| format!("{}.lyricsfile.yaml", stem.to_string_lossy()))
+    else {
+        bail!("No file stem for lyricsfile path: {}", path.display());
     };
 
     path.pop();
