@@ -55,6 +55,7 @@ pub enum CavaInputMethod {
     Pulse,
     Portaudio,
     Pipewire,
+    Coreaudio,
     Sndio,
     Oss,
     Jack,

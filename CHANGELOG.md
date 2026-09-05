@@ -26,6 +26,7 @@ All notable changes to this project will be documented in this file.
 - `remove` to the CLI allowing you to remove songs from the queue
 - `Pause` and `Unpause` actions
 - `inverted_bar_as_mask` option to cava
+- `coreaudio` cava input method for macOS
 - `Sort` queue keybind
 - `AlbumArtist` added to song properties.
 - Added `queue_disable_current_item_style_timeout_ms`
