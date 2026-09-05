@@ -53,6 +53,7 @@ pub(crate) fn init(
     let config_directory2 = config_directory.clone();
 
     let mut theme_name = theme_name;
+    let mut error_modal_shown = false;
     let mut watcher = new_debouncer(
         Duration::from_millis(500),
         None,
@@ -81,6 +82,7 @@ pub(crate) fn init(
                 let config = match read_config_file(&config_path) {
                     Ok(cfg) => cfg,
                     Err(err) => {
+                        error_modal_shown = true;
                         try_skip!(
                             event_tx.send(AppEvent::InfoModal {
                                 message: vec![
@@ -116,6 +118,7 @@ pub(crate) fn init(
                         match result {
                             Ok((theme_path, theme)) => (theme_path, theme),
                             Err(err) => {
+                                error_modal_shown = true;
                                 try_skip!(
                                     event_tx.send(AppEvent::InfoModal {
                                         message: vec![
@@ -138,6 +141,7 @@ pub(crate) fn init(
                 };
 
                 let Ok(config) = config.into_config(theme, None, None, true).inspect_err(|err| {
+                    error_modal_shown = true;
                     try_skip!(
                         event_tx.send(AppEvent::InfoModal {
                             message: vec![
@@ -166,11 +170,16 @@ pub(crate) fn init(
                     theme_name = None;
                 }
 
-                try_skip!(
-                    event_tx.send(AppEvent::UiAppEvent(crate::ui::UiAppEvent::PopConfigErrorModal)),
-                    "Failed to pop config error modal"
-                );
+                if error_modal_shown {
+                    error_modal_shown = false;
+                    try_skip!(
+                        event_tx
+                            .send(AppEvent::UiAppEvent(crate::ui::UiAppEvent::PopConfigErrorModal)),
+                        "Failed to pop config error modal"
+                    );
+                }
 
+                log::debug!("Config changed, sending event");
                 try_skip!(
                     event_tx.send(AppEvent::ConfigChanged {
                         config: Box::new(config),

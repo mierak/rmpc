@@ -109,8 +109,9 @@ impl Pane for AlbumArtPane {
                 }
                 self.album_art.show_current(ctx)?;
             }
-            UiEvent::ConfigChanged if is_visible && !self.is_modal_open => {
-                self.album_art.show_current(ctx)?;
+            UiEvent::ConfigChanged => {
+                // Not needed to react, config change already executes hide()
+                // and before_show() pair
             }
             UiEvent::Exit => {
                 self.album_art.cleanup()?;
