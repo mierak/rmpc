@@ -1,4 +1,4 @@
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 
 use anyhow::Result;
 use enum_map::EnumMap;
@@ -162,6 +162,11 @@ where
             });
 
         (items, idx)
+    }
+    // Panes that enqueue directories override this to expand them into their
+    // songs, ordered the way the pane displays them. Others pass through.
+    fn resolve_enqueue(&self, items: Vec<Enqueue>, _ctx: &Ctx) -> Result<Vec<Enqueue>> {
+        Ok(items)
     }
     fn show_info(&self, item: &T, ctx: &Ctx) -> Result<()> {
         Ok(())
@@ -327,6 +332,7 @@ where
                     self.stack_mut().current_mut().select_idx(idx_to_select, ctx.config.scrolloff);
                     if let Some(item) = self.stack().current().selected() {
                         let (items, _) = self.enqueue(std::iter::once(item));
+                        let items = self.resolve_enqueue(items, ctx)?;
                         if !items.is_empty() {
                             ctx.command(move |_, client| {
                                 client.enqueue_multiple(items, None, None, false)?;
@@ -599,6 +605,7 @@ where
             CommonAction::PaneLeft => {}
             CommonAction::AddOptions { kind: AddKind::Action(options) } => {
                 let (enqueue, hovered_idx) = self.enqueue_items(options.all);
+                let enqueue = self.resolve_enqueue(enqueue, ctx)?;
                 if !enqueue.is_empty() {
                     let queue_len = ctx.queue.len();
                     let current_song_idx = ctx.current_song_index();
@@ -614,13 +621,22 @@ where
                 }
             }
             CommonAction::AddOptions { kind: AddKind::Modal(items) } => {
-                let opts = items
-                    .iter()
-                    .map(|(label, opts)| {
-                        let enqueue = self.enqueue_items(opts.all);
-                        (label.to_owned(), *opts, enqueue)
-                    })
-                    .collect_vec();
+                // Options that share `all` resolve to the same items, so
+                // resolve once per value instead of once per
+                // option.
+                let mut resolved: HashMap<bool, (Vec<Enqueue>, Option<usize>)> = HashMap::new();
+                let mut opts = Vec::with_capacity(items.len());
+                for (label, options) in items {
+                    let enqueue = if let Some(enqueue) = resolved.get(&options.all) {
+                        enqueue.clone()
+                    } else {
+                        let (enqueue, hovered_idx) = self.enqueue_items(options.all);
+                        let enqueue = (self.resolve_enqueue(enqueue, ctx)?, hovered_idx);
+                        resolved.insert(options.all, enqueue.clone());
+                        enqueue
+                    };
+                    opts.push((label, options, enqueue));
+                }
 
                 modal!(ctx, create_add_modal(opts, ctx));
             }
@@ -695,7 +711,13 @@ where
             CommonAction::Rate { kind: _, current: true, min_rating: _, max_rating: _ } => {
                 event.abandon();
             }
-            CommonAction::Save { kind: SaveKind::Playlist { name, all, duplicates_strategy } } => {
+            CommonAction::Save { kind: _, current: true } => {
+                event.abandon();
+            }
+            CommonAction::Save {
+                kind: SaveKind::Playlist { name, all, duplicates_strategy },
+                current: false,
+            } => {
                 let list_songs = self.list_songs_in_items(all);
                 let all_songs: Vec<_> = ctx.query_sync(move |client| {
                     Ok(list_songs(client)?.into_iter().map(|s| s.file).collect())
@@ -708,7 +730,10 @@ where
 
                 add_to_playlist_or_show_modal(name, all_songs, duplicates_strategy, ctx);
             }
-            CommonAction::Save { kind: SaveKind::Modal { all, duplicates_strategy } } => {
+            CommonAction::Save {
+                kind: SaveKind::Modal { all, duplicates_strategy },
+                current: false,
+            } => {
                 let list_songs = self.list_songs_in_items(all);
                 let song_paths: Vec<_> = ctx.query_sync(move |client| {
                     Ok(list_songs(client)?.into_iter().map(|s| s.file).collect())
@@ -797,10 +822,11 @@ where
             .items(false)
             .map(|(_, item)| self.list_songs_in_item(item.to_owned()))
             .collect_vec();
+        let (current_items, _) = self.enqueue_items(false);
+        let current_items = self.resolve_enqueue(current_items, ctx)?;
 
         let modal = MenuModal::new(ctx)
             .list_section(ctx, |mut section| {
-                let (current_items, _) = self.enqueue_items(false);
                 if !current_items.is_empty() {
                     let cloned_items = current_items.clone();
                     section.add_item("Add to queue", move |ctx| {
@@ -906,10 +932,12 @@ where
                 if section.items.is_empty() { None } else { Some(section) }
             })
             .list_section(ctx, |mut section| {
-                // TODO Deletion cannot be currently done as we need to clear the marked items
-                // after the deletion occurs but do not have access to the pane's state in the
-                // callback. An event should be dispatched upon deletion to clear the items or
-                // better yet, the marked items need to be refactored directly into the
+                // TODO Deletion cannot be currently done as we need to clear
+                // the marked items after the deletion occurs
+                // but do not have access to the pane's state in the
+                // callback. An event should be dispatched upon deletion to
+                // clear the items or better yet, the marked
+                // items need to be refactored directly into the
                 // `DirStackItem` directly.
 
                 // if !to_delete.is_empty() {

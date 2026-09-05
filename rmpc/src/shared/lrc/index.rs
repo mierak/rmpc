@@ -94,8 +94,8 @@ impl LrcIndex {
     }
 
     pub(crate) fn find_entry(&self, song: &Song) -> Option<(&Path, &LrcMetadata)> {
-        // TODO xxx.last() is called here to not change existing behavior. Consider
-        // supporting all the tag entries
+        // TODO xxx.last() is called here to not change existing behavior.
+        // Consider supporting all the tag entries
         let artist = song.metadata.get("artist").map(|v| v.last())?;
         let title = song.metadata.get("title").map(|v| v.last())?;
         let album = song.metadata.get("album").map(|v| v.last());
@@ -129,8 +129,9 @@ impl LrcIndex {
 
         log::trace!(artist, title, album; "Found multiple Lyrics entries for song, getting closest match by length");
         let Some(target_duration) = song.duration else {
-            // Song does not have a length information, not sure if this can ever happen,
-            // but better safe than sorry. Return the first result rather than nothing.
+            // Song does not have a length information, not sure if this can
+            // ever happen, but better safe than sorry. Return the
+            // first result rather than nothing.
             let (path, metadata) = results[0];
             return Some((path, metadata));
         };
@@ -157,7 +158,8 @@ impl LrcIndex {
         }
 
         if !without_length.is_empty() {
-            // Lrc matching by length was not found, but there are lrc without length
+            // Lrc matching by length was not found, but there are lrc without
+            // length
             let (path, metadata) = without_length[0];
             return Some((path, metadata));
         }
@@ -400,7 +402,7 @@ mod tests {
 
         let result = index.find_entry(&song);
 
-        assert!(result.unwrap().0.to_string_lossy() == "1");
+        assert_eq!(result.unwrap().0.to_string_lossy(), "1");
     }
 
     #[test]
@@ -431,7 +433,7 @@ mod tests {
 
         let result = index.find_entry(&song);
 
-        assert!(result.unwrap().0.to_string_lossy() == "should match");
+        assert_eq!(result.unwrap().0.to_string_lossy(), "should match");
     }
 
     #[test]
@@ -462,7 +464,7 @@ mod tests {
 
         let result = index.find_entry(&song);
 
-        assert!(result.unwrap().0.to_string_lossy() == "should match");
+        assert_eq!(result.unwrap().0.to_string_lossy(), "should match");
     }
 
     #[test]
@@ -495,7 +497,7 @@ mod tests {
 
         let result = index.find_entry(&song);
 
-        assert!(result.unwrap().0.to_string_lossy() == "no length");
+        assert_eq!(result.unwrap().0.to_string_lossy(), "no length");
     }
 
     #[test]
@@ -526,6 +528,6 @@ mod tests {
 
         let result = index.find_entry(&song);
 
-        assert!(result.unwrap().0.to_string_lossy() == "no album");
+        assert_eq!(result.unwrap().0.to_string_lossy(), "no album");
     }
 }

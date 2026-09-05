@@ -71,6 +71,7 @@ pub trait MpdClientExt {
         &mut self,
         current_partition: &str,
     ) -> Result<Vec<PartitionedOutput>, MpdError>;
+    fn current_partition_outputs(&mut self) -> Result<Vec<PartitionedOutput>, MpdError>;
     fn create_playlist(&mut self, name: &str, items: Vec<String>) -> Result<(), MpdError>;
     fn next_keep_state(&mut self, keep: bool, state: State) -> Result<(), MpdError>;
     fn prev_keep_state(&mut self, keep: bool, state: State) -> Result<(), MpdError>;
@@ -109,6 +110,7 @@ pub enum MpdDelete {
 #[derive(Debug, Clone)]
 pub enum Enqueue {
     File { path: String },
+    Directory { path: String },
     Playlist { name: String },
     Find { filter: Vec<(Tag, FilterKind, String)> },
 }
@@ -162,7 +164,9 @@ impl<T: MpdClient + MpdCommand + ProtoClient> MpdClientExt for T {
             self.send_start_cmd_list()?;
             for item in &items[i..] {
                 match item {
-                    Enqueue::File { path } => self.send_add(path, position),
+                    Enqueue::File { path } | Enqueue::Directory { path } => {
+                        self.send_add(path, position)
+                    }
                     Enqueue::Playlist { name } => self.send_load_playlist(name, position),
                     Enqueue::Find { filter } => self.send_find_add(
                         &filter
@@ -179,7 +183,7 @@ impl<T: MpdClient + MpdCommand + ProtoClient> MpdClientExt for T {
             match self.read_ok() {
                 Ok(()) => i = items_len,
                 Err(MpdError::Mpd(err)) => {
-                    i += 1 + err.command_list_index as usize;
+                    i += 1 + err.command_list_index;
                     errors += 1;
                 }
                 err => err?,
@@ -275,27 +279,13 @@ impl<T: MpdClient + MpdCommand + ProtoClient> MpdClientExt for T {
         current_partition: &str,
     ) -> Result<Vec<PartitionedOutput>, MpdError> {
         if current_partition == "default" {
-            Ok(self
-                .outputs()?
-                .0
-                .into_iter()
-                .map(|output| PartitionedOutput {
-                    id: output.id,
-                    name: output.name,
-                    enabled: if output.plugin == "dummy" { false } else { output.enabled },
-                    kind: if output.plugin == "dummy" {
-                        PartitionedOutputKind::OtherPartition
-                    } else {
-                        PartitionedOutputKind::CurrentPartition
-                    },
-                    plugin: output.plugin,
-                })
-                .collect())
+            self.current_partition_outputs()
         } else {
             // MPD lists all outputs only on the default partition so we have to
-            // switch to it, list the outputs and then switch back. We also have to
-            // list outputs on the current partition to find out which output is
-            // actually enabled on the current partition.
+            // switch to it, list the outputs and then switch back. We also have
+            // to list outputs on the current partition to find out
+            // which output is actually enabled on the current
+            // partition.
             self.send_start_cmd_list_ok()?;
             self.send_switch_to_partition("default")?;
             self.send_outputs()?;
@@ -335,6 +325,28 @@ impl<T: MpdClient + MpdCommand + ProtoClient> MpdClientExt for T {
 
             Ok(result)
         }
+    }
+
+    // A plain outputs command reflects the partition the connection is on
+    // and never switches partitions. Outputs moved to another partition
+    // show up as the dummy plugin.
+    fn current_partition_outputs(&mut self) -> Result<Vec<PartitionedOutput>, MpdError> {
+        Ok(self
+            .outputs()?
+            .0
+            .into_iter()
+            .map(|output| PartitionedOutput {
+                id: output.id,
+                name: output.name,
+                enabled: if output.plugin == "dummy" { false } else { output.enabled },
+                kind: if output.plugin == "dummy" {
+                    PartitionedOutputKind::OtherPartition
+                } else {
+                    PartitionedOutputKind::CurrentPartition
+                },
+                plugin: output.plugin,
+            })
+            .collect())
     }
 
     fn create_playlist(&mut self, name: &str, items: Vec<String>) -> Result<(), MpdError> {
@@ -451,7 +463,7 @@ impl<T: MpdClient + MpdCommand + ProtoClient> MpdClientExt for T {
         let mut uris = Vec::new();
         for item in items {
             match item {
-                Enqueue::File { path } => uris.push(path),
+                Enqueue::File { path } | Enqueue::Directory { path } => uris.push(path),
                 Enqueue::Playlist { name } => {
                     let playlist = self.list_playlist(&name)?.0;
                     uris.extend(playlist);
@@ -482,7 +494,7 @@ impl<T: MpdClient + MpdCommand + ProtoClient> MpdClientExt for T {
         let mut uris = Vec::new();
         for item in items {
             match item {
-                Enqueue::File { path } => uris.push(path),
+                Enqueue::File { path } | Enqueue::Directory { path } => uris.push(path),
                 Enqueue::Playlist { name } => {
                     let playlist = self.list_playlist(&name)?.0;
                     uris.extend(playlist);
@@ -526,14 +538,16 @@ impl<T: MpdClient + MpdCommand + ProtoClient> MpdClientExt for T {
             Ok(()) => {}
             Err(MpdError::Mpd(err)) if err.is_no_exist() => {
                 let Some(cache_dir) = cache_dir else {
-                    // This should not happen, the download should only happen when
-                    // cache_dir is defined in the first place.
+                    // This should not happen, the download should only happen
+                    // when cache_dir is defined in the
+                    // first place.
                     log::error!(err:?; "MPD reported error when adding files from yt-dlp cache dir, but cache_dir is not configured");
                     return Err(MpdError::Mpd(err))?;
                 };
                 let Some(cfg) = &self.config() else {
-                    // This should not happen either, music_directory is required for
-                    // MPD to work and rmpc needs socket connection to use yt-dpl so it
+                    // This should not happen either, music_directory is
+                    // required for MPD to work and rmpc
+                    // needs socket connection to use yt-dpl so it
                     // should always have permission to access the config.
                     log::error!(err:?; "MPD reported error when adding files from yt-dlp cache dir, but cannot get music_directory from MPD");
                     return Err(MpdError::Mpd(err))?;
@@ -543,9 +557,9 @@ impl<T: MpdClient + MpdCommand + ProtoClient> MpdClientExt for T {
                 log::warn!(cache_dir:?, music_directory:?; "MPD reported noexist error when adding files from yt-dlp cache dir. Will try again after issuing database update.");
 
                 let Ok(update_dir) = cache_dir.strip_prefix(music_directory) else {
-                    // Rethrow the original error. The cache_dir is not inside the
-                    // music_directory so there is no reason to try to issue update to
-                    // mpd.
+                    // Rethrow the original error. The cache_dir is not inside
+                    // the music_directory so there is no
+                    // reason to try to issue update to mpd.
                     return Err(MpdError::Mpd(err))?;
                 };
 
@@ -656,6 +670,12 @@ pub struct PartitionedOutput {
     pub enabled: bool,
     pub plugin: String,
     pub kind: PartitionedOutputKind,
+}
+
+impl PartitionedOutput {
+    pub fn is_on_current_partition(&self) -> bool {
+        matches!(self.kind, PartitionedOutputKind::CurrentPartition)
+    }
 }
 
 #[derive(Debug, Clone, Copy)]

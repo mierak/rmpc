@@ -242,8 +242,8 @@ impl SearchPane {
             && stickers_supported
             && (rating_filter.is_some() || liked_filter.is_some())
         {
-            // Filters are empty, but rating filters are set - show all songs with the
-            // wanted rating
+            // Filters are empty, but rating filters are set - show all songs
+            // with the wanted rating
             ctx.query().id(SEARCH).replace_id(SEARCH).target(PaneType::Search).query(
                 move |client| {
                     // empty URI returns all songs with the sticker
@@ -305,8 +305,8 @@ impl SearchPane {
                 },
             );
         } else if filter.is_empty() {
-            // Filters are empty, stickers are either not supported or not set - clear
-            // current results
+            // Filters are empty, stickers are either not supported or not set -
+            // clear current results
             let _ = std::mem::take(&mut self.songs_dir);
         } else {
             // Search normally
@@ -479,8 +479,12 @@ impl SearchPane {
                     event.abandon();
                 }
                 CommonAction::Rate { .. } => {}
+                CommonAction::Save { kind: _, current: true } => {
+                    event.abandon();
+                }
                 CommonAction::Save {
                     kind: SaveKind::Playlist { name, all: true, duplicates_strategy },
+                    current: false,
                 } => {
                     let song_paths: Vec<String> =
                         self.items(true).map(|(_, song)| song.file.clone()).collect();
@@ -491,7 +495,10 @@ impl SearchPane {
 
                     add_to_playlist_or_show_modal(name, song_paths, duplicates_strategy, ctx);
                 }
-                CommonAction::Save { kind: SaveKind::Modal { all: true, duplicates_strategy } } => {
+                CommonAction::Save {
+                    kind: SaveKind::Modal { all: true, duplicates_strategy },
+                    current: false,
+                } => {
                     let song_paths: Vec<String> =
                         self.items(true).map(|(_, song)| song.file.clone()).collect();
                     if song_paths.is_empty() {
@@ -841,8 +848,12 @@ impl SearchPane {
                 CommonAction::Rate { kind: _, current: true, min_rating: _, max_rating: _ } => {
                     event.abandon();
                 }
+                CommonAction::Save { kind: _, current: true } => {
+                    event.abandon();
+                }
                 CommonAction::Save {
                     kind: SaveKind::Playlist { name, all, duplicates_strategy },
+                    current: false,
                 } => {
                     let song_paths: Vec<String> =
                         self.items(all).map(|(_, song)| song.file.clone()).collect();
@@ -853,7 +864,10 @@ impl SearchPane {
 
                     add_to_playlist_or_show_modal(name, song_paths, duplicates_strategy, ctx);
                 }
-                CommonAction::Save { kind: SaveKind::Modal { all, duplicates_strategy } } => {
+                CommonAction::Save {
+                    kind: SaveKind::Modal { all, duplicates_strategy },
+                    current: false,
+                } => {
                     let song_paths: Vec<_> =
                         self.items(all).map(|(_, song)| song.file.clone()).collect();
                     if song_paths.is_empty() {
@@ -1102,7 +1116,8 @@ impl Pane for SearchPane {
                 self.column_areas[BrowserArea::Current] = current_area;
                 self.inputs.render(current_area, frame.buffer_mut(), ctx);
 
-                // Render only the part of the preview that is actually supposed to be shown
+                // Render only the part of the preview that is actually supposed
+                // to be shown
                 let offset = self.songs_dir.state.offset();
                 let items = self.songs_dir.to_list_items_range(
                     offset..offset + previous_area.height as usize,

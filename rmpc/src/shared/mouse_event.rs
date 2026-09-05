@@ -161,8 +161,8 @@ fn is_scrollbar_interaction(event: MouseEvent, scrollbar_area: Rect) -> bool {
             event.x == scrollbar_x && scrollbar_area.contains(event.into())
         }
         MouseEventKind::Drag { drag_start_position } => {
-            // For drags, check if drag started on scrollbar or current position is on
-            // scrollbar
+            // For drags, check if drag started on scrollbar or current position
+            // is on scrollbar
             (drag_start_position.x == scrollbar_x && scrollbar_area.contains(drag_start_position))
                 || (event.x == scrollbar_x && scrollbar_area.contains(event.into()))
         }

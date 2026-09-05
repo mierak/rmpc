@@ -7,6 +7,7 @@ debug the project.
 
 * [Prerequisites](#prerequisites)
 * [Dev setup and running rmpc from the source code](#dev-setup-and-running-rmpc-from-the-source-code)
+* [AI usage](#ai-usage)
 * [Formatting the code](#formatting-the-code)
 * [Reporting an issue](#reporting-an-issue)
 * [Requesting a feature](#requesting-a-feature)
@@ -56,6 +57,22 @@ rustup component add rustfmt --toolchain nightly
 ```bash
 cargo +nightly fmt --all
 ```
+
+## AI usage
+
+Rmpc is a project created by a human in their spare time and for humans to enjoy. Usage of AI is
+allowed but you, the contributor, are responsible for the submission.
+If you wish to contribute using AI you must follow these few points:
+
+- All AI usage **MUST** be disclosed. State what tool you used and to what extent you used its
+  assistance.
+- You, the human, **MUST** fully understand the code changes you made and how they affect the rest
+  of the system.
+- Do not copy paste or otherwise use AI to generate messages and descriptions in issues and PRs.
+  These are for human interaction and talking to an LLM via a proxy is demotivating at the very
+  least. If you wish to include AI generated text, you are allowed to do so in its own section of
+  the comment/description body and it must be clearly labeled as AI generated.
+- Failure to follow these rules may result in closing your issue/PR without notice.
 
 ## Reporting an issue
 

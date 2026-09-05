@@ -22,9 +22,10 @@ impl SocketCommandExecute for SwitchTabCommand {
         _stream: IpcStream,
         _config: &Config,
     ) -> Result<()> {
-        // Skipping validation here due to config hot reload, the config passed here
-        // might be stale since hot reloading only updates config in the main thread.
-        // Let the main event loop handle validation with the current config.
+        // Skipping validation here due to config hot reload, the config passed
+        // here might be stale since hot reloading only updates config
+        // in the main thread. Let the main event loop handle validation
+        // with the current config.
         event_tx.send(AppEvent::RemoteSwitchTab { tab_name: self.tab })?;
         Ok(())
     }

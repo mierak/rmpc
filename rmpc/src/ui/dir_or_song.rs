@@ -84,6 +84,10 @@ impl DirOrSong {
         }
     }
 
+    pub fn is_hidden_dir(&self, hidden: &[String]) -> bool {
+        matches!(self, DirOrSong::Dir { name, playlist: false, .. } if hidden.iter().any(|h| h == name))
+    }
+
     pub fn last_modified(&self) -> chrono::DateTime<chrono::Utc> {
         match self {
             DirOrSong::Dir { last_modified, .. } => *last_modified,
@@ -150,7 +154,8 @@ impl Ord for DirOrSongCustomSort<'_, '_> {
                 }
                 (DirOrSong::Song(a), DirOrSong::Song(b)) => {
                     let ord = a.with_custom_sort(self.opts).cmp(&b.with_custom_sort(self.opts));
-                    // have to undo the reverse here because songs' custom sort reverses already
+                    // have to undo the reverse here because songs' custom sort
+                    // reverses already
                     if self.opts.reverse { ord.reverse() } else { ord }
                 }
                 (a @ DirOrSong::Dir { name, .. }, DirOrSong::Song(song))
@@ -164,7 +169,8 @@ impl Ord for DirOrSongCustomSort<'_, '_> {
 
                         let s = song.format(prop, "", TagResolutionStrategy::All);
                         if let Some(s) = s {
-                            // The next compare should not ignore leading "the" if the resulting
+                            // The next compare should not ignore leading "the"
+                            // if the resulting
                             // format is not empty
                             if !s.is_empty() {
                                 is_leading = false;
@@ -416,7 +422,8 @@ impl CmpByProp {
                 )
             }
             SongProperty::Position => {
-                // last() is fine because position should never have multiple values
+                // last() is fine because position should never have multiple
+                // values
                 let self_pos = a.metadata.get("pos").map(|v| v.last());
                 let other_pos = b.metadata.get("pos").map(|v| v.last());
                 CmpByProp::opt_str_parse::<_, usize>(
@@ -1006,5 +1013,22 @@ mod ordtest {
             Ordering::Less,
             "transitivity requires: if a<b and b<c then a<c, but got ac={ac:?}"
         );
+    }
+
+    #[test]
+    fn is_hidden_dir_matches_dirs_by_leaf_name() {
+        let hidden = vec![".Trash-1000".to_string()];
+
+        // A directory whose leaf name is blacklisted is hidden.
+        assert!(dir(".Trash-1000").is_hidden_dir(&hidden));
+        // Other directories are kept.
+        assert!(!dir("Music").is_hidden_dir(&hidden));
+        // Songs are never hidden, even if their file matches.
+        assert!(!song(".Trash-1000", &[]).is_hidden_dir(&hidden));
+        // Playlists sharing the name are not hidden (blacklist targets
+        // folders).
+        assert!(!DirOrSong::playlist_name_only(".Trash-1000".to_string()).is_hidden_dir(&hidden));
+        // Empty blacklist hides nothing.
+        assert!(!dir(".Trash-1000").is_hidden_dir(&[]));
     }
 }

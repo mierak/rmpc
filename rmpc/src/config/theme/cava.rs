@@ -194,7 +194,8 @@ impl CavaThemeFile {
                         .tuple_windows()
                         .fold(HashMap::new(), |mut acc, ((a_key, a_val), (b_key, b_val))| {
                             if b_key - a_key == 0 {
-                                // range only includes start and end, simply include them in the map
+                                // range only includes start and end, simply
+                                // include them in the map
                                 acc.insert(a_key, CrosstermColor::Rgb {
                                     r: a_val.0,
                                     g: a_val.1,

@@ -1,4 +1,4 @@
-use std::sync::LazyLock;
+use std::sync::{LazyLock, OnceLock};
 
 use anyhow::Result;
 use crossterm::{
@@ -38,9 +38,10 @@ pub struct Terminal {
     emulator: Emulator,
     kitty_keyboard_protocol: bool,
     kitty_graphics: LazyLock<bool>,
-    sixel: LazyLock<bool>,
+    pub sixel: LazyLock<bool>,
     ueberzug_x11: LazyLock<bool>,
     ueberzug_wayland: LazyLock<bool>,
+    pub resolved_backend: OnceLock<ImageMethod>,
     zellij: bool,
 }
 
@@ -68,6 +69,7 @@ impl Terminal {
                 .inspect_err(|err| log::error!(err:?; "Failed to determine kitty graphics support"))
                 .unwrap_or_default()
         });
+        let resolved_backend = OnceLock::new();
 
         let ueberzug_x11: LazyLock<bool> = LazyLock::new(features::detect_ueberzug_x11);
         let ueberzug_wayland: LazyLock<bool> = LazyLock::new(features::detect_ueberzug_wayland);
@@ -81,6 +83,7 @@ impl Terminal {
             ueberzug_x11,
             ueberzug_wayland,
             zellij,
+            resolved_backend,
         }
     }
 
@@ -138,6 +141,7 @@ impl Terminal {
             ImageMethodFile::Auto => self.autodetect_image_backend().into(),
         };
 
+        self.resolved_backend.get_or_init(|| result);
         log::debug!(requested_backend:?, resolved_backend:? = result, tmux = *IS_TMUX; "Resolved image backend");
 
         result
@@ -168,8 +172,8 @@ impl Terminal {
             _ => all_backends.retain(|b| !matches!(b, B::Iterm2)),
         }
 
-        // Ueberzugpp should be tested for for all terminals except Konsole(size and
-        // position issues) if no other backend was found before it.
+        // Ueberzugpp should be tested for for all terminals except Konsole(size
+        // and position issues) if no other backend was found before it.
         if !matches!(self.emulator, Emulator::Konsole) {
             all_backends.push(B::UeberzugWayland);
             all_backends.push(B::UeberzugX11);

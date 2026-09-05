@@ -254,8 +254,8 @@ end
 M.setup = function(self, args)
     self.api_key = args.api_key
     self.shared_secret = args.shared_secret
-    self.update_now_playing = (args.update_now_playing ~= nil) and args.update_now_playing or false
-    self.enabled = (args.update_now_playing ~= nil) and args.enabled or true
+    self.update_now_playing = args.update_now_playing == true
+    self.enabled = args.enabled == nil or args.enabled
 
     local xdg_open = util.which("xdg-open")
     if not xdg_open then
@@ -310,8 +310,12 @@ M.setup = function(self, args)
 end
 
 M.song_change = function(self, old, new)
+    if not self.enabled then
+        return
+    end
+
     if new ~= nil and (self.update_now_playing or false) then
-        lastfm_update_now_playing(self.api_key, self.shared_secret, self.session_key, new, new.duration)
+        lastfm_update_now_playing(self.api_key, self.shared_secret, self.session_key, new, new.duration / 1000)
     end
 
     local current_time = os.time()
@@ -330,6 +334,10 @@ M.song_change = function(self, old, new)
 end
 
 M.state_change = function(self, old, new)
+    if not self.enabled then
+        return
+    end
+
     if new ~= "play" and old == "play" then
         local current_time = os.time()
 

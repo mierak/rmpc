@@ -380,9 +380,10 @@ impl Pane for QueuePane {
 
                 let columns = (0..formats.len()).map(|i| {
                     let mut max_len: usize = widths[i].width.into();
-                    // We have to subtract marker symbol length from max len in order to make space
-                    // for the marker symbol in case we are in the first column of the table and the
-                    // song is marked.
+                    // We have to subtract marker symbol length from max len in
+                    // order to make space for the marker
+                    // symbol in case we are in the first column of the table
+                    // and the song is marked.
                     if is_marked && i == 0 {
                         max_len = max_len.saturating_sub(marker_symbol_len);
                     }
@@ -876,7 +877,8 @@ impl Pane for QueuePane {
                                 sect.action(move |ctx, value| {
                                     let Some((_, opts)) = opts.iter().find(|opt| opt.0 == value)
                                     else {
-                                        // shouldn't happen since the options are generated from
+                                        // shouldn't happen since the options
+                                        // are generated from
                                         // the same list, but just in case
                                         status_error!("Invalid option selected");
                                         return Ok(());
@@ -1306,8 +1308,12 @@ impl Pane for QueuePane {
                 CommonAction::Rate { kind: _, current: true, min_rating: _, max_rating: _ } => {
                     event.abandon();
                 }
+                CommonAction::Save { kind: _, current: true } => {
+                    event.abandon();
+                }
                 CommonAction::Save {
                     kind: SaveKind::Playlist { name, all, duplicates_strategy },
+                    current: false,
                 } => {
                     let song_paths: Vec<String> =
                         self.items(all).map(|(_, song)| song.file.clone()).collect();
@@ -1318,7 +1324,10 @@ impl Pane for QueuePane {
 
                     add_to_playlist_or_show_modal(name, song_paths, duplicates_strategy, ctx);
                 }
-                CommonAction::Save { kind: SaveKind::Modal { all, duplicates_strategy } } => {
+                CommonAction::Save {
+                    kind: SaveKind::Modal { all, duplicates_strategy },
+                    current: false,
+                } => {
                     let song_paths: Vec<String> =
                         self.items(all).map(|(_, song)| song.file.clone()).collect();
                     if song_paths.is_empty() {

@@ -161,8 +161,9 @@ impl Default for KeyConfigFile {
             (s().char('i'),                       C::FocusInput),
             (s().char('o').char('i'),             C::ShowInfo),
             (s().char('x').ctrl(),                C::ContextMenu {}),
-            (s().char('s').ctrl().char('s'),      C::Save { kind: SaveKind::Modal { all: false, duplicates_strategy: DuplicateStrategy::Ask } }),
-            (s().char('s').ctrl().char('a'),      C::Save { kind: SaveKind::Modal { all: true, duplicates_strategy: DuplicateStrategy::Ask } }),
+            (s().char('s').ctrl().char('s'),      C::Save { kind: SaveKind::Modal { all: false, duplicates_strategy: DuplicateStrategy::Ask }, current: false }),
+            (s().char('s').ctrl().char('a'),      C::Save { kind: SaveKind::Modal { all: true, duplicates_strategy: DuplicateStrategy::Ask }, current: false }),
+            (s().char('s').ctrl().char('c'),      C::Save { kind: SaveKind::Modal { all: false, duplicates_strategy: DuplicateStrategy::Ask }, current: true }),
             (s().char('r'),                       C::Rate { kind: RateKind::default(), current: false, min_rating: 0, max_rating: 10 }),
         ]);
 

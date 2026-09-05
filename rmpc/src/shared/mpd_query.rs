@@ -20,6 +20,7 @@ pub const EXTERNAL_COMMAND: &str = "external_command";
 pub const GLOBAL_STATUS_UPDATE: &str = "global_status_update";
 pub const GLOBAL_VOLUME_UPDATE: &str = "global_volume_update";
 pub const GLOBAL_QUEUE_UPDATE: &str = "global_queue_update";
+pub const GLOBAL_OUTPUTS_UPDATE: &str = "global_outputs_update";
 pub const GLOBAL_STICKERS_UPDATE: &str = "global_stickers_update";
 
 #[derive(derive_more::Debug, Builder)]

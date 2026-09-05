@@ -74,7 +74,7 @@ mod tests {
         let version_1: Version = "0.22.0".parse().unwrap();
         let version_2: Version = "0.22.0".parse().unwrap();
 
-        assert!(version_1 == version_2);
+        assert_eq!(version_1, version_2);
     }
 
     #[test]

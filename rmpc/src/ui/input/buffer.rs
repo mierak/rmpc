@@ -79,13 +79,13 @@ impl InputBuffer {
         let mut end = fill_to_end(value, start, cols);
 
         if cursor < start {
-            // Snap start to cursor if it is before the start and simply fill to the end of
-            // the available space
+            // Snap start to cursor if it is before the start and simply fill to
+            // the end of the available space
             start = snap_to_grapheme_start(value, cursor);
             end = fill_to_end(value, start, cols);
         } else if cursor >= end {
-            // Snap end to after the grapheme at the cursor and fill to available space to
-            // the left
+            // Snap end to after the grapheme at the cursor and fill to
+            // available space to the left
             let target_end = next_grapheme_end(value, cursor);
             let mut remaining = cols;
             let mut new_start = target_end;
@@ -184,7 +184,8 @@ impl InputBuffer {
                     .value
                     .unicode_word_indices()
                     .find(|(idx, w)| {
-                        // -1 so that the if cursor is at the start of a word, the word itself is
+                        // -1 so that the if cursor is at the start of a word,
+                        // the word itself is
                         // not counted and instead the word before is considered
                         (*idx..*idx + w.len()).contains(&self.cursor.saturating_sub(1))
                     })
@@ -280,8 +281,8 @@ impl InputBuffer {
             None => InputResultEvent::NoChange,
         };
 
-        // If cursor moved outside the current window, recompute the window based on
-        // existing width
+        // If cursor moved outside the current window, recompute the window
+        // based on existing width
         if !self.visible_slice.contains(&self.cursor) {
             if old_cursor > self.cursor {
                 let start = self.cursor;
@@ -613,7 +614,7 @@ mod test {
             let res = input.handle_input(Some(InputEvent::PopRight));
             match res {
                 InputResultEvent::Pop => {
-                    assert!(input.value == " done");
+                    assert_eq!(input.value, " done");
                     assert_eq!(input.cursor, 1);
                 }
                 _ => panic!("Expected Pop"),
@@ -773,7 +774,7 @@ mod test {
 
             match res {
                 InputResultEvent::Pop => {
-                    assert!(input.value == "foo,!");
+                    assert_eq!(input.value, "foo,!");
                     assert_eq!(input.cursor, 4);
                 }
                 _ => panic!("Expected Pop event"),

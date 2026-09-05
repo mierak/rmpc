@@ -1,11 +1,13 @@
 use std::path::{Path, PathBuf};
 
-use anyhow::{Context, Result, bail};
-use rmpc_shared::{paths::rmpcd_data_dir, version::Version};
+use anyhow::{Context, Result};
+use rmpc_shared::version::Version;
 use serde::{Deserialize, Serialize};
 use serde_with::{DisplayFromStr, serde_as};
 use sha2::{Digest, Sha256};
 use tracing::{debug, trace};
+
+use crate::paths::Paths;
 
 include!(concat!(env!("OUT_DIR"), "/lua_type_defs.rs"));
 
@@ -27,15 +29,11 @@ fn hash_type_defs() -> String {
 }
 
 pub fn eject() -> Result<PathBuf> {
-    eject_inner(&RealFs)
+    eject_inner(&RealFs, Paths::type_def_dir())
 }
 
-pub fn eject_inner(fs: &impl FileSystem) -> Result<PathBuf> {
-    let Some(mut data_dir) = rmpcd_data_dir() else {
-        bail!("Could not determine data directory");
-    };
-
-    data_dir.push("lua");
+pub fn eject_inner(fs: &impl FileSystem, data_dir: &Path) -> Result<PathBuf> {
+    let data_dir = data_dir.to_owned();
 
     let hash = hash_type_defs();
     let crate_version: Version = env!("CARGO_PKG_VERSION").parse()?;
@@ -174,9 +172,10 @@ mod test {
     };
 
     use anyhow::anyhow;
-    use rmpc_shared::env::ENV;
 
     use super::*;
+
+    const DATA_DIR: &str = "/home/user/.local/share/rmpcd/lua";
 
     #[derive(Default)]
     struct TestFs {
@@ -261,46 +260,13 @@ mod test {
     }
 
     #[test]
-    fn fails_on_missing_home() {
-        let _lock = ENV.lock();
-        let fs = TestFs::default();
-
-        ENV.clear();
-        fs.stub_exists(false);
-
-        let result = eject_inner(&fs);
-
-        assert_eq!(result.unwrap_err().to_string(), "Could not determine data directory");
-    }
-
-    #[test]
-    fn uses_xdg_data_dir() {
-        let _lock = ENV.lock();
-        let fs = TestFs::default();
-
-        ENV.clear();
-        ENV.set("XDG_DATA_HOME", "/tmp/test_data");
-        fs.stub_exists(false);
-
-        let result = eject_inner(&fs);
-
-        assert!(
-            calls!(fs, "write").contains(&"/tmp/test_data/rmpcd/lua/manifest.json".to_string()),
-        );
-        assert!(result.is_ok());
-    }
-
-    #[test]
     fn fails_with_missing_manifest() {
-        let _lock = ENV.lock();
         let fs = TestFs::default();
 
-        ENV.clear();
-        ENV.set("HOME", "/home/user");
         fs.stub_exists(true);
         fs.stub_read_str(Err::<&str, _>(anyhow!("manifest not found")));
 
-        let result = eject_inner(&fs);
+        let result = eject_inner(&fs, Path::new(DATA_DIR));
 
         assert_eq!(
             result.unwrap_err().to_string(),
@@ -310,15 +276,12 @@ mod test {
 
     #[test]
     fn fails_with_invalid_manifest() {
-        let _lock = ENV.lock();
         let fs = TestFs::default();
 
-        ENV.clear();
-        ENV.set("HOME", "/home/user");
         fs.stub_exists(true);
         fs.stub_read_str(Ok("invalid json"));
 
-        let result = eject_inner(&fs);
+        let result = eject_inner(&fs, Path::new(DATA_DIR));
 
         assert_eq!(
             result.unwrap_err().to_string(),
@@ -328,19 +291,16 @@ mod test {
 
     #[test]
     fn does_not_eject_when_up_to_date() {
-        let _lock = ENV.lock();
         let fs = TestFs::default();
         let hash = hash_type_defs();
         let crate_version: Version = env!("CARGO_PKG_VERSION").parse().unwrap();
 
-        ENV.clear();
-        ENV.set("HOME", "/home/user");
         fs.stub_exists(true);
         fs.stub_read_str(Ok(format!(
             r#"{{"rmpcd_version":"{crate_version}","hash":"{hash}","files":["rmpcd.lua"]}}"#
         )));
 
-        let result = eject_inner(&fs);
+        let result = eject_inner(&fs, Path::new(DATA_DIR));
 
         assert!(result.is_ok());
         assert!(calls!(fs, "remove_file").is_empty());
@@ -350,18 +310,15 @@ mod test {
 
     #[test]
     fn does_not_eject_when_higher_version() {
-        let _lock = ENV.lock();
         let fs = TestFs::default();
         let crate_version: Version = Version::new(99, 99, 99);
 
-        ENV.clear();
-        ENV.set("HOME", "/home/user");
         fs.stub_exists(true);
         fs.stub_read_str(Ok(format!(
             r#"{{"rmpcd_version":"{crate_version}","hash":"does not match","files":["rmpcd.lua"]}}"#
         )));
 
-        let result = eject_inner(&fs);
+        let result = eject_inner(&fs, Path::new(DATA_DIR));
 
         assert!(result.is_ok());
         assert!(calls!(fs, "remove_file").is_empty());
@@ -371,18 +328,15 @@ mod test {
 
     #[test]
     fn ejects_when_hash_mismatch() {
-        let _lock = ENV.lock();
         let fs = TestFs::default();
         let crate_version: Version = env!("CARGO_PKG_VERSION").parse().unwrap();
 
-        ENV.clear();
-        ENV.set("HOME", "/home/user");
         fs.stub_exists(true);
         fs.stub_read_str(Ok(format!(
             r#"{{"rmpcd_version":"{crate_version}","hash":"does not match","files":["rmpcd.lua"]}}"#
         )));
 
-        let result = eject_inner(&fs);
+        let result = eject_inner(&fs, Path::new(DATA_DIR));
 
         assert!(result.is_ok());
         assert_eq!(calls!(fs, "remove_file").len(), 1);
@@ -411,14 +365,11 @@ mod test {
 
     #[test]
     fn ejects_when_dir_does_not_exist() {
-        let _lock = ENV.lock();
         let fs = TestFs::default();
 
-        ENV.clear();
-        ENV.set("HOME", "/home/user");
         fs.stub_exists(false);
 
-        let result = eject_inner(&fs);
+        let result = eject_inner(&fs, Path::new(DATA_DIR));
 
         assert!(result.is_ok());
         assert_eq!(calls!(fs, "write").len(), 15);
@@ -447,16 +398,13 @@ mod test {
 
     #[test]
     fn writes_correct_manifest() {
-        let _lock = ENV.lock();
         let fs = TestFs::default();
 
-        ENV.clear();
-        ENV.set("HOME", "/home/user");
         fs.stub_exists(false);
         let hash = hash_type_defs();
         let crate_version: Version = env!("CARGO_PKG_VERSION").parse().unwrap();
 
-        let result = eject_inner(&fs);
+        let result = eject_inner(&fs, Path::new(DATA_DIR));
 
         assert!(result.is_ok());
         let m: Manifest = serde_json::from_str(&String::from_utf8_lossy(

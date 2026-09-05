@@ -21,6 +21,8 @@ use tokio::{
 };
 use tracing::{error, info, trace, warn};
 
+use crate::subscribed_channels::SubscribedChannels;
+
 pub type MpdClient = rmpc_mpd::client::Client<'static>;
 pub type MpdError = rmpc_mpd::errors::MpdError;
 pub type MpdStream = rmpc_mpd::client::TcpOrUnixStream;
@@ -50,6 +52,16 @@ struct Shared {
     #[debug(skip)]
     interrupt_stream: StdMutex<Option<MpdStream>>,
     idle_state: AtomicU8,
+    subscribed_channels: SubscribedChannels,
+}
+
+fn resubscribe(client: &mut MpdClient, shared: &Shared) {
+    for channel in shared.subscribed_channels.list() {
+        match client.subscribe(&channel) {
+            Ok(()) => info!(channel, "Resubscribed to channel"),
+            Err(err) => error!(channel, error = ?err, "Failed to resubscribe to channel"),
+        }
+    }
 }
 
 fn preempt_idle(shared: &Shared) {
@@ -92,7 +104,11 @@ fn worker_loop(
         let mut shutting_down = false;
         let reconnect_base_delay = Duration::from_millis(500);
         let reconnect_max_delay = Duration::from_secs(16);
-        let mut skip_recv = false;
+        // Start in idle rather than waiting for a first command. MPD closes a
+        // connected client that is neither idle nor sending after
+        // connection_timeout (60s by default), and nothing guarantees a command
+        // arrives before then now that plugins load after the connect.
+        let mut skip_recv = true;
 
         'outer: while !shutting_down {
             if !skip_recv {
@@ -162,6 +178,7 @@ fn worker_loop(
                                     }
                                 }
                                 info!("Reconnected to MPD");
+                                resubscribe(&mut client, &shared);
                                 on_reconnect();
                                 continue 'outer;
                             }
@@ -195,6 +212,7 @@ impl AsyncClient {
         let shared = Arc::new(Shared {
             interrupt_stream: StdMutex::new(None),
             idle_state: AtomicU8::new(IDLE_STATE_NOT_IDLE),
+            subscribed_channels: SubscribedChannels::default(),
         });
 
         let init =
@@ -247,6 +265,51 @@ impl AsyncClient {
             .await
             .map_err(|err| MpdError::Generic(format!("Timed out waiting for response: {err}")))?
             .map_err(|err| MpdError::Generic(format!("Worker dropped response: {err}")))?
+    }
+
+    pub async fn subscribe(&self, channel: String) -> Result<(), MpdError> {
+        let shared = Arc::clone(&self.shared);
+
+        self.run(move |c| {
+            match shared.subscribed_channels.increment(&channel) {
+                1 => {
+                    if let Err(err) = c.subscribe(&channel) {
+                        shared.subscribed_channels.decrement(&channel);
+                        return Err(err);
+                    }
+                }
+                count => {
+                    trace!(channel, count, "Channel already subscribed to, increased refcount");
+                }
+            }
+
+            Ok(())
+        })
+        .await
+    }
+
+    pub async fn unsubscribe(&self, channel: String) -> Result<(), MpdError> {
+        let shared = Arc::clone(&self.shared);
+
+        self.run(move |c| {
+            match shared.subscribed_channels.decrement(&channel) {
+                Some(0) => {
+                    if let Err(err) = c.unsubscribe(&channel) {
+                        shared.subscribed_channels.increment(&channel);
+                        return Err(err);
+                    }
+                }
+                Some(remaining) => {
+                    trace!(channel, remaining, "Channel still has other subscribers");
+                }
+                None => {
+                    warn!(channel, "Not subscribed to channel, ignoring");
+                }
+            }
+
+            Ok(())
+        })
+        .await
     }
 
     pub fn skip_to_idle(&self) {

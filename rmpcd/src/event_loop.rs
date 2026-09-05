@@ -79,20 +79,32 @@ pub async fn init(
                 let ro_status = &ro_mpd_state.status;
                 let ro_song = &ro_mpd_state.current_song;
                 if ro_song != &song {
-                    album_art = if let Some(s) = &song {
-                        let uri = s.file.clone();
-                        album_art_changed = true;
-                        client
-                            .run(move |c| c.find_album_art(&uri, AlbumArtOrder::EmbeddedFirst))
-                            .await?
-                    } else {
-                        None
-                    };
+                    // A database update can rewrite metadata or last_modified
+                    // of the entry that is currently playing (auto_update,
+                    // manual update/rescan). That is not a song change: only
+                    // a different queue entry or file is. Plugins otherwise
+                    // see phantom song changes mid-song (double
+                    // notifications, broken scrobbles), while MPRIS still
+                    // wants the refreshed metadata.
+                    let identity_changed = ro_song.as_ref().map(|s| (s.id, s.file.as_str()))
+                        != song.as_ref().map(|s| (s.id, s.file.as_str()));
 
-                    tx.send_safe(PluginsEvent::SongChange {
-                        old: ro_song.as_ref().map(Song::from),
-                        new: song.as_ref().map(Song::from),
-                    });
+                    if identity_changed {
+                        album_art = if let Some(s) = &song {
+                            let uri = s.file.clone();
+                            album_art_changed = true;
+                            client
+                                .run(move |c| c.find_album_art(&uri, AlbumArtOrder::EmbeddedFirst))
+                                .await?
+                        } else {
+                            None
+                        };
+
+                        tx.send_safe(PluginsEvent::SongChange {
+                            old: ro_song.as_ref().map(Song::from),
+                            new: song.as_ref().map(Song::from),
+                        });
+                    }
 
                     change_buffer.push(Change::Metadata);
                 }

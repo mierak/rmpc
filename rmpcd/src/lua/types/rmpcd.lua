@@ -6,6 +6,11 @@
 ---@field install fun(path: "#builtin.notify"): NotifyPlugin
 ---@field install fun(path: "#builtin.playcount"): PlaycountPlugin
 ---@field install fun(path: "#builtin.lyrics"): LyricsPlugin
+---@field install fun(spec: RmpcdPluginSpec): LyricsPlugin
+
+---@class RmpcdPluginSpec
+---@field url string
+---@field branch string | nil
 
 ---@generic Args
 ---@class RmpcdPlugin<Args>
@@ -16,7 +21,7 @@
 ---@field message fun(self, channel: string, message: string)|nil
 ---@field idle_event fun(self, event: IdleEvent)|nil
 ---@field shutdown fun(self)|nil
----@field reconnect fun(self)|nil
+---@field reconnect fun(self)|nil Called after the connection to MPD is re-established. Channels from `subscribed_channels` are resubscribed before this runs.
 
 ---@type RmpcdGlobal
 ---@diagnostic disable-next-line: lowercase-global

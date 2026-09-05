@@ -6,6 +6,12 @@ All notable changes to this project will be documented in this file.
 
 ### Added
 
+- `FileExtension` falls back to the underlying file's extension (`RealUri`, MPD 0.25) for
+  songs inside a CUE sheet
+- `directories_hidden_dirs` config option to hide directories with the given names from the
+  `Directories` pane
+- Added `ActiveOutputs` and `ActiveOutput` status properties showing the enabled outputs
+- Added `current` option to `Save()` keybind to save the currently playing song
 - Added a new vertical volume slider pane.
 - **Breaking** `ExternalCommand` can now have arguments supplied at runtime. This will break your
   existing keybinds if they contained either `{` or `}`. You will now need to escape these by
@@ -52,9 +58,15 @@ All notable changes to this project will be documented in this file.
 - Sixel is no longer hard limited to 1MB of data. Set `input-buffer-size` in your tmux config to
   alleviate the limitation.
 - `ContextMenu` moved from `<C-z>` to `<C-x>`  to not conflict with putting the job to background
+- Raise MSRV to 1.97.1
 
 ### Fixed
 
+- `Bits()` reporting the channel count as bit depth during DSD playback. MPD formats DSD audio as
+  `dsd64:2` or `384000:dsd:2`, neither of which parsed; DSD now reports its real sample rate,
+  1 bit and the channel count, and the float bit depth marker (`f`) no longer breaks the other fields
+- `SampleRate()`, `Bits()` and `Channels()` status properties ignoring their `default:`, unlike
+  `Bitrate` and `Crossfade`
 - Kitty image backend never displaying images whose encoded data fits into a single 4096 byte
   chunk, because the first chunk always claimed more data would follow (`m=1`)
 - Benign error log when reading a sticker that does not exist
@@ -79,6 +91,11 @@ keybinds
 - rmpc will now handle focused events and attempt to resize the TUI if needed
 - Loading a playlist when with missing songs will now load the existing songs instead of nothing
 - The borders of browser panes are nolonger affected by the scrollbar track being set
+- Adding a directory to the queue now orders its songs by `directories_sort` instead of relying on MPD's default order
+- `addyt` sometimes failing when files with identical file name already exists it the dir
+- Sixel image disappearing when switching tmux panes
+- Improve responsivness when cava cava is starting/quitting, especially when reloading config
+- MPD's error no longer parsing command index into u8 which has insufficient space
 
 ## [0.11.0] - 2026-02-01
 

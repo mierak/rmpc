@@ -33,7 +33,12 @@ use crate::{
     config::{
         Config,
         cli::{Args, Command},
-        keys::{CommonAction, GlobalAction, Key, actions::RateKind},
+        keys::{
+            CommonAction,
+            GlobalAction,
+            Key,
+            actions::{RateKind, SaveKind},
+        },
         tabs::{PaneType, SizedPaneOrSplit, TabName},
         theme::level_styles::LevelStyles,
     },
@@ -55,7 +60,11 @@ use crate::{
     ui::{
         image::facade::EncodeData,
         input::{InputEvent, InputResultEvent},
-        modals::{downloads::DownloadsModal, info_list_modal::SongCtx, menu::create_rating_modal},
+        modals::{
+            downloads::DownloadsModal,
+            info_list_modal::SongCtx,
+            menu::{add_to_playlist_or_show_modal, create_rating_modal, create_save_modal},
+        },
     },
 };
 
@@ -777,6 +786,34 @@ impl<'ui> Ui<'ui> {
                         status_error!("No song is currently playing");
                     }
                 }
+                CommonAction::Save { kind, current: true } => {
+                    if let Some(song) = ctx.current_song() {
+                        let song_paths = vec![song.file.clone()];
+                        match kind {
+                            SaveKind::Modal { duplicates_strategy, .. } => {
+                                match create_save_modal(song_paths, None, *duplicates_strategy, ctx)
+                                {
+                                    Ok(modal) => {
+                                        modal!(ctx, modal);
+                                    }
+                                    Err(err) => {
+                                        status_error!("Failed to open save modal: {err}");
+                                    }
+                                }
+                            }
+                            SaveKind::Playlist { name, duplicates_strategy, .. } => {
+                                add_to_playlist_or_show_modal(
+                                    name.clone(),
+                                    song_paths,
+                                    *duplicates_strategy,
+                                    ctx,
+                                );
+                            }
+                        }
+                    } else {
+                        status_error!("No song is currently playing");
+                    }
+                }
                 _ => {}
             }
         }
@@ -791,8 +828,9 @@ impl<'ui> Ui<'ui> {
         ctx: &mut Ctx,
     ) -> Result<()> {
         if let Some(action) = action {
-            // We got some resolved keybind in insert mode. Currently only Confirm and Close
-            // are possible to be bound there so this is fine.
+            // We got some resolved keybind in insert mode. Currently only
+            // Confirm and Close are possible to be bound there so
+            // this is fine.
             let kind = match action.claim_common() {
                 Some(CommonAction::Confirm) => InputResultEvent::Confirm,
                 Some(CommonAction::Close) => InputResultEvent::Cancel,
@@ -927,8 +965,9 @@ impl<'ui> Ui<'ui> {
                 );
             }
             UiEvent::ConfigChanged => {
-                // Call on_hide for all panes in the current tab and current layout because they
-                // might not be visible after the change
+                // Call on_hide for all panes in the current tab and current
+                // layout because they might not be visible
+                // after the change
                 self.layout.for_each_pane(
                     self.area,
                     &mut |pane, _, _, _, _| {
@@ -960,14 +999,15 @@ impl<'ui> Ui<'ui> {
                     let old = old_other_panes.remove(&key);
                     self.panes.others.insert(key, old.unwrap_or(new_other_pane));
                 }
-                // We have to be careful about the order of operations here as they might cause
-                // a panic if done incorrectly
+                // We have to be careful about the order of operations here as
+                // they might cause a panic if done incorrectly
                 self.tabs = Self::init_tabs(ctx)?;
                 ctx.active_tab = new_active_tab.clone();
                 self.on_event(UiEvent::TabChanged(new_active_tab.clone()), ctx)?;
 
-                // Call before_show here, because we have "hidden" all the panes before and this
-                // will force them to reinitialize
+                // Call before_show here, because we have "hidden" all the panes
+                // before and this will force them to
+                // reinitialize
                 self.before_show(self.area, ctx)?;
             }
             _ => {}
@@ -1064,8 +1104,8 @@ impl<'ui> Ui<'ui> {
                 }
                 (FETCH_SONG_STICKERS, MpdQueryResult::SongStickers(stickers)) => {
                     for (k, v) in stickers {
-                        // Assume all stickers were fetched for each song so simple replace is
-                        // enough
+                        // Assume all stickers were fetched for each song so
+                        // simple replace is enough
                         ctx.set_song_stickers(k, v);
                     }
                     ctx.render()?;

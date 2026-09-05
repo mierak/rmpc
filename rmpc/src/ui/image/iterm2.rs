@@ -63,8 +63,8 @@ impl Backend for Iterm2 {
         {
             log::debug!("encoding animated gif");
 
-            // Take smaller of the two dimensions to make the gif stretch over available
-            // area and not overflow
+            // Take smaller of the two dimensions to make the gif stretch over
+            // available area and not overflow
             let (width, height) = gif_data.dimensions;
             let aligned_area = create_aligned_area(area, (width, height), max_size, halign, valign);
             log::debug!(aligned_area:?, dims:? = gif_data.dimensions; "encoded");

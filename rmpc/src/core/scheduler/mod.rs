@@ -76,8 +76,8 @@ where
             loop {
                 let timeout = duration.map_or_else(never, after);
                 log::trace!(duration:?; "Starting new schedule loop");
-                // Bias towards the job receiver so we do not lose jobs when timeout happens at
-                // the same time
+                // Bias towards the job receiver so we do not lose jobs when
+                // timeout happens at the same time
                 select_biased!(
                     recv(add_job_rx) -> job => {
                         let job = try_cont!(job, "Failed to process scheduler command");
@@ -108,7 +108,8 @@ where
                         Some(Reverse(JobOrRepeatedJob::Job(job))) => job.run(&args),
                         Some(Reverse(JobOrRepeatedJob::RepeatedJob(mut job))) => {
                             job.run(&args, now);
-                            // Add the job back to the queue after it has been ran and its next
+                            // Add the job back to the queue after it has been
+                            // ran and its next
                             // run_at has been calculated
                             jobs.push(Reverse(JobOrRepeatedJob::RepeatedJob(job)));
                         }
@@ -147,8 +148,8 @@ where
         timeout: Duration,
         callback: impl FnOnce(&T) -> Result<()> + Send + 'static,
     ) {
-        // Skip errors as this should never really happen, but still want to log it in
-        // case it does
+        // Skip errors as this should never really happen, but still want to log
+        // it in case it does
         try_skip!(
             self.add_job_tx.send(SchedulerCommand::AddJob(Job::new(
                 id,
@@ -162,8 +163,8 @@ where
 
     /// Cancel a scheduled job.
     pub(crate) fn cancel(&self, id: Id) {
-        // Skip errors as this should never really happen, but still want to log it in
-        // case it does
+        // Skip errors as this should never really happen, but still want to log
+        // it in case it does
         try_skip!(self.add_job_tx.send(SchedulerCommand::CancelJob(id)), "Failed to cancel job");
     }
 
@@ -190,8 +191,8 @@ where
         callback: impl FnMut(&T) -> Result<()> + Send + 'static,
     ) -> TaskGuard<T> {
         let id = id::new();
-        // Skip errors as this should never really happen, but still want to log it in
-        // case it does
+        // Skip errors as this should never really happen, but still want to log
+        // it in case it does
         try_skip!(
             self.add_job_tx.send(SchedulerCommand::AddRepeatedJob(RepeatedJob::new(
                 id,

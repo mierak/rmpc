@@ -60,8 +60,9 @@ where
             return;
         };
 
-        // Save original state and remove offset because ratatui's table will think that
-        // we are rendering from item 0 to viewport_len, the rest will be ignored
+        // Save original state and remove offset because ratatui's table will
+        // think that we are rendering from item 0 to viewport_len, the
+        // rest will be ignored
         let original_offset = state.offset();
         let original_selected = state.inner.selected();
         *state.inner.offset_mut() = 0;

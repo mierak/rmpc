@@ -31,9 +31,9 @@ use crate::{
     shared::{
         events::ClientRequest,
         keys::KeyResolver,
-        lrc::{Lrc, LrcIndex},
+        lrc::{Lrc, LrcIndex, lyricsfile_parser},
         macros::{status_error, status_warn},
-        mpd_client_ext::MpdClientExt,
+        mpd_client_ext::{MpdClientExt, PartitionedOutput},
         mpd_query::MpdQuerySync,
         ring_vec::RingVec,
         ytdlp::YtDlpManager,
@@ -55,6 +55,7 @@ pub struct Ctx {
     #[cfg(not(test))]
     current_song: Option<Song>,
     pub(crate) queue: Vec<Song>,
+    pub(crate) outputs: Vec<PartitionedOutput>,
     #[cfg(test)]
     pub(crate) stickers: HashMap<String, HashMap<String, String>>,
     #[cfg(not(test))]
@@ -106,6 +107,7 @@ impl Ctx {
         let status = client.get_status()?;
         let queue = client.playlist_info()?.unwrap_or_default();
         let current_song = client.get_current_song()?;
+        let outputs = client.current_partition_outputs()?;
         let cached_queue_time_total = queue.iter().filter_map(|s| s.duration).sum();
 
         if !supported_commands.contains("albumart") || !supported_commands.contains("readpicture") {
@@ -126,6 +128,7 @@ impl Ctx {
             config: std::sync::Arc::new(config),
             status,
             queue,
+            outputs,
             current_song,
             stickers: HashMap::new(),
             active_tab,
@@ -169,8 +172,9 @@ impl Ctx {
             match self.stickers_supported {
                 StickersSupport::Unsupported => {
                     self.stickers_supported = StickersSupport::UnsupportedAndChecked;
-                    // Shoot a dummy sticker request to MPD to see what error we get to determine
-                    // what exactly is wrong.
+                    // Shoot a dummy sticker request to MPD to see what error we
+                    // get to determine what exactly is
+                    // wrong.
                     self.command(|_, client| {
                         if let Err(err) = client.sticker("", "test") {
                             status_error!(
@@ -269,29 +273,48 @@ impl Ctx {
         self.status.song
     }
 
-    pub(crate) fn find_current_lyrics_path(&self) -> Option<PathBuf> {
+    pub(crate) fn find_current_lyrics_path(&self) -> Option<LyricsResult> {
         let song = self.current_song()?;
         let lyrics_dir = self.config.lyrics_dir.as_ref()?;
-        let path = crate::shared::lrc::get_lrc_path(lyrics_dir, &song.file)
+
+        // Priority: lyricsfile.yaml > .lrc > lrc_index
+        let lrc_path = crate::shared::lrc::get_lyricsfile_path(lyrics_dir, &song.file)
             .ok()
             .filter(|p| p.is_file())
-            .or_else(|| self.lrc_index.find_entry(song).map(|(path, _)| path.to_path_buf()));
+            .map(LyricsResult::Lyricsfile)
+            .or_else(|| {
+                crate::shared::lrc::get_lrc_path(lyrics_dir, &song.file)
+                    .ok()
+                    .filter(|p| p.is_file())
+                    .map(LyricsResult::Lrc)
+            })
+            .or_else(|| {
+                self.lrc_index
+                    .find_entry(song)
+                    .map(|(path, _)| path.to_path_buf())
+                    .map(LyricsResult::Index)
+            });
 
         let artist = song.metadata.get("artist").map(|v| v.last())?;
         let title = song.metadata.get("title").map(|v| v.last())?;
         let album = song.metadata.get("album").map(|v| v.last());
-        match &path {
+        match &lrc_path {
             Some(path) => log::debug!(artist, title, album; "Lyrics found at {}", path.display()),
             None => log::debug!(artist, title, album; "No lyrics found"),
         }
 
-        path
+        lrc_path
     }
 
-    pub(crate) fn find_lrc(&self) -> Result<Option<(PathBuf, Lrc)>> {
-        let Some(path) = self.find_current_lyrics_path() else { return Ok(None) };
-        let lrc = std::fs::read_to_string(&path)?.parse()?;
-        Ok(Some((path, lrc)))
+    pub(crate) fn find_lrc(&self) -> Result<Option<(LyricsResult, Lrc)>> {
+        let Some(result) = self.find_current_lyrics_path() else { return Ok(None) };
+        let lrc = match &result {
+            LyricsResult::Lrc(path) | LyricsResult::Index(path) => {
+                std::fs::read_to_string(path)?.parse()?
+            }
+            LyricsResult::Lyricsfile(path) => lyricsfile_parser::parse(path)?,
+        };
+        Ok(Some((result, lrc)))
     }
 
     pub(crate) fn song_stickers(&self, uri: &str) -> Option<&HashMap<String, String>> {
@@ -337,6 +360,22 @@ impl Ctx {
 
     pub(crate) fn stickers(&self) -> &HashMap<String, HashMap<String, String>> {
         &self.stickers
+    }
+}
+
+pub enum LyricsResult {
+    Lrc(PathBuf),
+    Lyricsfile(PathBuf),
+    Index(PathBuf),
+}
+
+impl LyricsResult {
+    pub fn display(&self) -> std::path::Display<'_> {
+        match self {
+            LyricsResult::Lrc(path) => path.display(),
+            LyricsResult::Lyricsfile(path) => path.display(),
+            LyricsResult::Index(path) => path.display(),
+        }
     }
 }
 

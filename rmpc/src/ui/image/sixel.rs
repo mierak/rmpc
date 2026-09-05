@@ -44,6 +44,15 @@ impl Backend for Sixel {
         mut data: Self::EncodedData,
         _ctx: &Ctx,
     ) -> Result<()> {
+        let tmux = tmux::is_inside_tmux();
+        let limit = *tmux::INPUT_BUFFER_LIMIT;
+        if tmux && data.content.len() > limit {
+            bail!(
+                "Image is {} bytes which is larger than your tmux's 'input-buffer-size'. Increase it and restart rmpc to display this image.",
+                data.content.len()
+            )
+        }
+
         log::debug!(bytes = data.content.len(); "transmitting data");
 
         // Adjust for tmux pane position if inside tmux
@@ -95,15 +104,10 @@ impl Backend for Sixel {
 
         let width = image.width();
         let height = image.height();
-        let tmux = tmux::is_inside_tmux();
 
         let mut buf = Vec::new();
 
-        if tmux {
-            write!(buf, "\x1bPtmux;\x1b\x1bP0;1;7q\"1;1;{};{}", image.width(), image.height())?;
-        } else {
-            write!(buf, "\x1bP0;1;7q\"1;1;{};{}", image.width(), image.height())?;
-        }
+        write!(buf, "\x1bP0;1;7q\"1;1;{};{}", image.width(), image.height())?;
 
         let image = image.to_rgba8();
         let quantized = NeuQuant::new(10, 256, image.as_raw());
@@ -132,24 +136,12 @@ impl Backend for Sixel {
                 repeat = 1;
             }
 
-            let limit = *tmux::INPUT_BUFFER_LIMIT;
-            if tmux && buf.len() > limit {
-                bail!(
-                    "Image is {} bytes which is larger than your tmux's 'input-buffer-size'. Increase it and restart rmpc to display this image.",
-                    buf.len()
-                )
-            }
-
             put_color(&mut buf, character, last_color.unwrap_or_default(), repeat)?;
 
             buf.push(if y % 6 == 5 { b'-' } else { b'$' });
         }
 
-        if tmux {
-            write!(buf, "\x1b\\\x1b\\")?;
-        } else {
-            write!(buf, "\x1b\\")?;
-        }
+        write!(buf, "\x1b\\")?;
 
         log::debug!(bytes = buf.len(), image_bytes = image.len(), elapsed:? = start.elapsed(); "encoded data");
         Ok(Data { content: VecDeque::from(buf), area: resized_area.area })

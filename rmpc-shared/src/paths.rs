@@ -36,6 +36,10 @@ pub fn cache_dir() -> Option<PathBuf> {
         .or_else(|| home_dir().map(|home| home.join(".cache")))
 }
 
+pub fn runtime_dir() -> Option<PathBuf> {
+    ENV.var_os("XDG_RUNTIME_DIR").map(PathBuf::from).filter(|p| p.is_absolute())
+}
+
 pub fn rmpc_config_dir() -> Option<PathBuf> {
     config_dir().map(|config_dir| config_dir.join("rmpc"))
 }
@@ -245,9 +249,10 @@ pub mod utils {
         #[test_case("$NOT_SET", "$NOT_SET")]
         #[test_case("no/$NOT_SET/path", "no/$NOT_SET/path")]
         #[test_case("basic/path", "basic/path")]
-        // NOTE: current implementation only expands vars that are the entire part.
-        // This is different from how shells do it, but I can't think of a use case for
-        // it in paths #[test_case("no$HOME$VALUE", "no/home/some_userpath")]
+        // NOTE: current implementation only expands vars that are the entire
+        // part. This is different from how shells do it, but I can't
+        // think of a use case for it in paths
+        // #[test_case("no$HOME$VALUE", "no/home/some_userpath")]
         fn env_var_expansion(input: &str, expected: &str) {
             let _lock = ENV.lock();
 

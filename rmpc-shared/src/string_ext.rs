@@ -20,8 +20,9 @@ impl StringExt for String {
         if let std::borrow::Cow::Owned(string) = String::from_utf8_lossy(&v) {
             string
         } else {
-            // SAFETY: `String::from_utf8_lossy`'s guarantees valid utf8 when a borrowed
-            // variant is returned. Owned value, meaning invalid utf8, is handled above.
+            // SAFETY: `String::from_utf8_lossy`'s guarantees valid utf8 when a
+            // borrowed variant is returned. Owned value, meaning
+            // invalid utf8, is handled above.
             unsafe { String::from_utf8_unchecked(v) }
         }
     }

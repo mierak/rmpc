@@ -319,8 +319,9 @@ impl Command {
             Command::AddYt { url, position } => {
                 let config = config.clone();
                 Ok(Box::new(move |_, client| {
-                    // Idle with message subsystem, the cli client is never subscribed to any
-                    // channels so this will idle indefinitely
+                    // Idle with message subsystem, the cli client is never
+                    // subscribed to any channels so this
+                    // will idle indefinitely
                     client.enter_idle(Some(IdleEvent::Message))?;
 
                     ytdlp::init_and_download(&config, &url, |path| {
@@ -354,8 +355,9 @@ impl Command {
 
                 let config = config.clone();
                 Ok(Box::new(move |_, client| {
-                    // Idle with message subsystem, the cli client is never subscribed to any
-                    // channels so this will idle indefinitely
+                    // Idle with message subsystem, the cli client is never
+                    // subscribed to any channels so this
+                    // will idle indefinitely
                     client.enter_idle(Some(IdleEvent::Message))?;
 
                     ytdlp::init_and_download(&config, &chosen_url, |path| {

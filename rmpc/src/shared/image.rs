@@ -97,8 +97,8 @@ pub fn create_aligned_area(
     let cell_height = window_size.height as f64 / window_size.rows as f64;
     log::debug!(window_size:?, cell_width:?, cell_height:?; "Terminal size");
 
-    // Convert available area to pixel space and build pixel bounds by clamping to
-    // max_size_px
+    // Convert available area to pixel space and build pixel bounds by clamping
+    // to max_size_px
     let area_px = SizePx {
         width: available_area_cells.width as f64 * cell_width,
         height: available_area_cells.height as f64 * cell_height,
@@ -118,9 +118,9 @@ pub fn create_aligned_area(
     };
     log::debug!(used_px:?; "Used size in pixels");
 
-    // Convert to cell units (ceil to ensure the allocated cell box can contain the
-    // used_px) Clamp to available area to guard against any floating-point edge
-    // cases
+    // Convert to cell units (ceil to ensure the allocated cell box can contain
+    // the used_px) Clamp to available area to guard against any
+    // floating-point edge cases
     let mut used_cells = Size {
         width: (used_px.width / cell_width).ceil() as u16,
         height: (used_px.height / cell_height).ceil() as u16,
