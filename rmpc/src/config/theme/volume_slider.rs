@@ -32,7 +32,9 @@ pub struct VolumeSliderConfigFile {
     pub filled_style: Option<StyleFile>,
     pub thumb_style: Option<StyleFile>,
 }
+
 #[derive(Debug, Clone, Hash, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(default)]
 pub struct Symbols {
     pub start: Option<String>,
     pub filled: String,

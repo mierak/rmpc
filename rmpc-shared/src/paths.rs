@@ -9,7 +9,7 @@ use crate::{
 const CONFIG_NAME: &str = "config.debug.ron";
 #[cfg(not(debug_assertions))]
 const CONFIG_NAME: &str = "config.ron";
-const CRATE_NAME: &str = env!("CARGO_CRATE_NAME");
+const CRATE_NAME: &str = "rmpc";
 
 pub fn home_dir() -> Option<PathBuf> {
     ENV.var_os("HOME").filter(|home| !home.is_empty()).map(PathBuf::from)
@@ -72,6 +72,20 @@ pub fn config_paths(cli_arg_config_path: Option<&Path>) -> Vec<PathBuf> {
     }
 
     result
+}
+
+pub fn is_in_standard_config_dir(path: &Path) -> bool {
+    let Some(canonical_cfg_dir) = path.parent().and_then(|dir| std::fs::canonicalize(dir).ok())
+    else {
+        return false;
+    };
+
+    config_paths(None).iter().filter_map(|path| path.parent().map(Path::to_path_buf)).any(
+        |standard_dir| {
+            std::fs::canonicalize(standard_dir)
+                .is_ok_and(|standard_dir| canonical_cfg_dir.starts_with(standard_dir))
+        },
+    )
 }
 
 /// # Panics
