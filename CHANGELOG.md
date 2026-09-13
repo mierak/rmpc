@@ -102,6 +102,7 @@ keybinds
 - AlbumArt no longer double rendering on config reload
 - Improve rendering performance of the Queue pane
 - Remove dependency on flake-utils in Nix flake and use channels tarball
+- `Volume` pane not letting users use only partially default symbols
 
 ## [0.11.0] - 2026-02-01
 
