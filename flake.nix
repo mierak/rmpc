@@ -3,21 +3,23 @@
 
   inputs = {
     # For packages we pull.
-    nixpkgs.url = "github:nixos/nixpkgs?ref=nixpkgs-unstable";
-    # So we don't have to manually define things for each os/arch combination.
-    flake-utils.url = "github:numtide/flake-utils";
+    nixpkgs.url = "https://channels.nixos.org/nixos-unstable/nixexprs.tar.zst";
     # To cache rust crates.
     crane.url = "github:ipetkov/crane";
   };
 
   # NOTE: much of the following is taken from https://crane.dev/examples/quick-start-workspace.html.
   outputs = inputs: let
+    inherit (inputs.nixpkgs) lib;
+    forAllSystems = lib.genAttrs (lib.systems.doubles.linux ++ lib.systems.doubles.darwin);
+    pkgsFor = system: inputs.nixpkgs.legacyPackages.${system};
+
     # The "scope" produced from this function is used to automatically populate arguments to
     # functions we'll call to build packages and the devShell.
     mkScope = pkgs:
       pkgs.lib.makeScope pkgs.newScope (self: {
         inherit inputs;
-        lib = pkgs.lib;
+        inherit (pkgs) lib;
         craneLib = inputs.crane.mkLib pkgs;
         # Only includes rust/cargo files in the build source, meaning that rebuilds won't happen for unrelated files.
         src = self.craneLib.cleanCargoSource ./.;
@@ -67,20 +69,18 @@
         # Development shell, initialized either with `nix develop` or using direnv.
         shell = self.callPackage ./nix/shell.nix {};
       });
-  in
-    inputs.flake-utils.lib.eachDefaultSystem (
-      system: let
-        pkgs = inputs.nixpkgs.legacyPackages.${system};
-      in {
-        packages = {
-          # Add the packages defined above to the packages set, so that they can be run/built.
-          inherit (mkScope pkgs) rmpc rmpcd;
+  in {
+    packages = forAllSystems (system: let
+      pkgs = pkgsFor system;
+    in {
+      inherit (mkScope pkgs) rmpc rmpcd;
+      default = (mkScope pkgs).rmpc;
+    });
 
-          # Make the default package just be rmpc.
-          default = (mkScope pkgs).rmpc;
-        };
-
-        devShells.default = (mkScope pkgs).shell;
-      }
-    );
+    devShells = forAllSystems (system: let
+      pkgs = pkgsFor system;
+    in {
+      default = (mkScope pkgs).shell;
+    });
+  };
 }
