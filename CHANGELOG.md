@@ -60,6 +60,8 @@ All notable changes to this project will be documented in this file.
   alleviate the limitation.
 - `ContextMenu` moved from `<C-z>` to `<C-x>`  to not conflict with putting the job to background
 - Raise MSRV to 1.97.1
+- Rmpc will no longer enable config hot reload if the config file is specified with the
+  `--config`/`-c` flags and is not located in one of the standard directories used by rmpc.
 
 ### Fixed
 

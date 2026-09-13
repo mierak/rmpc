@@ -17,7 +17,7 @@ use rmpc_mpd::{
 };
 use rmpc_shared::{
     env::ENV,
-    paths::{config_paths, theme_paths},
+    paths::{config_paths, is_in_standard_config_dir, theme_paths},
 };
 use shared::{
     dependencies::CAVA,
@@ -454,11 +454,21 @@ fn main() -> Result<()> {
                     .context("Failed to initialize socket listener")?;
 
             let _config_watcher_guard = if let Some(config_path) = config_path {
-                ctx.config.enable_config_hot_reload.then(|| {
+                if !ctx.config.enable_config_hot_reload {
+                    None
+                } else if !is_in_standard_config_dir(&config_path) {
+                    log::warn!(config_path:? = config_path.to_str();
+                        "Config file is not inside any of rmpc's standard config directories, disabling config hot reload");
+                    None
+                } else {
                     log::debug!("Enabling config hot reload for '{}'", config_path.display());
-                    core::config_watcher::init(config_path, theme_path, event_tx.clone())
-                        .inspect_err(|e| log::warn!("Failed to initialize config watcher: {e}"))
-                })
+                    Some(
+                        core::config_watcher::init(config_path, theme_path, event_tx.clone())
+                            .inspect_err(|e| {
+                                log::warn!("Failed to initialize config watcher: {e}");
+                            }),
+                    )
+                }
             } else {
                 log::warn!("No config file was detected, not watching config for changes");
                 None
