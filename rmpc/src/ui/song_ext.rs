@@ -15,7 +15,7 @@ use crate::{
         theme::{
             SymbolsConfig,
             TagResolutionStrategy,
-            properties::{Property, PropertyKindOrText, SongProperty, Transform},
+            properties::{Property, PropertyKindOrText, SongProperty, Transform, hashed_color},
         },
     },
     ctx::Ctx,
@@ -404,6 +404,9 @@ impl SongExt for Song {
                 PropertyKindOrText::Transform(Transform::Replace { .. }) => format
                     .as_string(Some(self), "", TagResolutionStrategy::All, ctx)
                     .map(|v| v.to_lowercase().contains(&filter.to_lowercase())),
+                PropertyKindOrText::Transform(Transform::Hash { .. }) => format
+                    .as_string(Some(self), "", TagResolutionStrategy::All, ctx)
+                    .map(|v| v.to_lowercase().contains(&filter.to_lowercase())),
             };
             if match_found.is_some_and(|v| v) {
                 return true;
@@ -525,6 +528,28 @@ impl SongExt for Song {
                             .and_then(|format| self.as_line(format, tag_separator, strategy, ctx))
                     })
             }
+            PropertyKindOrText::Transform(Transform::Hash { content, colors }) => self
+                .as_line(content, tag_separator, strategy, ctx)
+                .map(|mut line| {
+                    let mut buf = String::new();
+                    for span in &line.spans {
+                        buf.push_str(span.content.as_ref());
+                    }
+
+                    if let Some(color) = hashed_color(&buf, colors) {
+                        for span in &mut line.spans {
+                            span.style = span.style.fg(color);
+                        }
+                    }
+
+                    line
+                })
+                .or_else(|| {
+                    format
+                        .default
+                        .as_ref()
+                        .and_then(|format| self.as_line(format, tag_separator, strategy, ctx))
+                }),
         }
     }
 

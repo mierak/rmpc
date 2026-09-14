@@ -3,14 +3,39 @@ use std::collections::BTreeMap;
 use anyhow::{Result, bail};
 use bon::Builder;
 use itertools::Itertools;
-use ratatui::style::Style;
+use ratatui::style::{Color, Style};
 use rmpc_mpd::filter::Tag;
 use serde::{Deserialize, Serialize};
 use serde_with::skip_serializing_none;
 use strum::Display;
 
-use super::style::ToConfigOr;
+use super::style::{StringColor, ToConfigOr};
 use crate::config::{defaults, theme::StyleFile};
+
+/// Picks a color from `colors` deterministically based on the content string.
+///
+/// The same content always maps to the same color, while different content is
+/// spread across the palette. Returns `None` when `colors` is empty so callers
+/// can leave the content unstyled.
+pub(crate) fn hashed_color(content: &str, colors: &[Color]) -> Option<Color> {
+    if colors.is_empty() {
+        return None;
+    }
+
+    // FNV-1a, a small deterministic hash so the mapping is stable across runs.
+    let mut hash: u64 = 0xcbf2_9ce4_8422_2325;
+    for byte in content.as_bytes() {
+        hash ^= u64::from(*byte);
+        hash = hash.wrapping_mul(0x0000_0100_0000_01b3);
+    }
+
+    let idx = (hash % colors.len() as u64) as usize;
+    Some(colors[idx])
+}
+
+pub(super) fn parse_colors(colors: Vec<String>) -> Result<Vec<Color>> {
+    colors.into_iter().filter_map(|color| StringColor(Some(color)).to_color().transpose()).collect()
+}
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub enum SongPropertyFile {
@@ -319,12 +344,17 @@ pub enum TransformFile<T: Clone> {
         content: Box<PropertyFile<T>>,
         replacements: Vec<ReplacementFile<T>>,
     },
+    Hash {
+        content: Box<PropertyFile<T>>,
+        colors: Vec<String>,
+    },
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum Transform<T> {
     Truncate { content: Box<Property<T>>, length: usize, from_start: bool },
     Replace { content: Box<Property<T>>, replacements: BTreeMap<String, Property<T>> },
+    Hash { content: Box<Property<T>>, colors: Vec<Color> },
 }
 
 #[derive(Debug, Clone, Hash, Eq, PartialEq)]
@@ -592,6 +622,12 @@ impl TryFrom<PropertyFile<PropertyKindFile>> for Property<PropertyKind> {
                         .map(|r| -> Result<_> { Ok((r.r#match, r.replace.try_into()?)) })
                         .try_collect()?,
                 }),
+                PropertyKindFileOrText::Transform(TransformFile::Hash { content, colors }) => {
+                    PropertyKindOrText::Transform(Transform::Hash {
+                        content: Box::new((*content).try_into()?),
+                        colors: parse_colors(colors)?,
+                    })
+                }
                 PropertyKindFileOrText::Sticker(value) => PropertyKindOrText::Sticker(value),
                 PropertyKindFileOrText::Property(prop) => {
                     PropertyKindOrText::Property(match prop {
@@ -717,5 +753,49 @@ impl TryFrom<SongProperty> for Tag {
             SongProperty::LastModified() => bail!("Cannot convert LastModified to Tag"),
             SongProperty::Other(val) => Ok(Tag::Custom(val)),
         }
+    }
+}
+
+#[cfg(test)]
+#[allow(clippy::unwrap_used)]
+mod tests {
+    use std::collections::HashSet;
+
+    use ratatui::style::Color;
+
+    use super::hashed_color;
+
+    #[test]
+    fn empty_palette_yields_none() {
+        assert_eq!(hashed_color("anything", &[]), None);
+    }
+
+    #[test]
+    fn is_deterministic() {
+        let colors = [Color::Red, Color::Green, Color::Blue];
+        assert_eq!(hashed_color("2024", &colors), hashed_color("2024", &colors));
+    }
+
+    #[test]
+    fn always_within_palette() {
+        let colors = [Color::Red, Color::Green, Color::Blue];
+        for content in ["", "a", "2024", "The Beatles", "α β γ"] {
+            let picked = hashed_color(content, &colors).unwrap();
+            assert!(colors.contains(&picked), "{content:?} picked {picked:?} outside palette");
+        }
+    }
+
+    #[test]
+    fn single_color_palette_is_always_selected() {
+        let colors = [Color::Magenta];
+        assert_eq!(hashed_color("whatever", &colors), Some(Color::Magenta));
+    }
+
+    #[test]
+    fn spreads_across_the_palette() {
+        let colors = [Color::Red, Color::Green, Color::Blue, Color::Yellow];
+        let used: HashSet<_> =
+            (0..64).map(|i| hashed_color(&format!("item-{i}"), &colors).unwrap()).collect();
+        assert!(used.len() > 1, "hash should distribute across multiple colors, got {used:?}");
     }
 }
