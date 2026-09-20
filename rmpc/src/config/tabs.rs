@@ -208,6 +208,7 @@ pub enum PaneTypeFile {
         levels: Vec<BrowserTagConfigFile>,
     },
     Cava,
+    Waveform,
     Empty(),
 }
 
@@ -250,6 +251,7 @@ pub enum PaneType {
         levels: Vec<BrowserTagConfig>,
     },
     Cava,
+    Waveform,
     Empty,
 }
 
@@ -257,7 +259,7 @@ pub const PANES_ALLOWED_IN_BOTH_TAB_AND_LAYOUT: [PaneTypeDiscriminants; 2] =
     [PaneTypeDiscriminants::Property, PaneTypeDiscriminants::Empty];
 
 #[cfg(debug_assertions)]
-pub const UNFOCUSABLE_TABS: [PaneTypeDiscriminants; 12] = [
+pub const UNFOCUSABLE_TABS: [PaneTypeDiscriminants; 13] = [
     PaneTypeDiscriminants::AlbumArt,
     PaneTypeDiscriminants::Lyrics,
     PaneTypeDiscriminants::ProgressBar,
@@ -269,11 +271,12 @@ pub const UNFOCUSABLE_TABS: [PaneTypeDiscriminants; 12] = [
     PaneTypeDiscriminants::Property,
     PaneTypeDiscriminants::Cava,
     PaneTypeDiscriminants::QueueHeader,
+    PaneTypeDiscriminants::Waveform,
     PaneTypeDiscriminants::Empty,
 ];
 
 #[cfg(not(debug_assertions))]
-pub const UNFOCUSABLE_TABS: [PaneTypeDiscriminants; 11] = [
+pub const UNFOCUSABLE_TABS: [PaneTypeDiscriminants; 12] = [
     PaneTypeDiscriminants::AlbumArt,
     PaneTypeDiscriminants::Lyrics,
     PaneTypeDiscriminants::ProgressBar,
@@ -284,6 +287,7 @@ pub const UNFOCUSABLE_TABS: [PaneTypeDiscriminants; 11] = [
     PaneTypeDiscriminants::Property,
     PaneTypeDiscriminants::Cava,
     PaneTypeDiscriminants::QueueHeader,
+    PaneTypeDiscriminants::Waveform,
     PaneTypeDiscriminants::Empty,
 ];
 
@@ -388,6 +392,7 @@ impl TryFrom<PaneTypeFile> for PaneType {
                 }
             }
             PaneTypeFile::Cava => PaneType::Cava,
+            PaneTypeFile::Waveform => PaneType::Waveform,
             PaneTypeFile::Empty() => PaneType::Empty,
         })
     }

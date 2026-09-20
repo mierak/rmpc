@@ -6,6 +6,8 @@ All notable changes to this project will be documented in this file.
 
 ### Added
 
+- Added a `Waveform` visualizer pane that natively renders PipeWire audio via `pw-cat`
+  as an alternative to `Cava`
 - `FileExtension` falls back to the underlying file's extension (`RealUri`, MPD 0.25) for
   songs inside a CUE sheet
 - `directories_hidden_dirs` config option to hide directories with the given names from the

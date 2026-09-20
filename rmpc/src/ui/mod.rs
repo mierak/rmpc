@@ -965,6 +965,9 @@ impl<'ui> Ui<'ui> {
                 );
             }
             UiEvent::ConfigChanged => {
+                // Notify panes with background workers about removal.
+                self.panes.notify_removed_from_config(ctx)?;
+
                 // Call on_hide for all panes in the current tab and current
                 // layout because they might not be visible
                 // after the change
@@ -1040,6 +1043,7 @@ impl<'ui> Ui<'ui> {
                 Panes::FrameCount(p) => p.on_event(&mut event, visible, ctx),
                 Panes::Others(p) => p.on_event(&mut event, visible, ctx),
                 Panes::Cava(p) => p.on_event(&mut event, visible, ctx),
+                Panes::Waveform(p) => p.on_event(&mut event, visible, ctx),
                 // Property and the dummy TabContent pane do not need to receive events
                 Panes::Property(_) | Panes::TabContent => Ok(()),
                 // Empty pane is a noop, no events
@@ -1088,6 +1092,7 @@ impl<'ui> Ui<'ui> {
                     #[cfg(debug_assertions)]
                     Panes::FrameCount(p) => p.on_query_finished(id, data, visible, ctx),
                     Panes::Cava(p) => p.on_query_finished(id, data, visible, ctx),
+                    Panes::Waveform(p) => p.on_query_finished(id, data, visible, ctx),
                     // Property and the dummy TabContent pane do not need to receive command
                     // notifications
                     Panes::Property(_) | Panes::TabContent => Ok(()),

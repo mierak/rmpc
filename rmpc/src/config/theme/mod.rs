@@ -9,6 +9,7 @@ use properties::{SongFormat, SongFormatFile};
 use ratatui::style::{Color, Style};
 use rmpc_mpd::commands::metadata_tag::MetadataTag;
 use rmpc_shared::paths::utils::{env_var_expand, tilde_expand};
+use waveform::{WaveformTheme, WaveformThemeFile};
 
 use self::{
     header::{HeaderConfig, HeaderConfigFile},
@@ -31,6 +32,7 @@ pub mod queue_table;
 mod scrollbar;
 pub mod style;
 pub mod volume_slider;
+pub mod waveform;
 
 pub use style::{ConfigColor, Modifiers, StyleFile};
 
@@ -78,6 +80,7 @@ pub struct UiConfig {
     pub level_styles: LevelStyles,
     pub lyrics: LyricsConfig,
     pub cava: CavaTheme,
+    pub waveform: WaveformTheme,
     pub border_symbol_sets: BorderSetLib,
 }
 
@@ -125,6 +128,7 @@ pub struct UiConfigFile {
     pub(super) level_styles: LevelStylesFile,
     pub(super) lyrics: LyricsConfigFile,
     pub(super) cava: CavaThemeFile,
+    pub(super) waveform: WaveformThemeFile,
     pub border_symbol_sets: BorderSetLibFile,
 }
 
@@ -212,6 +216,7 @@ impl Default for UiConfigFile {
             components: defaults::components(),
             lyrics: LyricsConfigFile::default(),
             cava: CavaThemeFile::default(),
+            waveform: WaveformThemeFile::default(),
             border_symbol_sets: BorderSetLibFile::default(),
         }
     }
@@ -447,6 +452,7 @@ impl TryFrom<UiConfigFile> for UiConfig {
             layout: value.layout.convert(&components, &border_set_lib)?,
             components,
             cava: value.cava.into_config(bg_color)?,
+            waveform: value.waveform.into_config(bg_color)?,
             background_color: bg_color,
             draw_borders: value.draw_borders,
             format_tag_separator: value.format_tag_separator,

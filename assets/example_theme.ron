@@ -62,6 +62,13 @@
     lyrics: (
         timestamp: false
     ),
+    waveform: (
+        trace_symbol: "▌",
+        trace_style: (fg: "blue"),
+        show_center_line: false,
+        center_line_style: None,
+        background_color: None,
+    ),
     browser_song_format: [
         (
             kind: Group([

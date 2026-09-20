@@ -14,6 +14,7 @@ use serde::{Deserialize, Serialize};
 use sort_mode::{SortMode, SortModeFile, SortOptions};
 use tabs::{PaneType, Tabs, TabsFile, validate_tabs};
 use theme::properties::{SongProperty, SongPropertyFile};
+use waveform::{Waveform, WaveformFile};
 
 pub mod album_art;
 pub mod artists;
@@ -26,6 +27,7 @@ mod search;
 pub mod sort_mode;
 pub mod tabs;
 pub mod theme;
+pub mod waveform;
 
 pub use search::{FilterKindFile, Search};
 
@@ -86,6 +88,7 @@ pub struct Config {
     pub directories_sort: Arc<SortOptions>,
     pub directories_hidden_dirs: Arc<Vec<String>>,
     pub cava: Cava,
+    pub waveform: Waveform,
     pub auto_open_downloads: bool,
     pub extra_yt_dlp_args: Vec<String>,
     pub duration_format: DurationFormat,
@@ -159,6 +162,7 @@ pub struct ConfigFile {
     pub directories_sort: SortModeFile,
     pub directories_hidden_dirs: Vec<String>,
     pub cava: CavaFile,
+    pub waveform: WaveformFile,
     pub extra_yt_dlp_args: Vec<String>,
     pub auto_open_downloads: bool,
     pub duration_format: String,
@@ -233,6 +237,7 @@ impl Default for ConfigFile {
             keep_state_on_song_change: true,
             reflect_changes_to_playlist: false,
             cava: CavaFile::default(),
+            waveform: WaveformFile::default(),
             show_playlists_in_browser: ShowPlaylistsMode::default(),
             directories_hidden_dirs: Vec::new(),
             extra_yt_dlp_args: Vec::new(),
@@ -389,6 +394,7 @@ impl ConfigFile {
             keep_state_on_song_change: self.keep_state_on_song_change,
             reflect_changes_to_playlist: self.reflect_changes_to_playlist,
             cava: self.cava.into(),
+            waveform: self.waveform.try_into()?,
             extra_yt_dlp_args: self.extra_yt_dlp_args,
             auto_open_downloads: self.auto_open_downloads,
             duration_format: DurationFormat::parse(&self.duration_format)?,

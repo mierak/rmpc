@@ -23,6 +23,7 @@ use strum::{Display, IntoDiscriminant};
 use tabs::TabsPane;
 use tag_browser::TagBrowserPane;
 use volume::VolumePane;
+use waveform::WaveformPane;
 
 #[cfg(debug_assertions)]
 use self::{frame_count::FrameCountPane, logs::LogsPane};
@@ -90,6 +91,7 @@ pub mod search;
 pub mod tabs;
 pub mod tag_browser;
 pub mod volume;
+pub mod waveform;
 
 #[derive(Debug, Display, strum::EnumDiscriminants)]
 pub enum Panes<'pane_ref, 'pane> {
@@ -114,6 +116,7 @@ pub enum Panes<'pane_ref, 'pane> {
     Property(PropertyPane<'pane_ref>),
     Others(&'pane_ref mut Box<dyn BoxedPane>),
     Cava(&'pane_ref mut CavaPane),
+    Waveform(&'pane_ref mut WaveformPane),
     Empty(&'pane_ref mut EmptyPane),
 }
 
@@ -139,6 +142,7 @@ pub struct PaneContainer<'panes> {
     pub header: HeaderPane,
     pub tabs: TabsPane<'panes>,
     pub cava: CavaPane,
+    pub waveform: WaveformPane,
     #[cfg(debug_assertions)]
     pub frame_count: FrameCountPane,
     pub empty: EmptyPane,
@@ -270,11 +274,19 @@ impl<'panes> PaneContainer<'panes> {
             header: HeaderPane::new(),
             tabs: TabsPane::new(ctx)?,
             cava: CavaPane::new(ctx),
+            waveform: WaveformPane::new(ctx),
             #[cfg(debug_assertions)]
             frame_count: FrameCountPane::new(),
             empty: EmptyPane,
             others: Self::init_other_panes(ctx).collect(),
         })
+    }
+
+    /// Notify panes with background workers about removal.
+    pub fn notify_removed_from_config(&mut self, ctx: &Ctx) -> Result<()> {
+        self.cava.on_removed_from_config(ctx)?;
+        self.waveform.on_removed_from_config(ctx)?;
+        Ok(())
     }
 
     pub fn init_other_panes(
@@ -354,6 +366,7 @@ impl<'panes> PaneContainer<'panes> {
                     .with_context(|| format!("expected pane to be defined {p:?}"))?,
             )),
             PaneType::Cava => Ok(Panes::Cava(&mut self.cava)),
+            PaneType::Waveform => Ok(Panes::Waveform(&mut self.waveform)),
             PaneType::Empty => Ok(Panes::Empty(&mut self.empty)),
         }
     }
@@ -383,6 +396,7 @@ macro_rules! pane_call {
             Panes::Property(s) => s.$fn($($param),+),
             Panes::Others(s) => s.$fn($($param),+),
             Panes::Cava(s) => s.$fn($($param),+),
+            Panes::Waveform(s) => s.$fn($($param),+),
             Panes::Empty(s) => s.$fn($($param),+),
         }
     }
@@ -433,6 +447,11 @@ pub(crate) trait Pane {
     }
 
     fn resize(&mut self, area: Rect, ctx: &Ctx) -> Result<()> {
+        Ok(())
+    }
+
+    /// Panes with background workers should stop them here.
+    fn on_removed_from_config(&mut self, ctx: &Ctx) -> Result<()> {
         Ok(())
     }
 }

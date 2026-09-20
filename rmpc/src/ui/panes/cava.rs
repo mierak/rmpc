@@ -31,6 +31,7 @@ use super::Pane;
 use crate::{
     config::{
         cava::{Cava, CavaInputMethod},
+        tabs::PaneType,
         theme::cava::{CavaTheme, Orientation},
     },
     ctx::Ctx,
@@ -312,6 +313,14 @@ impl CavaPane {
         Ok(())
     }
 
+    pub(crate) fn stop(&mut self) -> Result<()> {
+        self.command(CavaCommand::Stop)?;
+        if let Some(handle) = self.handle.take() {
+            handle.join().map_err(|_| anyhow!("Cava thread panicked"))??;
+        }
+        Ok(())
+    }
+
     fn command(&self, cmd: CavaCommand) -> Result<()> {
         let Some(handle) = self.handle.as_ref() else {
             log::trace!(cmd:?; "Cava thread is not running, not sending command");
@@ -364,16 +373,14 @@ impl Pane for CavaPane {
 
     fn on_hide(&mut self, ctx: &Ctx) -> Result<()> {
         self.pause_and_clear(ctx)?;
+        self.on_removed_from_config(ctx)?;
         Ok(())
     }
 
     fn on_event(&mut self, event: &mut UiEvent, is_visible: bool, ctx: &Ctx) -> Result<()> {
         match event {
             UiEvent::Exit => {
-                self.command(CavaCommand::Stop)?;
-                if let Some(handle) = self.handle.take() {
-                    handle.join().expect("Failed to join cava thread")?;
-                }
+                self.stop()?;
             }
             UiEvent::ConfigChanged => {
                 self.command(CavaCommand::ConfigChanged {
@@ -427,6 +434,13 @@ impl Pane for CavaPane {
 
         if matches!(ctx.status.state, State::Play) {
             self.run(ctx)?;
+        }
+        Ok(())
+    }
+
+    fn on_removed_from_config(&mut self, ctx: &Ctx) -> Result<()> {
+        if !ctx.config.active_panes.contains(&PaneType::Cava) {
+            self.stop()?;
         }
         Ok(())
     }

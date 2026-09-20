@@ -37,6 +37,17 @@
         vertical_align: Center,
         horizontal_align: Center,
     ),
+    waveform: (
+        source: "mpd.PipeWire", // PipeWire stream target.
+        sample_rate: 44100,
+        framerate: 60,
+        duration_ms: 50, // Duration of the waveform to visualize (10 - 250).
+        output_latency_ms: 0, // Increase to match latency added by your actual audio output.
+        gain: 1.0,
+        display_mode: MonoMix, // Left, Right, MonoMix, Stereo, or StereoCentered.
+        fill_wave: true, // Fill in the amplitude of the wave.
+        render_silence: false, // Draw trace glyphs for silent samples.
+    ),
     keybinds: (
         global: {
             "q":          Quit,

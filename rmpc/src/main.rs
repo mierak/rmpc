@@ -20,7 +20,7 @@ use rmpc_shared::{
     paths::{config_paths, is_in_standard_config_dir, theme_paths},
 };
 use shared::{
-    dependencies::CAVA,
+    dependencies::{CAVA, PW_CAT},
     macros::{status_warn, try_skip},
 };
 
@@ -296,6 +296,7 @@ fn main() -> Result<()> {
 
             println!("\nVisualizer:");
             println!("{}", CAVA.display());
+            println!("{}", PW_CAT.display());
         }
         Some(Command::Version) => {
             print_version();
