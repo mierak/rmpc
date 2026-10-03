@@ -472,8 +472,8 @@ impl std::fmt::Display for AddKind {
             AddKind::Modal(modal) => write!(f, "Modal with options {:?} options", modal.len()),
             AddKind::Action(opts) => write!(
                 f,
-                "position: {}, autoplay: {}, all: {}",
-                opts.position, opts.autoplay, opts.all
+                "position: {}, autoplay: {}, all: {}, preserve_order: {}",
+                opts.position, opts.autoplay, opts.all, opts.preserve_order
             ),
         }
     }
@@ -486,26 +486,31 @@ impl Default for AddKind {
                 autoplay: AutoplayKind::None,
                 position: Position::EndOfQueue,
                 all: false,
+                preserve_order: true,
             }),
             ("At the start of queue".into(), AddOpts {
                 autoplay: AutoplayKind::None,
                 position: Position::StartOfQueue,
                 all: false,
+                preserve_order: true,
             }),
             ("After the current song".into(), AddOpts {
                 autoplay: AutoplayKind::None,
                 position: Position::AfterCurrentSong,
                 all: false,
+                preserve_order: true,
             }),
             ("Replace the queue".into(), AddOpts {
                 autoplay: AutoplayKind::None,
                 position: Position::Replace,
                 all: false,
+                preserve_order: true,
             }),
             ("Replace the queue and play".into(), AddOpts {
                 autoplay: AutoplayKind::First,
                 position: Position::Replace,
                 all: false,
+                preserve_order: true,
             }),
         ])
     }
@@ -532,12 +537,24 @@ pub enum AutoplayKind {
     None,
 }
 
-#[derive(Debug, Default, serde::Serialize, serde::Deserialize, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, serde::Serialize, serde::Deserialize, Clone, Copy, PartialEq, Eq)]
 #[serde(default)]
 pub struct AddOpts {
     pub autoplay: AutoplayKind,
     pub all: bool,
     pub position: Position,
+    pub preserve_order: bool,
+}
+
+impl Default for AddOpts {
+    fn default() -> Self {
+        Self {
+            autoplay: AutoplayKind::default(),
+            all: false,
+            position: Position::default(),
+            preserve_order: true,
+        }
+    }
 }
 
 impl AddOpts {
@@ -1129,6 +1146,10 @@ impl ToDescription for CommonAction {
                     AutoplayKind::None => "",
                 });
 
+                if !opts.preserve_order {
+                    buf.push_str(" without preserving the browser's sort order");
+                }
+
                 buf.into()
             },
             CommonAction::ShowInfo => "Show info about item under cursor in a modal popup".into(),
@@ -1285,6 +1306,7 @@ impl TryFrom<CommonActionFile> for CommonAction {
                     autoplay: AutoplayKind::None,
                     position: Position::EndOfQueue,
                     all: false,
+                    preserve_order: true,
                 }),
             },
             CommonActionFile::AddReplace => CommonAction::AddOptions {
@@ -1292,6 +1314,7 @@ impl TryFrom<CommonActionFile> for CommonAction {
                     autoplay: AutoplayKind::None,
                     position: Position::Replace,
                     all: false,
+                    preserve_order: true,
                 }),
             },
             CommonActionFile::Insert => CommonAction::AddOptions {
@@ -1299,6 +1322,7 @@ impl TryFrom<CommonActionFile> for CommonAction {
                     autoplay: AutoplayKind::None,
                     position: Position::AfterCurrentSong,
                     all: false,
+                    preserve_order: true,
                 }),
             },
             CommonActionFile::InsertAll => CommonAction::AddOptions {
@@ -1306,6 +1330,7 @@ impl TryFrom<CommonActionFile> for CommonAction {
                     autoplay: AutoplayKind::None,
                     position: Position::AfterCurrentSong,
                     all: true,
+                    preserve_order: true,
                 }),
             },
             CommonActionFile::AddAll => CommonAction::AddOptions {
@@ -1313,6 +1338,7 @@ impl TryFrom<CommonActionFile> for CommonAction {
                     autoplay: AutoplayKind::None,
                     position: Position::EndOfQueue,
                     all: true,
+                    preserve_order: true,
                 }),
             },
             CommonActionFile::AddAllReplace => CommonAction::AddOptions {
@@ -1320,6 +1346,7 @@ impl TryFrom<CommonActionFile> for CommonAction {
                     autoplay: AutoplayKind::None,
                     position: Position::Replace,
                     all: true,
+                    preserve_order: true,
                 }),
             },
             CommonActionFile::Delete => CommonAction::Delete,

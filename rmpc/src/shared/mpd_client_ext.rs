@@ -34,7 +34,7 @@ pub trait MpdClientExt {
         current_song_idx: Option<usize>,
         hovered_song_idx: Option<usize>,
     ) {
-        let opts = AddOpts { autoplay, position, all: false };
+        let opts = AddOpts { autoplay, position, all: false, preserve_order: true };
         let replace = matches!(position, Position::Replace);
         let (autoplay_idx, position) = match opts.autoplay_idx_and_queue_position(
             &ctx.queue,
@@ -106,7 +106,6 @@ pub enum MpdDelete {
     Playlist { name: String },
 }
 
-#[allow(dead_code, reason = "Search is currently unused")]
 #[derive(Debug, Clone)]
 pub enum Enqueue {
     File { path: String },
@@ -726,7 +725,7 @@ mod tests {
             let autoplay = AutoplayKind::First;
             let current_song_idx = Some(4);
             let hovered = None;
-            let opts = AddOpts { autoplay, position, all: false };
+            let opts = AddOpts { autoplay, position, all: false, preserve_order: true };
 
             let (autoplay_idx, queue_position) = opts
                 .autoplay_idx_and_queue_position(&ctx_with_queue.queue, current_song_idx, hovered)
@@ -742,7 +741,7 @@ mod tests {
             let current_song_idx = Some(4);
             let hovered = Some(1);
             let autoplay = AutoplayKind::Hovered;
-            let opts = AddOpts { autoplay, position, all: false };
+            let opts = AddOpts { autoplay, position, all: false, preserve_order: true };
 
             let (autoplay_idx, queue_position) = opts
                 .autoplay_idx_and_queue_position(&ctx_with_queue.queue, current_song_idx, hovered)
@@ -758,7 +757,7 @@ mod tests {
             let current_song_idx = Some(4);
             let hovered = Some(1);
             let autoplay = AutoplayKind::None;
-            let opts = AddOpts { autoplay, position, all: false };
+            let opts = AddOpts { autoplay, position, all: false, preserve_order: true };
 
             let (autoplay_idx, queue_position) = opts
                 .autoplay_idx_and_queue_position(&ctx_with_queue.queue, current_song_idx, hovered)
@@ -774,7 +773,7 @@ mod tests {
             let autoplay = AutoplayKind::First;
             let current_song_idx = Some(9);
             let hovered = None;
-            let opts = AddOpts { autoplay, position, all: false };
+            let opts = AddOpts { autoplay, position, all: false, preserve_order: true };
 
             let (autoplay_idx, queue_position) = opts
                 .autoplay_idx_and_queue_position(&ctx_with_queue.queue, current_song_idx, hovered)
@@ -790,7 +789,7 @@ mod tests {
             let autoplay = AutoplayKind::First;
             let current_song_idx = Some(5);
             let hovered = None;
-            let opts = AddOpts { autoplay, position, all: false };
+            let opts = AddOpts { autoplay, position, all: false, preserve_order: true };
 
             let (autoplay_idx, queue_position) = opts
                 .autoplay_idx_and_queue_position(&ctx_with_queue.queue, current_song_idx, hovered)
@@ -806,7 +805,7 @@ mod tests {
             let current_song_idx = Some(5);
             let hovered = Some(1);
             let autoplay = AutoplayKind::Hovered;
-            let opts = AddOpts { autoplay, position, all: false };
+            let opts = AddOpts { autoplay, position, all: false, preserve_order: true };
 
             let (autoplay_idx, queue_position) = opts
                 .autoplay_idx_and_queue_position(&ctx_with_queue.queue, current_song_idx, hovered)
@@ -822,7 +821,7 @@ mod tests {
             let current_song_idx = Some(5);
             let hovered = Some(1);
             let autoplay = AutoplayKind::None;
-            let opts = AddOpts { autoplay, position, all: false };
+            let opts = AddOpts { autoplay, position, all: false, preserve_order: true };
 
             let (autoplay_idx, queue_position) = opts
                 .autoplay_idx_and_queue_position(&ctx_with_queue.queue, current_song_idx, hovered)
@@ -838,7 +837,7 @@ mod tests {
             let autoplay = AutoplayKind::First;
             let current_song_idx = Some(5);
             let hovered = None;
-            let opts = AddOpts { autoplay, position, all: false };
+            let opts = AddOpts { autoplay, position, all: false, preserve_order: true };
 
             let (autoplay_idx, queue_position) = opts
                 .autoplay_idx_and_queue_position(&ctx_with_queue.queue, current_song_idx, hovered)
@@ -854,7 +853,7 @@ mod tests {
             let current_song_idx = Some(5);
             let hovered = Some(1);
             let autoplay = AutoplayKind::Hovered;
-            let opts = AddOpts { autoplay, position, all: false };
+            let opts = AddOpts { autoplay, position, all: false, preserve_order: true };
 
             let (autoplay_idx, queue_position) = opts
                 .autoplay_idx_and_queue_position(&ctx_with_queue.queue, current_song_idx, hovered)
@@ -870,7 +869,7 @@ mod tests {
             let current_song_idx = Some(5);
             let hovered = Some(1);
             let autoplay = AutoplayKind::None;
-            let opts = AddOpts { autoplay, position, all: false };
+            let opts = AddOpts { autoplay, position, all: false, preserve_order: true };
 
             let (autoplay_idx, queue_position) = opts
                 .autoplay_idx_and_queue_position(&ctx_with_queue.queue, current_song_idx, hovered)
@@ -886,7 +885,7 @@ mod tests {
             let current_song_idx = Some(5);
             let hovered = None;
             let autoplay = AutoplayKind::First;
-            let opts = AddOpts { autoplay, position, all: false };
+            let opts = AddOpts { autoplay, position, all: false, preserve_order: true };
 
             let (autoplay_idx, queue_position) = opts
                 .autoplay_idx_and_queue_position(&ctx_with_queue.queue, current_song_idx, hovered)
@@ -902,7 +901,7 @@ mod tests {
             let current_song_idx = Some(5);
             let hovered = Some(1);
             let autoplay = AutoplayKind::Hovered;
-            let opts = AddOpts { autoplay, position, all: false };
+            let opts = AddOpts { autoplay, position, all: false, preserve_order: true };
 
             let (autoplay_idx, queue_position) = opts
                 .autoplay_idx_and_queue_position(&ctx_with_queue.queue, current_song_idx, hovered)
@@ -918,7 +917,7 @@ mod tests {
             let current_song_idx = Some(5);
             let hovered = Some(1);
             let autoplay = AutoplayKind::None;
-            let opts = AddOpts { autoplay, position, all: false };
+            let opts = AddOpts { autoplay, position, all: false, preserve_order: true };
 
             let (autoplay_idx, queue_position) = opts
                 .autoplay_idx_and_queue_position(&ctx_with_queue.queue, current_song_idx, hovered)
@@ -934,7 +933,7 @@ mod tests {
             let current_song_idx = Some(5);
             let hovered = Some(1);
             let autoplay = AutoplayKind::First;
-            let opts = AddOpts { autoplay, position, all: false };
+            let opts = AddOpts { autoplay, position, all: false, preserve_order: true };
 
             let (autoplay_idx, queue_position) = opts
                 .autoplay_idx_and_queue_position(&ctx_with_queue.queue, current_song_idx, hovered)
@@ -950,7 +949,7 @@ mod tests {
             let current_song_idx = Some(5);
             let hovered = Some(1);
             let autoplay = AutoplayKind::Hovered;
-            let opts = AddOpts { autoplay, position, all: false };
+            let opts = AddOpts { autoplay, position, all: false, preserve_order: true };
 
             let (autoplay_idx, queue_position) = opts
                 .autoplay_idx_and_queue_position(&ctx_with_queue.queue, current_song_idx, hovered)
@@ -966,7 +965,7 @@ mod tests {
             let current_song_idx = Some(5);
             let hovered = Some(1);
             let autoplay = AutoplayKind::None;
-            let opts = AddOpts { autoplay, position, all: false };
+            let opts = AddOpts { autoplay, position, all: false, preserve_order: true };
 
             let (autoplay_idx, queue_position) = opts
                 .autoplay_idx_and_queue_position(&ctx_with_queue.queue, current_song_idx, hovered)
@@ -982,7 +981,7 @@ mod tests {
             let current_song_idx = Some(5);
             let hovered = Some(1);
             let autoplay = AutoplayKind::First;
-            let opts = AddOpts { autoplay, position, all: false };
+            let opts = AddOpts { autoplay, position, all: false, preserve_order: true };
 
             let (autoplay_idx, queue_position) = opts
                 .autoplay_idx_and_queue_position(&ctx_with_queue.queue, current_song_idx, hovered)
@@ -998,7 +997,7 @@ mod tests {
             let current_song_idx = Some(5);
             let hovered = Some(1);
             let autoplay = AutoplayKind::Hovered;
-            let opts = AddOpts { autoplay, position, all: false };
+            let opts = AddOpts { autoplay, position, all: false, preserve_order: true };
 
             let (autoplay_idx, queue_position) = opts
                 .autoplay_idx_and_queue_position(&ctx_with_queue.queue, current_song_idx, hovered)
@@ -1014,7 +1013,7 @@ mod tests {
             let current_song_idx = Some(5);
             let hovered = Some(1);
             let autoplay = AutoplayKind::None;
-            let opts = AddOpts { autoplay, position, all: false };
+            let opts = AddOpts { autoplay, position, all: false, preserve_order: true };
 
             let (autoplay_idx, queue_position) = opts
                 .autoplay_idx_and_queue_position(&ctx_with_queue.queue, current_song_idx, hovered)
@@ -1030,7 +1029,7 @@ mod tests {
             let current_song_idx = Some(5);
             let hovered = Some(1);
             let autoplay = AutoplayKind::First;
-            let opts = AddOpts { autoplay, position, all: false };
+            let opts = AddOpts { autoplay, position, all: false, preserve_order: true };
 
             let (autoplay_idx, queue_position) = opts
                 .autoplay_idx_and_queue_position(&ctx_with_queue.queue, current_song_idx, hovered)
@@ -1046,7 +1045,7 @@ mod tests {
             let current_song_idx = Some(5);
             let hovered = Some(1);
             let autoplay = AutoplayKind::Hovered;
-            let opts = AddOpts { autoplay, position, all: false };
+            let opts = AddOpts { autoplay, position, all: false, preserve_order: true };
 
             let (autoplay_idx, queue_position) = opts
                 .autoplay_idx_and_queue_position(&ctx_with_queue.queue, current_song_idx, hovered)
@@ -1062,7 +1061,7 @@ mod tests {
             let current_song_idx = Some(5);
             let hovered = Some(1);
             let autoplay = AutoplayKind::None;
-            let opts = AddOpts { autoplay, position, all: false };
+            let opts = AddOpts { autoplay, position, all: false, preserve_order: true };
 
             let (autoplay_idx, queue_position) = opts
                 .autoplay_idx_and_queue_position(&ctx_with_queue.queue, current_song_idx, hovered)
