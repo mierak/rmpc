@@ -5,7 +5,7 @@ use ratatui::{Frame, prelude::Rect, widgets::ListState};
 use rmpc_mpd::{
     client::Client,
     commands::{Song, list::MpdGroupedList, metadata_tag::MetadataTag},
-    filter::{Filter, Tag},
+    filter::{Filter, FilterKind, Tag},
     mpd_client::MpdClient,
 };
 
@@ -18,7 +18,13 @@ use crate::{
         theme::properties::SongProperty,
     },
     ctx::Ctx,
-    shared::{cmp::StringCompare, id, keys::ActionEvent, mouse_event::MouseEvent},
+    shared::{
+        cmp::StringCompare,
+        id,
+        keys::ActionEvent,
+        mouse_event::MouseEvent,
+        mpd_client_ext::Enqueue,
+    },
     ui::{
         UiEvent,
         browser::BrowserPane,
@@ -276,14 +282,26 @@ impl TagBrowserPane {
         Ok(())
     }
 
-    fn songs_for_item(&self, item: &DirOrSong) -> Vec<Song> {
+    fn root_item_filter(&self, item: &DirOrSong) -> Result<Vec<(Tag, FilterKind, String)>> {
+        if let DirOrSong::Dir { metadata, .. } = item
+            && !metadata.is_empty()
+        {
+            return Ok(metadata
+                .iter()
+                .map(|(k, v)| (Tag::from(k.clone()), FilterKind::Exact, v.clone()))
+                .collect());
+        }
+
+        let root_tag: Tag = self.tags[0].group_by[0][0].clone().try_into()?;
+        Ok(vec![(root_tag, FilterKind::Exact, item.as_path().to_owned())])
+    }
+
+    fn songs_for_item<'a>(&'a self, item: &'a DirOrSong) -> impl Iterator<Item = &'a Song> + 'a {
         let path = self.stack().path().to_owned();
-        item.walk(&self.stack, path)
-            .filter_map(|item| match item {
-                DirOrSong::Song(song) => Some(song.clone()),
-                DirOrSong::Dir { .. } => None,
-            })
-            .collect()
+        item.walk(&self.stack, path).filter_map(|item| match item {
+            DirOrSong::Song(song) => Some(song),
+            DirOrSong::Dir { .. } => None,
+        })
     }
 }
 
@@ -395,8 +413,40 @@ impl BrowserPane<DirOrSong> for TagBrowserPane {
         &self,
         item: DirOrSong,
     ) -> impl FnOnce(&mut Client<'_>) -> Result<Vec<Song>> + Clone + 'static {
-        let prebuilt_songs = self.songs_for_item(&item);
+        let prebuilt_songs: Vec<Song> = self.songs_for_item(&item).cloned().collect();
         move |_client| Ok(prebuilt_songs)
+    }
+
+    fn enqueue<'a>(
+        &self,
+        items: impl Iterator<Item = &'a DirOrSong>,
+    ) -> (Vec<Enqueue>, Option<usize>) {
+        let at_root = self.stack.path().as_slice().is_empty();
+        let hovered = self.stack.current().selected().filter(|h| h.is_file()).map(|h| h.as_path());
+        let mut hovered_idx = None;
+        let mut result = Vec::new();
+
+        for item in items {
+            let mut songs = self.songs_for_item(item).peekable();
+            // Songs of root items are fetched lazily. When they are not loaded
+            // yet, let MPD add the item itself instead of skipping it.
+            if at_root && songs.peek().is_none() && matches!(item, DirOrSong::Dir { .. }) {
+                match self.root_item_filter(item) {
+                    Ok(filter) => result.push(Enqueue::Find { filter }),
+                    Err(err) => log::warn!(err:?; "Cannot build filter for root item"),
+                }
+                continue;
+            }
+
+            for song in songs {
+                if hovered == Some(song.file.as_str()) {
+                    hovered_idx = Some(result.len());
+                }
+                result.push(Enqueue::File { path: song.file.clone() });
+            }
+        }
+
+        (result, hovered_idx)
     }
 
     fn fetch_data(&self, selected: &DirOrSong, ctx: &Ctx) -> Result<()> {
@@ -1109,7 +1159,8 @@ mod tests {
             pane.stack_mut().enter();
             pane.stack_mut().enter();
 
-            let result = pane.songs_for_item(&DirOrSong::Song(songs[0].clone()));
+            let result =
+                pane.songs_for_item(&DirOrSong::Song(songs[0].clone())).cloned().collect_vec();
             assert_eq!(result, vec![songs[0].clone()]);
         }
 
@@ -1125,7 +1176,10 @@ mod tests {
             pane.stack.insert(Path::new(), vec![DirOrSong::name_only("artist".to_string())]);
             pane.process_songs("artist".to_string(), songs.clone(), &ctx);
 
-            let mut result = pane.songs_for_item(&DirOrSong::name_only("artist".to_string()));
+            let mut result = pane
+                .songs_for_item(&DirOrSong::name_only("artist".to_string()))
+                .cloned()
+                .collect_vec();
             result.sort_by(|a, b| a.file.cmp(&b.file));
             let mut expected = songs.clone();
             expected.sort_by(|a, b| a.file.cmp(&b.file));
@@ -1148,7 +1202,8 @@ mod tests {
             pane.stack_mut().current_mut().select_idx(0, 0);
             pane.stack_mut().enter();
 
-            let result = pane.songs_for_item(find_dir_by_display_name(&pane, "album_a"));
+            let result =
+                pane.songs_for_item(find_dir_by_display_name(&pane, "album_a")).collect_vec();
 
             assert_eq!(result.len(), songs_a.len());
             assert!(result.iter().all(|s| s.file.contains("album_a")));
@@ -1167,9 +1222,9 @@ mod tests {
             pane.stack_mut().current_mut().select_idx(0, 0);
             pane.stack_mut().enter();
 
-            let result = pane.songs_for_item(&DirOrSong::name_only("nonexistent".to_string()));
+            let item = DirOrSong::name_only("nonexistent".to_string());
 
-            assert!(result.is_empty());
+            assert!(pane.songs_for_item(&item).next().is_none());
         }
 
         #[rstest]
@@ -1203,7 +1258,8 @@ mod tests {
             pane.stack_mut().current_mut().select_idx(0, 0);
             pane.stack_mut().enter();
 
-            let result = pane.songs_for_item(find_dir_by_display_name(&pane, "album_a"));
+            let result =
+                pane.songs_for_item(find_dir_by_display_name(&pane, "album_a")).collect_vec();
 
             let expected_count = disc1_songs.len() + disc2_songs.len();
             assert_eq!(result.len(), expected_count);
@@ -1229,13 +1285,124 @@ mod tests {
             pane.stack_mut().current_mut().select_idx(0, 0);
             pane.stack_mut().enter();
 
-            let result_a = pane.songs_for_item(find_dir_by_display_name(&pane, "album_a"));
-            let result_b = pane.songs_for_item(find_dir_by_display_name(&pane, "album_b"));
+            let result_a =
+                pane.songs_for_item(find_dir_by_display_name(&pane, "album_a")).collect_vec();
+            let result_b =
+                pane.songs_for_item(find_dir_by_display_name(&pane, "album_b")).collect_vec();
 
             assert_eq!(result_a.len(), songs_a.len());
             assert!(result_a.iter().all(|s| s.file.contains("album_a")));
             assert_eq!(result_b.len(), songs_b.len());
             assert!(result_b.iter().all(|s| s.file.contains("album_b")));
+        }
+    }
+
+    #[allow(clippy::unwrap_used)]
+    mod enqueue {
+        use super::*;
+
+        fn exact(tag: &str, value: &str) -> (Tag, FilterKind, String) {
+            (Tag::Custom(tag.to_string()), FilterKind::Exact, value.to_string())
+        }
+
+        fn pane_with_root_artists(ctx: &Ctx, artists: &[&str]) -> TagBrowserPane {
+            let mut pane = TagBrowserPane::new(
+                vec![tag("artist"), album_tag(None, None)],
+                PaneType::Artists,
+                ctx,
+            );
+            pane.stack.insert(
+                Path::new(),
+                artists.iter().map(|a| DirOrSong::name_only((*a).to_string())).collect(),
+            );
+            pane
+        }
+
+        fn all_items(pane: &TagBrowserPane) -> (Vec<Enqueue>, Option<usize>) {
+            pane.enqueue(pane.items(true).map(|(_, item)| item))
+        }
+
+        #[rstest]
+        fn unfetched_root_items_are_added_by_filter(mut ctx: Ctx, config: Config) {
+            ctx.config = std::sync::Arc::new(config);
+            let pane = pane_with_root_artists(&ctx, &["artist_a", "artist_b"]);
+
+            let (items, hovered_idx) = all_items(&pane);
+
+            assert_eq!(hovered_idx, None);
+            assert!(matches!(&items[..], [
+                Enqueue::Find { filter: a },
+                Enqueue::Find { filter: b },
+            ] if *a == vec![exact("artist", "artist_a")]
+                && *b == vec![exact("artist", "artist_b")]));
+        }
+
+        #[rstest]
+        fn grouped_root_items_use_all_their_tags(mut ctx: Ctx, config: Config) {
+            ctx.config = std::sync::Arc::new(config);
+            let grouped_tag = BrowserTagConfig {
+                group_by: vec![vec![SongProperty::Album], vec![SongProperty::Artist]],
+                sort_by: None,
+                format: vec![],
+                skip: CollapseLevel::default(),
+            };
+            let mut pane = TagBrowserPane::new(vec![grouped_tag], PaneType::Albums, &ctx);
+            pane.process_grouped_list(
+                MpdGroupedList(vec![HashMap::from([
+                    ("album".to_string(), "The Phantom Agony".to_string()),
+                    ("artist".to_string(), "Epica".to_string()),
+                ])]),
+                &ctx,
+            );
+
+            let (items, _) = all_items(&pane);
+
+            let Some(Enqueue::Find { filter }) = items.first() else {
+                panic!("expected Enqueue::Find, got {items:?}");
+            };
+            assert_eq!(items.len(), 1);
+            assert_eq!(filter.iter().sorted_by(|a, b| a.2.cmp(&b.2)).collect_vec(), vec![
+                &exact("artist", "Epica"),
+                &exact("album", "The Phantom Agony"),
+            ]);
+        }
+
+        #[rstest]
+        fn loaded_root_items_are_added_song_by_song_in_pane_order(mut ctx: Ctx, config: Config) {
+            ctx.config = std::sync::Arc::new(config);
+            let mut pane = pane_with_root_artists(&ctx, &["loaded", "unfetched"]);
+            let songs = vec![song("album_b", "2021"), song("album_a", "2020")];
+            pane.process_songs("loaded".to_string(), songs, &ctx);
+
+            let (items, _) = all_items(&pane);
+
+            let expected = pane.songs_for_item(&pane.stack.current().items[0]).collect_vec();
+            assert_eq!(expected.len(), 2);
+            assert!(matches!(&items[..], [
+                Enqueue::File { path: a },
+                Enqueue::File { path: b },
+                Enqueue::Find { filter },
+            ] if *a == expected[0].file
+                && *b == expected[1].file
+                && *filter == vec![exact("artist", "unfetched")]));
+        }
+
+        #[rstest]
+        fn below_root_items_report_hovered_song(mut ctx: Ctx, config: Config) {
+            ctx.config = std::sync::Arc::new(config);
+            let mut pane = pane_with_root_artists(&ctx, &["artist"]);
+            let songs = vec![song("album_a", "2020"), song("album_b", "2021")];
+            pane.process_songs("artist".to_string(), songs.clone(), &ctx);
+            pane.stack_mut().current_mut().select_idx(0, 0);
+            pane.stack_mut().enter();
+            pane.stack_mut().current_mut().select_idx(0, 0);
+            pane.stack_mut().enter();
+            let hovered = pane.stack.current().selected().unwrap().as_path().to_owned();
+
+            let (items, hovered_idx) = all_items(&pane);
+
+            assert_eq!(hovered_idx, Some(0));
+            assert!(matches!(&items[..], [Enqueue::File { path }] if *path == hovered));
         }
     }
 }

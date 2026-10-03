@@ -605,7 +605,11 @@ where
             CommonAction::PaneLeft => {}
             CommonAction::AddOptions { kind: AddKind::Action(options) } => {
                 let (enqueue, hovered_idx) = self.enqueue_items(options.all);
-                let enqueue = self.resolve_enqueue(enqueue, ctx)?;
+                let enqueue = if options.preserve_order {
+                    self.resolve_enqueue(enqueue, ctx)?
+                } else {
+                    enqueue
+                };
                 if !enqueue.is_empty() {
                     let queue_len = ctx.queue.len();
                     let current_song_idx = ctx.current_song_index();
@@ -621,18 +625,25 @@ where
                 }
             }
             CommonAction::AddOptions { kind: AddKind::Modal(items) } => {
-                // Options that share `all` resolve to the same items, so
-                // resolve once per value instead of once per
-                // option.
-                let mut resolved: HashMap<bool, (Vec<Enqueue>, Option<usize>)> = HashMap::new();
+                // Options that share `all` and `preserve_order` resolve to the
+                // same items, so resolve once per combination instead of once
+                // per option.
+                let mut resolved: HashMap<(bool, bool), (Vec<Enqueue>, Option<usize>)> =
+                    HashMap::new();
                 let mut opts = Vec::with_capacity(items.len());
                 for (label, options) in items {
-                    let enqueue = if let Some(enqueue) = resolved.get(&options.all) {
+                    let key = (options.all, options.preserve_order);
+                    let enqueue = if let Some(enqueue) = resolved.get(&key) {
                         enqueue.clone()
                     } else {
                         let (enqueue, hovered_idx) = self.enqueue_items(options.all);
-                        let enqueue = (self.resolve_enqueue(enqueue, ctx)?, hovered_idx);
-                        resolved.insert(options.all, enqueue.clone());
+                        let enqueue = if options.preserve_order {
+                            self.resolve_enqueue(enqueue, ctx)?
+                        } else {
+                            enqueue
+                        };
+                        let enqueue = (enqueue, hovered_idx);
+                        resolved.insert(key, enqueue.clone());
                         enqueue
                     };
                     opts.push((label, options, enqueue));

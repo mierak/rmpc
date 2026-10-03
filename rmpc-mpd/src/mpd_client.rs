@@ -933,7 +933,7 @@ impl<T: SocketClient> MpdCommand for T {
         &mut self,
         features: &[StringNormalizationFeature],
     ) -> MpdResult<()> {
-        debug_assert!(!features.is_empty());
+        debug_assert_ne!(features, &[]);
 
         let mut buf = String::from("stringnormalization enable");
         for feature in features {
@@ -947,7 +947,7 @@ impl<T: SocketClient> MpdCommand for T {
         &mut self,
         features: &[StringNormalizationFeature],
     ) -> MpdResult<()> {
-        debug_assert!(!features.is_empty());
+        debug_assert_ne!(features, &[]);
 
         let mut buf = String::from("stringnormalization disable");
         for feature in features {

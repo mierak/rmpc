@@ -6,6 +6,8 @@ All notable changes to this project will be documented in this file.
 
 ### Added
 
+- `preserve_order` option to `AddOptions`. Setting it to `false` makes adding of songs much faster
+  but ignores the client side browser sorting.
 - `FileExtension` falls back to the underlying file's extension (`RealUri`, MPD 0.25) for
   songs inside a CUE sheet
 - `directories_hidden_dirs` config option to hide directories with the given names from the
@@ -65,6 +67,8 @@ All notable changes to this project will be documented in this file.
 
 ### Fixed
 
+- Tag browser items whose songs were not loaded yet being skipped when added to the queue, MPD
+  now adds them itself
 - rmpcd MPRIS not exposing album art for the song already playing at startup, only after the
   first song change
 - `Bits()` reporting the channel count as bit depth during DSD playback. MPD formats DSD audio as
