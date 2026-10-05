@@ -3294,6 +3294,7 @@ dependencies = [
  "serde_path_to_error",
  "serde_with",
  "serde_yaml_ng",
+ "signal-hook",
  "strum",
  "sysinfo",
  "test-case",

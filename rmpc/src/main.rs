@@ -453,7 +453,26 @@ fn main() -> Result<()> {
                 core::socket::init(event_tx.clone(), worker_tx.clone(), Arc::clone(&ctx.config))
                     .context("Failed to initialize socket listener")?;
 
-            let _config_watcher_guard = if let Some(config_path) = config_path {
+            let config_reloader = if let Some(config_path) = config_path {
+                core::config_watcher::ConfigReloader::new(
+                    config_path.clone(),
+                    theme_path,
+                    event_tx.clone(),
+                )
+                .inspect_err(|e| log::warn!("Failed to initialize config reloader: {e}"))
+                .ok()
+                .map(|reloader| (config_path, reloader))
+            } else {
+                log::warn!("No config file was detected, not watching config for changes");
+                None
+            };
+
+            let _signal_guard = config_reloader.as_ref().map(|(_, reloader)| {
+                core::config_watcher::init_signals(Arc::clone(reloader))
+                    .inspect_err(|e| log::warn!("Failed to initialize reload signal handler: {e}"))
+            });
+
+            let _config_watcher_guard = if let Some((config_path, reloader)) = config_reloader {
                 if !ctx.config.enable_config_hot_reload {
                     None
                 } else if !is_in_standard_config_dir(&config_path) {
@@ -462,15 +481,11 @@ fn main() -> Result<()> {
                     None
                 } else {
                     log::debug!("Enabling config hot reload for '{}'", config_path.display());
-                    Some(
-                        core::config_watcher::init(config_path, theme_path, event_tx.clone())
-                            .inspect_err(|e| {
-                                log::warn!("Failed to initialize config watcher: {e}");
-                            }),
-                    )
+                    Some(core::config_watcher::init(reloader).inspect_err(|e| {
+                        log::warn!("Failed to initialize config watcher: {e}");
+                    }))
                 }
             } else {
-                log::warn!("No config file was detected, not watching config for changes");
                 None
             };
 

@@ -6,6 +6,8 @@ All notable changes to this project will be documented in this file.
 
 ### Added
 
+- Sending `SIGUSR1` to rmpc reloads the config file and `SIGUSR2` reloads the theme file, even
+  when `enable_config_hot_reload` is disabled
 - `preserve_order` option to `AddOptions`. Setting it to `false` makes adding of songs much faster
   but ignores the client side browser sorting.
 - `FileExtension` falls back to the underlying file's extension (`RealUri`, MPD 0.25) for
