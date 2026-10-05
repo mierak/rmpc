@@ -67,6 +67,7 @@ All notable changes to this project will be documented in this file.
 
 ### Fixed
 
+- Album art and other background work no longer waits for lyrics indexing to finish on startup
 - Tag browser items whose songs were not loaded yet being skipped when added to the queue, MPD
   now adds them itself
 - rmpcd MPRIS not exposing album art for the song already playing at startup, only after the

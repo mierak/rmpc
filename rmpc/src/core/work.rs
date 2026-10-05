@@ -1,6 +1,5 @@
 use std::{
     io::{BufRead, Cursor, Read},
-    path::PathBuf,
     sync::Arc,
 };
 
@@ -52,10 +51,6 @@ fn handle_work_request(
                 "Failed to send client request to complete command"
             );
             Ok(WorkDone::None)
-        }
-        WorkRequest::IndexLyrics { lyrics_dir } => {
-            let index = LrcIndex::index(&PathBuf::from(lyrics_dir));
-            Ok(WorkDone::LyricsIndexed { index })
         }
         WorkRequest::IndexSingleLrc { path } => {
             let metadata = LrcIndex::index_single(&path)?;

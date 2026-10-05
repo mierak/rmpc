@@ -23,7 +23,7 @@ use crate::shared::{lrc::lyrics::LrcMetadata, macros::try_cont};
 #[derive(Debug, Default, Serialize)]
 pub struct LrcIndex {
     // Using BTreeMap to have a well-defined iteration order.
-    index: BTreeMap<PathBuf, LrcMetadata>,
+    pub(crate) index: BTreeMap<PathBuf, LrcMetadata>,
 }
 
 impl LrcIndex {
