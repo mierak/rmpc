@@ -1,6 +1,7 @@
 use core::{config_watcher::ERROR_CONFIG_MODAL_ID, scheduler::Scheduler};
 use std::{
     io::{BufRead, Write},
+    path::PathBuf,
     sync::Arc,
     time::Duration,
 };
@@ -42,8 +43,9 @@ use crate::{
             read_config_for_debuginfo,
         },
         dependencies::{DEPENDENCIES, FFMPEG, FFPROBE, PYTHON3, PYTHON3MUTAGEN, UEBERZUGPP, YTDLP},
-        events::{AppEvent, ClientRequest, WorkRequest},
+        events::{AppEvent, ClientRequest, WorkDone, WorkRequest},
         logging,
+        lrc::LrcIndex,
         mpd_query::{MpdCommand, MpdQuery, MpdQueryResult},
         terminal::{TERMINAL, Terminal},
         tmux::{self, IS_TMUX},
@@ -399,9 +401,18 @@ fn main() -> Result<()> {
             if let Some(lyrics_dir) = &config.lyrics_dir
                 && config.enable_lyrics_index
             {
-                worker_tx
-                    .send(WorkRequest::IndexLyrics { lyrics_dir: lyrics_dir.clone() })
-                    .context("Failed to request lyrics indexing")?;
+                let lyrics_dir = PathBuf::from(lyrics_dir);
+                let tx = event_tx.clone();
+                std::thread::Builder::new()
+                    .name("lyrics_index".to_owned())
+                    .spawn(move || {
+                        let index = LrcIndex::index(&lyrics_dir);
+                        try_skip!(
+                            tx.send(AppEvent::WorkDone(Ok(WorkDone::LyricsIndexed { index }))),
+                            "Failed to send lyrics indexed notification"
+                        );
+                    })
+                    .context("Failed to spawn lyrics indexing thread")?;
             }
             event_tx.send(AppEvent::RequestRender).context("Failed to render first frame")?;
 

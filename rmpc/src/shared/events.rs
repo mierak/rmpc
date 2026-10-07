@@ -46,9 +46,6 @@ pub(crate) enum ClientRequest {
 
 #[allow(unused)]
 pub(crate) enum WorkRequest {
-    IndexLyrics {
-        lyrics_dir: String,
-    },
     IndexSingleLrc {
         /// Absolute path to the lrc file
         path: PathBuf,

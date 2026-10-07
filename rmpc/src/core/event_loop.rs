@@ -493,7 +493,7 @@ fn main_task<B: Backend + std::io::Write>(
                         }
                     }
                     WorkDone::LyricsIndexed { index } => {
-                        ctx.lrc_index = index;
+                        ctx.lrc_index.index.extend(index.index);
                         if let Err(err) = ui.on_event(UiEvent::LyricsIndexed, &mut ctx) {
                             log::error!(error:? = err; "UI failed to handle lyrics indexed event");
                         }
