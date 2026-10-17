@@ -147,6 +147,8 @@ fn worker_loop(
                 Ok(events) => {
                     if !events.is_empty() {
                         on_idle(events);
+                    } else if rx.is_empty() {
+                        skip_recv = true;
                     }
                 }
                 Err(e) => {
