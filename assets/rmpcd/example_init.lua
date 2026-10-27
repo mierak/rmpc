@@ -15,6 +15,9 @@ local config = {
 -- Enable mpris support
 -- config.mpris = true
 
+-- Prevent screen lock and idle suspend while MPD is playing
+-- config.inhibit_idle = true
+
 -- Disable TCP keepalive on the MPD socket (enabled by default)
 -- config.enable_keepalive = false
 

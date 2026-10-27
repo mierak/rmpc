@@ -22,6 +22,7 @@ use crate::{
     async_client::AsyncClient,
     ctx::Ctx,
     ext::SenderExt,
+    inhibit::IdleInhibitor,
     lua::{
         lualib::mpd::types::Song,
         plugin::{self, LuaPlugin, PluginStore, PluginsEvent},
@@ -32,6 +33,7 @@ use crate::{
 
 static IS_PLAYING: AtomicBool = AtomicBool::new(false);
 
+#[allow(clippy::too_many_arguments)]
 pub async fn init(
     client: Arc<AsyncClient>,
     ctx: Arc<RwLock<Ctx>>,
@@ -39,6 +41,7 @@ pub async fn init(
     mut shutdown_rx: tokio::sync::broadcast::Receiver<()>,
     app_ev_tx: UnboundedSender<AppEvent>,
     mpris_tx: Option<UnboundedSender<Change>>,
+    mut inhibitor: IdleInhibitor,
     plugin_store: PluginStore<LuaPlugin>,
 ) -> Result<()> {
     let (tx, rx) = tokio::sync::mpsc::unbounded_channel::<PluginsEvent>();
@@ -46,9 +49,8 @@ pub async fn init(
     let plugin_handle =
         tokio::spawn(async move { plugin::init_plugin_loop(rx, plugin_store).await });
 
-    if ctx.read().await.status.state == State::Play {
-        start_update_loop(client.clone(), app_ev_tx.clone());
-    }
+    let initially_playing = ctx.read().await.status.state == State::Play;
+    set_playing(initially_playing, &client, &app_ev_tx, &mut inhibitor).await;
 
     let mut change_buffer = Vec::new();
 
@@ -116,16 +118,13 @@ pub async fn init(
                     });
 
                     change_buffer.push(Change::PlaybackState);
-                    match new_status.state {
-                        State::Play => {
-                            let tx = app_ev_tx.clone();
-                            let client = client.clone();
-                            start_update_loop(client, tx);
-                        }
-                        State::Pause | State::Stop => {
-                            IS_PLAYING.store(false, Ordering::Relaxed);
-                        }
-                    }
+                    set_playing(
+                        new_status.state == State::Play,
+                        &client,
+                        &app_ev_tx,
+                        &mut inhibitor,
+                    )
+                    .await;
                 }
 
                 drop(ro_mpd_state);
@@ -213,11 +212,27 @@ pub async fn init(
         }
     }
 
+    inhibitor.set(false).await;
+
     trace!("Waiting for plugin loop to finish...");
 
     plugin_handle.await??;
 
     Ok(())
+}
+
+async fn set_playing(
+    playing: bool,
+    client: &Arc<AsyncClient>,
+    tx: &UnboundedSender<AppEvent>,
+    inhibitor: &mut IdleInhibitor,
+) {
+    if playing {
+        start_update_loop(client.clone(), tx.clone());
+    } else {
+        IS_PLAYING.store(false, Ordering::Relaxed);
+    }
+    inhibitor.set(playing).await;
 }
 
 pub fn start_update_loop(client: Arc<AsyncClient>, tx: UnboundedSender<AppEvent>) {
