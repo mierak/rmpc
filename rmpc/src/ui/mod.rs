@@ -1040,7 +1040,8 @@ impl<'ui> Ui<'ui> {
                 Panes::FrameCount(p) => p.on_event(&mut event, visible, ctx),
                 Panes::Others(p) => p.on_event(&mut event, visible, ctx),
                 Panes::Cava(p) => p.on_event(&mut event, visible, ctx),
-                // Property and the dummy TabContent pane do not need to receive events
+                // Property and the dummy TabContent pane do not need to receive
+                // events
                 Panes::Property(_) | Panes::TabContent => Ok(()),
                 // Empty pane is a noop, no events
                 Panes::Empty(_) => Ok(()),
@@ -1088,8 +1089,8 @@ impl<'ui> Ui<'ui> {
                     #[cfg(debug_assertions)]
                     Panes::FrameCount(p) => p.on_query_finished(id, data, visible, ctx),
                     Panes::Cava(p) => p.on_query_finished(id, data, visible, ctx),
-                    // Property and the dummy TabContent pane do not need to receive command
-                    // notifications
+                    // Property and the dummy TabContent pane do not need to
+                    // receive command notifications
                     Panes::Property(_) | Panes::TabContent => Ok(()),
                     // Empty pane is a noop, no commands
                     Panes::Empty(_) => Ok(()),

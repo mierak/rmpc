@@ -142,12 +142,13 @@ impl Ord for DirOrSongCustomSort<'_, '_> {
         }
 
         let order = match &self.opts.mode {
-            // directory grouping was already accounted above so we can now naively sort by
-            // mtime
+            // directory grouping was already accounted above so we can now
+            // naively sort by mtime
             SortMode::ModifiedTime => {
                 self.dir_or_song.last_modified().cmp(&other.dir_or_song.last_modified())
             }
-            // compare dirs against dirs, dirs against songs and songs against songs
+            // compare dirs against dirs, dirs against songs and songs against
+            // songs
             SortMode::Format(items) => match (self.dir_or_song, other.dir_or_song) {
                 (DirOrSong::Dir { name: a, .. }, DirOrSong::Dir { name: b, .. }) => {
                     StringCompare::from(self.opts).compare(a, b)

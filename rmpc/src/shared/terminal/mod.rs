@@ -153,22 +153,22 @@ impl Terminal {
         let mut all_backends = vec![B::Kitty, B::Iterm2, B::Sixel];
 
         match self.emulator {
-            // Konsole supports kitty but its implementation is incomplete and cannot work with
-            // rmpc because the unicode placeholders support is missing.
-            // Sixel and Iterm2 are also supported by Konsole but they have other issues like the
-            // screen not clearing up properly.
-            // This means that we cannot reliably support any of the preferred image backends and
-            // have to rely on the fallback ones.
+            // Konsole supports kitty but its implementation is incomplete and
+            // cannot work with rmpc because the unicode placeholders support is
+            // missing. Sixel and Iterm2 are also supported by Konsole but they
+            // have other issues like the screen not clearing up properly.
+            // This means that we cannot reliably support any of the preferred
+            // image backends and have to rely on the fallback ones.
             Emulator::Konsole => all_backends.clear(),
-            // These mostly support just Iterm2. Since Iterm2 does not have (to my knowledge) a
-            // proper way to reliably test for support we have to explicitly list terminals that are
-            // supposed to use Iterm2.
+            // These mostly support just Iterm2. Since Iterm2 does not have (to
+            // my knowledge) a proper way to reliably test for support we have
+            // to explicitly list terminals that are supposed to use Iterm2.
             Emulator::WezTerm => all_backends.retain(|b| matches!(b, B::Iterm2 | B::Sixel)),
             Emulator::VSCode => all_backends.retain(|b| matches!(b, B::Iterm2)),
             Emulator::Tabby => all_backends.retain(|b| matches!(b, B::Iterm2)),
             Emulator::Iterm2 => all_backends.retain(|b| matches!(b, B::Iterm2)),
-            // All other terminals use full feature detection so Iterm2 should be removed from
-            // tested backends.
+            // All other terminals use full feature detection so Iterm2 should
+            // be removed from tested backends.
             _ => all_backends.retain(|b| !matches!(b, B::Iterm2)),
         }
 
@@ -192,7 +192,8 @@ impl Terminal {
     fn is_backend_supported(&self, backend: ImageBackend) -> bool {
         match backend {
             ImageBackend::Kitty => *self.kitty_graphics,
-            // Iterm2 does not have feature deteciton, assume it is supported if it is asked for.
+            // Iterm2 does not have feature deteciton, assume it is supported if
+            // it is asked for.
             ImageBackend::Iterm2 => true,
             ImageBackend::Sixel => *self.sixel,
             ImageBackend::UeberzugWayland => *self.ueberzug_wayland,

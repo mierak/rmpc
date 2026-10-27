@@ -136,7 +136,8 @@ pub(crate) fn init(
                             }
                         }
                     }
-                    // No theme set in the config file, this is OK, use the default theme
+                    // No theme set in the config file, this is OK, use the
+                    // default theme
                     None => (None, UiConfig::default()),
                 };
 

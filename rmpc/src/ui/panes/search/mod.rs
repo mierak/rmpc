@@ -444,8 +444,8 @@ impl SearchPane {
                     self.inputs.enter_insert_mode(ctx);
                     ctx.render()?;
                 }
-                // Modal while we are on search column does not support all options. It can
-                // be implemented later.
+                // Modal while we are on search column does not support all
+                // options. It can be implemented later.
                 CommonAction::AddOptions { kind: AddKind::Modal(_) } => {}
                 CommonAction::AddOptions { kind: AddKind::Action(opts) } if opts.all => {
                     let (_, enqueue) = self.enqueue(opts.all);
@@ -461,8 +461,8 @@ impl SearchPane {
                         );
                     }
                 }
-                // This action only makes sense when opts.all is true while we are on the
-                // search column.
+                // This action only makes sense when opts.all is true while we
+                // are on the search column.
                 CommonAction::AddOptions { kind: AddKind::Action(_) } => {}
                 CommonAction::Delete => {
                     self.inputs.reset_focused(ctx);
