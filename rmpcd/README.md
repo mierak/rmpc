@@ -51,6 +51,9 @@ local config = {}
 config.address = "@mpd"
 config.mpris = false
 
+-- Prevent screen lock and idle suspend while MPD is playing
+config.inhibit_idle = true
+
 -- If you wish to subscribe to additional MPD channels
 config.subscribe_channels = { "test" }
 

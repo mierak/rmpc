@@ -31,6 +31,7 @@ mod async_client;
 mod ctx;
 mod event_loop;
 mod ext;
+mod inhibit;
 mod kv_bridge;
 mod lua;
 mod mpd_ext;
@@ -268,9 +269,25 @@ async fn run() -> Result<()> {
     let enable_mpris = lua_config.get::<Option<bool>>("mpris")?.unwrap_or(false);
     let tx = if enable_mpris { Some(mpris::setup(mpd.clone(), ctx.clone()).await?) } else { None };
 
+    let inhibit_idle = lua_config.get::<Option<bool>>("inhibit_idle")?.unwrap_or(false);
+    let inhibitor = if inhibit_idle {
+        inhibit::IdleInhibitor::new().await
+    } else {
+        inhibit::IdleInhibitor::disabled()
+    };
+
     info!("rmpcd started in {:.2?}", start.elapsed());
-    event_loop::init(mpd.clone(), ctx.clone(), idle_rx, shutdown_rx, idle_tx, tx, plugin_store)
-        .await?;
+    event_loop::init(
+        mpd.clone(),
+        ctx.clone(),
+        idle_rx,
+        shutdown_rx,
+        idle_tx,
+        tx,
+        inhibitor,
+        plugin_store,
+    )
+    .await?;
 
     mpd.shutdown().await;
 
