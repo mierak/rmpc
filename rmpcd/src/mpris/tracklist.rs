@@ -3,11 +3,7 @@ use std::{collections::HashMap, sync::Arc};
 
 use rmpc_mpd::commands::Song;
 use tokio::sync::RwLock;
-use zbus::{
-    interface,
-    object_server::SignalEmitter,
-    zvariant::{ObjectPath, OwnedObjectPath, Value},
-};
+use zbus::{ObjectPath, OwnedObjectPath, Variant, interface, object_server::SignalEmitter};
 
 use crate::{ctx::Ctx, mpris::metadata::SongExt};
 
@@ -27,7 +23,7 @@ impl Tracklist {
     async fn get_tracks_metadata(
         &self,
         tracks: Vec<ObjectPath<'_>>,
-    ) -> Vec<HashMap<&'static str, Value<'_>>> {
+    ) -> Vec<HashMap<&'static str, Variant<'_>>> {
         let state = self.ctx.read().await;
         let mut res = Vec::new();
         for track in tracks {
