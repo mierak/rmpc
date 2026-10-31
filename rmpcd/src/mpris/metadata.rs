@@ -3,7 +3,7 @@ use std::{collections::HashMap, path::PathBuf};
 use rmpc_mpd::commands::Song;
 use sha2::{Digest, Sha256};
 use url::Url;
-use zbus::zvariant::{ObjectPath, OwnedObjectPath, Value};
+use zbus::{ObjectPath, OwnedObjectPath, Variant};
 
 use crate::{ctx::Ctx, paths::Paths};
 
@@ -44,7 +44,7 @@ impl Ctx {
 
     pub(super) async fn current_song_metadata<'a>(
         &mut self,
-    ) -> zbus::fdo::Result<HashMap<&'static str, Value<'a>>> {
+    ) -> zbus::fdo::Result<HashMap<&'static str, Variant<'a>>> {
         let song = if let Some(song) = &self.current_song {
             song
         } else {
@@ -77,7 +77,7 @@ impl Ctx {
         if self.last_written_album_art_song_uri.as_ref().is_some_and(|uri| uri == &song.file) {
             match Url::from_file_path(&target_path) {
                 Ok(url) => {
-                    res.insert("mpris:artUrl", Value::new(url.to_string()));
+                    res.insert("mpris:artUrl", Variant::new(url.to_string()));
                 }
                 Err(()) => {
                     tracing::warn!(path = ?target_path, "Failed to build file URL for album art");
@@ -92,26 +92,26 @@ impl Ctx {
         self.queue.iter().map(|song| song.to_mpris_id()).collect()
     }
 
-    pub(super) fn song_to_metadata(song: &Song, metadata: &mut HashMap<&'static str, Value<'_>>) {
-        metadata.insert("mpris:trackid", Value::new(song.to_mpris_id()));
+    pub(super) fn song_to_metadata(song: &Song, metadata: &mut HashMap<&'static str, Variant<'_>>) {
+        metadata.insert("mpris:trackid", Variant::new(song.to_mpris_id()));
 
         if let Some(artist) = song.metadata.get("artist") {
             metadata.insert(
                 "xesam:artist",
-                Value::from(artist.iter().map(|a| a.to_owned()).collect::<Vec<_>>()),
+                Variant::from(artist.iter().map(|a| a.to_owned()).collect::<Vec<_>>()),
             );
         }
         if let Some(aartist) = song.metadata.get("albumartist") {
-            metadata.insert("xesam:albumArtist", Value::from(aartist.first().to_owned()));
+            metadata.insert("xesam:albumArtist", Variant::from(aartist.first().to_owned()));
         }
         if let Some(title) = song.metadata.get("title") {
-            metadata.insert("xesam:title", Value::from(title.first().to_owned()));
+            metadata.insert("xesam:title", Variant::from(title.first().to_owned()));
         }
         if let Some(album) = song.metadata.get("album") {
-            metadata.insert("xesam:album", Value::from(album.first().to_owned()));
+            metadata.insert("xesam:album", Variant::from(album.first().to_owned()));
         }
         if let Some(dur) = song.duration {
-            metadata.insert("mpris:length", Value::from(dur.as_micros() as i64));
+            metadata.insert("mpris:length", Variant::from(dur.as_micros() as i64));
         }
     }
 }
