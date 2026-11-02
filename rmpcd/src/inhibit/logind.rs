@@ -1,12 +1,11 @@
-use zbus::{Connection, zvariant::OwnedFd};
+use zbus::{Connection, OwnedFd};
 
 use super::backend::{APP_NAME, Backend, REASON};
 
 #[zbus::proxy(
     interface = "org.freedesktop.login1.Manager",
     default_service = "org.freedesktop.login1",
-    default_path = "/org/freedesktop/login1",
-    gen_blocking = false
+    default_path = "/org/freedesktop/login1"
 )]
 trait LoginManager {
     fn inhibit(&self, what: &str, who: &str, why: &str, mode: &str) -> zbus::Result<OwnedFd>;

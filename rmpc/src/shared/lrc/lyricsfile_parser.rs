@@ -49,7 +49,7 @@ struct LyricsfileWord {
 pub fn parse(path: &Path) -> Result<Lrc> {
     let yaml_content = std::fs::read_to_string(path)
         .with_context(|| format!("Failed to read lyricsfile at '{}'", path.display()))?;
-    let yaml = serde_yaml_ng::from_str::<Lyricsfile>(&yaml_content).with_context(|| {
+    let yaml = serde_saphyr::from_str::<Lyricsfile>(&yaml_content).with_context(|| {
         format!("Failed to deserialize lyricsfile '{}' at '{}'", yaml_content, path.display())
     })?;
 

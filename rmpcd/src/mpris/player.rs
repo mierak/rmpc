@@ -7,12 +7,7 @@ use rmpc_mpd::{
     proto_client::ProtoClient,
 };
 use tokio::sync::RwLock;
-use zbus::{
-    fdo,
-    interface,
-    object_server::SignalEmitter,
-    zvariant::{ObjectPath, Value},
-};
+use zbus::{ObjectPath, Variant, fdo, interface, object_server::SignalEmitter};
 
 use crate::{
     async_client::AsyncClient,
@@ -239,7 +234,7 @@ impl Player {
     }
 
     #[zbus(property)]
-    async fn metadata(&self) -> zbus::fdo::Result<HashMap<&'static str, Value<'_>>> {
+    async fn metadata(&self) -> zbus::fdo::Result<HashMap<&'static str, Variant<'_>>> {
         self.ctx.write().await.current_song_metadata().await
     }
 

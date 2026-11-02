@@ -3,7 +3,7 @@ use std::sync::Arc;
 use anyhow::Result;
 use tokio::sync::{RwLock, mpsc::UnboundedReceiver};
 use tracing::{error, info};
-use zbus::{Connection, zvariant::OwnedObjectPath};
+use zbus::{Connection, OwnedObjectPath};
 
 use crate::{
     ctx::Ctx,

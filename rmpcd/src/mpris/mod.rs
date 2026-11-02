@@ -25,11 +25,11 @@ pub async fn setup(
     let tracklist = Tracklist::new(mpd_state.clone());
     let player = Player::new(mpd_state.clone(), client);
 
-    let conn = zbus::connection::Builder::session()?
-        .name("org.mpris.MediaPlayer2.mpd")?
-        .serve_at("/org/mpris/MediaPlayer2", root)?
-        .serve_at("/org/mpris/MediaPlayer2", player)?
-        .serve_at("/org/mpris/MediaPlayer2", tracklist)?
+    let conn = zbus::connection::Builder::session()
+        .name("org.mpris.MediaPlayer2.mpd")
+        .serve_at("/org/mpris/MediaPlayer2", root)
+        .serve_at("/org/mpris/MediaPlayer2", player)
+        .serve_at("/org/mpris/MediaPlayer2", tracklist)
         .build()
         .await?;
 
