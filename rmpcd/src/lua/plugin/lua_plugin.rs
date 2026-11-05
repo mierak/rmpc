@@ -9,7 +9,15 @@ use tracing::{debug, error, trace};
 use crate::lua::{
     lualib::{
         mpd::types::{Song, State, Status},
-        plugin::{ON_IDLE, ON_MESSAGE, ON_RECONNECT, ON_SHUTDOWN, ON_SONG_CHANGE, ON_STATE_CHANGE},
+        plugin::{
+            ON_IDLE,
+            ON_MESSAGE,
+            ON_RECONNECT,
+            ON_SHUTDOWN,
+            ON_SONG_CHANGE,
+            ON_START,
+            ON_STATE_CHANGE,
+        },
     },
     plugin::triggers::Triggers,
 };
@@ -42,6 +50,7 @@ pub enum PluginEvent {
         event: IdleEvent,
     },
     Reconnect,
+    Start,
     Shutdown,
 }
 
@@ -146,14 +155,19 @@ impl LuaPlugin {
                 }
             }
             PluginEvent::Reconnect => {
-                let func: Option<mlua::Function> = state.get(ON_RECONNECT)?;
+                trace!(name, ON_RECONNECT, "Running plugin callback");
 
-                if let Some(func) = func {
-                    trace!(name, "Running plugin reconnect callback");
+                let func: mlua::Function = state.get(ON_RECONNECT)?;
+                if let Err(err) = func.call_async::<()>(state).await {
+                    error!("Failed to call plugin reconnect callback\n{err}");
+                }
+            }
+            PluginEvent::Start => {
+                trace!(name, ON_START, "Running plugin callback");
 
-                    if let Err(err) = func.call_async::<()>(state).await {
-                        error!("Failed to call plugin reconnect callback\n{err}");
-                    }
+                let func: mlua::Function = state.get(ON_START)?;
+                if let Err(err) = func.call_async::<()>(state).await {
+                    error!("Failed to call plugin start callback\n{err}");
                 }
             }
             PluginEvent::Shutdown => {

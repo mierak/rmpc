@@ -48,6 +48,7 @@ pub async fn init(
 
     let plugin_handle =
         tokio::spawn(async move { plugin::init_plugin_loop(rx, plugin_store).await });
+    tx.send_safe(PluginsEvent::Start);
 
     let initially_playing = ctx.read().await.status.state == State::Play;
     set_playing(initially_playing, &client, &app_ev_tx, &mut inhibitor).await;
