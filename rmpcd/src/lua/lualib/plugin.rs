@@ -11,6 +11,7 @@ pub const ON_MESSAGE: &str = "message";
 pub const ON_IDLE: &str = "idle_event";
 pub const ON_SHUTDOWN: &str = "shutdown";
 pub const ON_RECONNECT: &str = "reconnect";
+pub const ON_START: &str = "start";
 
 pub fn init(
     lua: &Lua,

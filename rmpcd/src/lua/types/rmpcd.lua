@@ -20,6 +20,7 @@
 ---@field state_change fun(self, old_state: PlaybackState, new_state: PlaybackState)|nil
 ---@field message fun(self, channel: string, message: string)|nil
 ---@field idle_event fun(self, event: IdleEvent)|nil
+---@field start fun(self)|nil Called exactly once after rmpcd has connected to MPD and all plugins are loaded. Not called again on reconnect.
 ---@field shutdown fun(self)|nil
 ---@field reconnect fun(self)|nil Called after the connection to MPD is re-established. Channels from `subscribed_channels` are resubscribed before this runs.
 

@@ -7,10 +7,11 @@ use crate::lua::lualib::plugin::{
     ON_RECONNECT,
     ON_SHUTDOWN,
     ON_SONG_CHANGE,
+    ON_START,
     ON_STATE_CHANGE,
 };
 
-pub const TRIGGER_COUNT: usize = 5;
+pub const TRIGGER_COUNT: usize = 7;
 
 bitflags! {
     #[derive(Debug, Clone, Copy, Hash, PartialEq, Eq)]
@@ -21,6 +22,7 @@ bitflags! {
         const Idle = 0b000_1000;
         const Shutdown = 0b001_0000;
         const Reconnect = 0b010_0000;
+        const Start = 0b100_0000;
     }
 }
 
@@ -38,6 +40,7 @@ impl FromLua for Triggers {
                 ON_IDLE => Ok(Triggers::Idle),
                 ON_SHUTDOWN => Ok(Triggers::Shutdown),
                 ON_RECONNECT => Ok(Triggers::Reconnect),
+                ON_START => Ok(Triggers::Start),
                 _ => Err(mlua::Error::external(format!("Unknown trigger type: {val}"))),
             };
 

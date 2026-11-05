@@ -8,7 +8,15 @@ use crate::{
     async_client::AsyncClient,
     lua::{
         self,
-        lualib::plugin::{ON_IDLE, ON_MESSAGE, ON_SHUTDOWN, ON_SONG_CHANGE, ON_STATE_CHANGE},
+        lualib::plugin::{
+            ON_IDLE,
+            ON_MESSAGE,
+            ON_RECONNECT,
+            ON_SHUTDOWN,
+            ON_SONG_CHANGE,
+            ON_START,
+            ON_STATE_CHANGE,
+        },
         plugin::{
             LuaPlugin,
             LuaPluginSpec,
@@ -123,6 +131,8 @@ async fn load_single(
     let message = state.contains_key(ON_MESSAGE)?;
     let idle = state.contains_key(ON_IDLE)?;
     let shutdown = state.contains_key(ON_SHUTDOWN)?;
+    let start = state.contains_key(ON_START)?;
+    let reconnect = state.contains_key(ON_RECONNECT)?;
     let mut triggers = Triggers::empty();
     if song_change {
         triggers |= Triggers::SongChange;
@@ -138,6 +148,12 @@ async fn load_single(
     }
     if shutdown {
         triggers |= Triggers::Shutdown;
+    }
+    if start {
+        triggers |= Triggers::Start;
+    }
+    if reconnect {
+        triggers |= Triggers::Reconnect;
     }
 
     if triggers.is_empty() {
