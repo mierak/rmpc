@@ -45,6 +45,8 @@ use crate::{
     ui::{UiEvent, image::clear_area},
 };
 
+mod waveform;
+
 #[derive(Debug)]
 pub struct CavaPane {
     area: Rect,
@@ -190,10 +192,10 @@ impl CavaPane {
             let bar_spacing = cava_theme.bar_spacing;
             let bars = area.width / (bar_width + bar_spacing);
 
-            if bars == 0 {
+            if bars == 0 || area.height == 0 {
                 log::debug!(
-                    width = area.width, bar_width, bar_spacing;
-                    "Cava area is too narrow to fit a single bar, waiting for the next command"
+                    width = area.width, height = area.height, bar_width, bar_spacing;
+                    "Cava area cannot fit a bar, waiting for the next command"
                 );
                 continue 'outer;
             }
@@ -207,9 +209,9 @@ impl CavaPane {
 
             log::debug!(cava_theme:?; "theme");
 
-            let bar_height = match cava_theme.orientation {
-                Orientation::Top | Orientation::Bottom => area.height,
-                Orientation::Horizontal => area.height / 2,
+            let bar_height = match (cava_config.waveform, cava_theme.orientation) {
+                (false, Orientation::Horizontal) => area.height / 2,
+                _ => area.height,
             };
 
             let process = CavaProcess::new(bars, bar_height, cava_config.clone())?;
@@ -221,14 +223,29 @@ impl CavaPane {
                             log::warn!("Cava reader thread has finished, stopping cava loop");
                             break 'inner;
                         };
-                        Self::render_cava(
-                            writer,
-                            area,
-                            &columns,
-                            x_offset,
-                            &empty_bar_symbol,
-                            &cava_theme,
-                        )?;
+                        if cava_config.waveform {
+                            let mut writer = writer.lock();
+                            queue!(writer, BeginSynchronizedUpdate, SavePosition)?;
+                            waveform::render(
+                                &mut *writer,
+                                area,
+                                &columns,
+                                x_offset,
+                                &empty_bar_symbol,
+                                &cava_theme,
+                            )?;
+                            queue!(writer, RestorePosition, EndSynchronizedUpdate)?;
+                            writer.flush()?;
+                        } else {
+                            Self::render_cava(
+                                writer,
+                                area,
+                                &columns,
+                                x_offset,
+                                &empty_bar_symbol,
+                                &cava_theme,
+                            )?;
+                        }
                     }
                     recv(receiver) -> msg => {
                         match msg {
@@ -461,8 +478,12 @@ impl CavaProcess {
         std::thread::Builder::new()
             .name("cava-reader".to_string())
             .spawn(move || {
-                let mut columns = vec![0_f32; bars as usize];
-                let mut buf = vec![0_u8; 2 * bars as usize];
+                // Spectrum frames contain one u16 per bar.
+                // Waveform frames contain interleaved base/top u16 pairs,
+                // oldest audio first.
+                let values = bars as usize * if cava_config.waveform { 2 } else { 1 };
+                let mut columns = vec![0_f32; values];
+                let mut buf = vec![0_u8; 2 * values];
                 let mut process = match Self::spawn_cava(bars, &cava_config) {
                     Ok(p) => p,
                     Err(err) => {
