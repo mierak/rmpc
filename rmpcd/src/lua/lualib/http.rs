@@ -49,6 +49,10 @@ async fn do_call(lua: Lua, url: &str, opts: Option<RequestOpts>) -> mlua::Result
         client = client.body(body);
     }
 
+    if let Some(ms) = opts.timeout_ms {
+        client = client.timeout(std::time::Duration::from_millis(ms));
+    }
+
     let result = lua.create_table()?;
 
     trace!(?client, "Sending HTTP request");
@@ -131,6 +135,7 @@ struct RequestOpts {
     body: Option<String>,
     #[serde(default)]
     params: HashMap<String, String>,
+    timeout_ms: Option<u64>,
 }
 
 #[derive(Default, Debug, Serialize, Deserialize)]
@@ -139,6 +144,7 @@ struct GetOpts {
     headers: HashMap<String, String>,
     #[serde(default)]
     params: HashMap<String, String>,
+    timeout_ms: Option<u64>,
 }
 
 #[derive(Default, Debug, Serialize, Deserialize)]
@@ -148,11 +154,18 @@ struct PostOpts {
     body: Option<String>,
     #[serde(default)]
     params: HashMap<String, String>,
+    timeout_ms: Option<u64>,
 }
 
 impl From<GetOpts> for RequestOpts {
     fn from(value: GetOpts) -> Self {
-        Self { method: Method::Get, headers: value.headers, body: None, params: value.params }
+        Self {
+            method: Method::Get,
+            headers: value.headers,
+            body: None,
+            params: value.params,
+            timeout_ms: value.timeout_ms,
+        }
     }
 }
 
@@ -163,6 +176,7 @@ impl From<PostOpts> for RequestOpts {
             headers: value.headers,
             body: value.body,
             params: value.params,
+            timeout_ms: value.timeout_ms,
         }
     }
 }

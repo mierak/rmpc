@@ -8,15 +8,18 @@
 ---@field headers? table<string, string>
 ---@field body? string
 ---@field params? table<string, string>
+---@field timeout_ms? integer
 
 ---@class HttpGetOpts
 ---@field headers? table<string, string>
 ---@field params? table<string, string>
+---@field timeout_ms? integer
 
 ---@class HttpPostOpts
 ---@field headers? table<string, string>
 ---@field body? string
 ---@field params? table<string, string>
+---@field timeout_ms? integer
 
 ---@class HttpResponse
 ---@field code integer|nil

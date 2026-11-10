@@ -4,5 +4,6 @@ pub mod log;
 pub mod mpd;
 pub mod plugin;
 pub mod process;
+pub mod socket;
 pub mod sync;
 pub mod util;

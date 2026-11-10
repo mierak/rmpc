@@ -39,7 +39,7 @@ pub fn eject_inner(fs: &impl FileSystem, data_dir: &Path) -> Result<PathBuf> {
     let crate_version: Version = env!("CARGO_PKG_VERSION").parse()?;
     let manifest_path = data_dir.clone().join("manifest.json");
 
-    if fs.exists(&data_dir) {
+    if fs.exists(&manifest_path) {
         let manifest = fs.read_str(&manifest_path).with_context(|| {
             format!("Failed to read manifest file at '{}'", manifest_path.display())
         })?;
@@ -340,7 +340,7 @@ mod test {
 
         assert!(result.is_ok());
         assert_eq!(calls!(fs, "remove_file").len(), 1);
-        assert_eq!(calls!(fs, "write").len(), 15);
+        assert_eq!(calls!(fs, "write").len(), 16);
         for f in [
             "/home/user/.local/share/rmpcd/lua/rmpcd.lua",
             "/home/user/.local/share/rmpcd/lua/rmpcd/log.lua",
@@ -356,11 +356,25 @@ mod test {
             "/home/user/.local/share/rmpcd/lua/rmpcd/fs.lua",
             "/home/user/.local/share/rmpcd/lua/rmpcd/notify.lua",
             "/home/user/.local/share/rmpcd/lua/rmpcd/sync.lua",
+            "/home/user/.local/share/rmpcd/lua/rmpcd/socket.lua",
             "/home/user/.local/share/rmpcd/lua/manifest.json",
         ] {
             assert!(calls!(fs, "write").contains(&f.to_string()), "Expected write call for '{f}'");
         }
-        assert_eq!(calls!(fs, "create_dir_all").len(), 14);
+        assert_eq!(calls!(fs, "create_dir_all").len(), 15);
+    }
+
+    #[test]
+    fn ejects_when_dir_exists_but_manifest_is_missing() {
+        let fs = TestFs::default();
+        fs.stub_exists(false);
+
+        let result = eject_inner(&fs, Path::new(DATA_DIR));
+
+        assert!(result.is_ok(), "{result:?}");
+        assert_eq!(calls!(fs, "exists"), &vec![format!("{DATA_DIR}/manifest.json")]);
+        assert!(calls!(fs, "read_str").is_empty());
+        assert_eq!(calls!(fs, "write").len(), 16);
     }
 
     #[test]
@@ -372,7 +386,7 @@ mod test {
         let result = eject_inner(&fs, Path::new(DATA_DIR));
 
         assert!(result.is_ok());
-        assert_eq!(calls!(fs, "write").len(), 15);
+        assert_eq!(calls!(fs, "write").len(), 16);
         for f in [
             "/home/user/.local/share/rmpcd/lua/rmpcd.lua",
             "/home/user/.local/share/rmpcd/lua/rmpcd/log.lua",
@@ -388,12 +402,13 @@ mod test {
             "/home/user/.local/share/rmpcd/lua/rmpcd/fs.lua",
             "/home/user/.local/share/rmpcd/lua/rmpcd/notify.lua",
             "/home/user/.local/share/rmpcd/lua/rmpcd/sync.lua",
+            "/home/user/.local/share/rmpcd/lua/rmpcd/socket.lua",
             "/home/user/.local/share/rmpcd/lua/manifest.json",
         ] {
             assert!(calls!(fs, "write").contains(&f.to_string()), "Expected write call for '{f}'");
         }
 
-        assert_eq!(calls!(fs, "create_dir_all").len(), 14);
+        assert_eq!(calls!(fs, "create_dir_all").len(), 15);
     }
 
     #[test]
@@ -416,7 +431,7 @@ mod test {
         .unwrap();
         assert_eq!(m.rmpcd_version, crate_version);
         assert_eq!(m.hash, hash);
-        assert_eq!(m.files.len(), 14);
+        assert_eq!(m.files.len(), 15);
         for f in [
             "rmpcd.lua",
             "rmpcd/log.lua",
@@ -432,6 +447,7 @@ mod test {
             "rmpcd/fs.lua",
             "rmpcd/notify.lua",
             "rmpcd/sync.lua",
+            "rmpcd/socket.lua",
         ] {
             assert!(m.files.contains(&PathBuf::from(f)), "Expected manifest to contain file '{f}'");
         }

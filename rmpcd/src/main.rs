@@ -160,7 +160,10 @@ fn run_init() -> Result<()> {
     match lua::type_def_eject::eject() {
         Ok(path) => {
             let value = &json!({
-                "workspace.library": [path.display().to_string()]
+                "workspace.library": [
+                    path.display().to_string(),
+                    Paths::plugins_dir().display().to_string(),
+                ]
             });
             let buf = Vec::new();
             let formatter = serde_json::ser::PrettyFormatter::with_indent(b"    ");

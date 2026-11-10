@@ -6,6 +6,8 @@
 ---@field which fun(prog: string): boolean
 ---@field nil_or_null fun(value: any): boolean
 ---@field deserialize_ron fun(value: number[]): (any | nil, string | nil)
+---@field json_encode fun(value: any): (string | nil, string | nil)
+---@field json_decode fun(text: string): (any | nil, string | nil)
 
 ---@type Util
 ---@diagnostic disable-next-line: lowercase-global

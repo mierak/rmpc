@@ -46,7 +46,31 @@ pub fn create(lua: &Lua) -> mlua::Result<Table> {
         (val, Value::Nil).into_lua_multi(lua)
     })?;
 
+    let json_encode = lua.create_function(|lua, val: Value| {
+        let json = match lua.from_value::<serde_json::Value>(val) {
+            Ok(json) => json,
+            Err(err) => return (Value::Nil, err.to_string()).into_lua_multi(lua),
+        };
+        match serde_json::to_string(&json) {
+            Ok(text) => (text, Value::Nil).into_lua_multi(lua),
+            Err(err) => (Value::Nil, err.to_string()).into_lua_multi(lua),
+        }
+    })?;
+
+    let json_decode = lua.create_function(|lua, text: String| {
+        let json = match serde_json::from_str::<serde_json::Value>(&text) {
+            Ok(json) => json,
+            Err(err) => return (Value::Nil, err.to_string()).into_lua_multi(lua),
+        };
+        match lua.to_value(&json) {
+            Ok(val) => (val, Value::Nil).into_lua_multi(lua),
+            Err(err) => (Value::Nil, err.to_string()).into_lua_multi(lua),
+        }
+    })?;
+
     tbl.set("dump_table", dump_table)?;
+    tbl.set("json_encode", json_encode)?;
+    tbl.set("json_decode", json_decode)?;
     tbl.set("md5", md5)?;
     tbl.set("which", which)?;
     tbl.set("nil_or_null", nil_or_null)?;
