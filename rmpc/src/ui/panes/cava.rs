@@ -399,9 +399,12 @@ impl Pane for CavaPane {
                 }
                 self.is_modal_open = true;
             }
-            UiEvent::ModalClosed if is_visible && matches!(ctx.status.state, State::Play) => {
+            UiEvent::ModalClosed if is_visible => {
+                // Reset even when not playing, a stuck flag makes resize() a no-op forever
                 self.is_modal_open = false;
-                self.run(ctx)?;
+                if matches!(ctx.status.state, State::Play) {
+                    self.run(ctx)?;
+                }
             }
             UiEvent::PlaybackStateChanged if is_visible => match ctx.status.state {
                 State::Play => {
@@ -632,5 +635,24 @@ impl CavaProcess {
                 }
             }
         }
+    }
+}
+
+#[cfg(test)]
+#[allow(clippy::unwrap_used, clippy::needless_pass_by_value)]
+mod tests {
+    use rstest::rstest;
+
+    use super::*;
+    use crate::tests::fixtures::ctx;
+
+    #[rstest]
+    fn modal_closed_while_paused_resets_modal_flag(ctx: Ctx) {
+        let mut pane = CavaPane::new(&ctx);
+        pane.is_modal_open = true;
+
+        pane.on_event(&mut UiEvent::ModalClosed, true, &ctx).unwrap();
+
+        assert!(!pane.is_modal_open);
     }
 }

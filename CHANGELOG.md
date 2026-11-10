@@ -67,6 +67,7 @@ All notable changes to this project will be documented in this file.
 
 ### Fixed
 
+- Cava not following terminal resizes after a modal was closed while playback was paused or stopped
 - Album art and other background work no longer waits for lyrics indexing to finish on startup
 - Tag browser items whose songs were not loaded yet being skipped when added to the queue, MPD
   now adds them itself
