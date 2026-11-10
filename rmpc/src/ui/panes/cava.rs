@@ -334,8 +334,6 @@ impl CavaPane {
 impl Pane for CavaPane {
     fn render(&mut self, frame: &mut Frame, area: Rect, ctx: &Ctx) -> anyhow::Result<()> {
         if area != self.area {
-            // Terminal resized: stop drawing over the old area right away, resize()
-            // restarts cava at the new one once the resize debounce fires
             self.command(CavaCommand::Pause)?;
         }
         self.area = area;
@@ -405,7 +403,6 @@ impl Pane for CavaPane {
                 self.is_modal_open = true;
             }
             UiEvent::ModalClosed if is_visible => {
-                // Reset even when not playing, a stuck flag makes resize() a no-op forever
                 self.is_modal_open = false;
                 if matches!(ctx.status.state, State::Play) {
                     self.run(ctx)?;
@@ -668,7 +665,6 @@ mod tests {
         pane.area = Rect::new(0, 0, 10, 5);
         let receiver = pane.command_channel.1.clone();
         let (got_tx, got_rx) = crossbeam::channel::unbounded();
-        // stand-in for the cava thread, records the first command it gets
         pane.handle = Some(std::thread::spawn(move || {
             got_tx.send(format!("{:?}", receiver.recv()?)).ok();
             Ok(())
