@@ -41,7 +41,10 @@ pub fn create(lua: &Lua) -> mlua::Result<Table> {
         },
     )?;
 
+    let pid = lua.create_function(|_, ()| Ok(std::process::id()))?;
+
     tbl.raw_set("spawn", spawn_process)?;
+    tbl.raw_set("pid", pid)?;
 
     Ok(tbl)
 }

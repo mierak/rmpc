@@ -113,6 +113,12 @@ pub fn create(lua: &Lua) -> mlua::Result<Table> {
             })
         })?;
 
+    let sleep = lua.create_async_function(async |_, ms: u64| {
+        tokio::time::sleep(tokio::time::Duration::from_millis(ms)).await;
+        Ok(())
+    })?;
+
+    tbl.raw_set("sleep", sleep)?;
     tbl.raw_set("set_timeout", set_timeout)?;
     tbl.raw_set("set_interval", interval)?;
     tbl.raw_set("debounce", debounce)?;

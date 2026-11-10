@@ -88,6 +88,7 @@ pub fn install_lib(
     install_lib!(http);
     install_lib!(fs);
     install_lib!(util);
+    install_lib!(socket);
 
     Ok(())
 }
