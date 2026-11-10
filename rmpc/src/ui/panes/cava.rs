@@ -333,6 +333,9 @@ impl CavaPane {
 
 impl Pane for CavaPane {
     fn render(&mut self, frame: &mut Frame, area: Rect, ctx: &Ctx) -> anyhow::Result<()> {
+        if area != self.area {
+            self.command(CavaCommand::Pause)?;
+        }
         self.area = area;
         frame.render_widget(
             Block::default()
@@ -399,9 +402,11 @@ impl Pane for CavaPane {
                 }
                 self.is_modal_open = true;
             }
-            UiEvent::ModalClosed if is_visible && matches!(ctx.status.state, State::Play) => {
+            UiEvent::ModalClosed if is_visible => {
                 self.is_modal_open = false;
-                self.run(ctx)?;
+                if matches!(ctx.status.state, State::Play) {
+                    self.run(ctx)?;
+                }
             }
             UiEvent::PlaybackStateChanged if is_visible => match ctx.status.state {
                 State::Play => {
@@ -632,5 +637,41 @@ impl CavaProcess {
                 }
             }
         }
+    }
+}
+
+#[cfg(test)]
+#[allow(clippy::unwrap_used, clippy::needless_pass_by_value)]
+mod tests {
+    use ratatui::{Terminal, backend::TestBackend};
+    use rstest::rstest;
+
+    use super::*;
+    use crate::tests::fixtures::{ctx, terminal};
+
+    #[rstest]
+    fn modal_closed_while_paused_resets_modal_flag(ctx: Ctx) {
+        let mut pane = CavaPane::new(&ctx);
+        pane.is_modal_open = true;
+
+        pane.on_event(&mut UiEvent::ModalClosed, true, &ctx).unwrap();
+
+        assert!(!pane.is_modal_open);
+    }
+
+    #[rstest]
+    fn render_with_new_area_pauses_cava(mut terminal: Terminal<TestBackend>, ctx: Ctx) {
+        let mut pane = CavaPane::new(&ctx);
+        pane.area = Rect::new(0, 0, 10, 5);
+        let receiver = pane.command_channel.1.clone();
+        let (got_tx, got_rx) = crossbeam::channel::unbounded();
+        pane.handle = Some(std::thread::spawn(move || {
+            got_tx.send(format!("{:?}", receiver.recv()?)).ok();
+            Ok(())
+        }));
+
+        terminal.draw(|frame| pane.render(frame, Rect::new(0, 0, 8, 5), &ctx).unwrap()).unwrap();
+
+        assert_eq!(got_rx.recv().unwrap(), "Pause");
     }
 }

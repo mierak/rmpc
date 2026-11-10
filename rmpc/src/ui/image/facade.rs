@@ -254,6 +254,13 @@ impl AlbumArtFacade {
         }
     }
 
+    pub fn hide_if_moved(&mut self, area: Rect, ctx: &Ctx) -> Result<()> {
+        if self.is_showing && area != self.last_size {
+            self.hide(ctx)?;
+        }
+        Ok(())
+    }
+
     pub fn set_size(&mut self, area: Rect) {
         self.last_size = area;
     }

@@ -26,7 +26,8 @@ impl AlbumArtPane {
 }
 
 impl Pane for AlbumArtPane {
-    fn render(&mut self, _frame: &mut Frame, area: Rect, _ctx: &Ctx) -> Result<()> {
+    fn render(&mut self, _frame: &mut Frame, area: Rect, ctx: &Ctx) -> Result<()> {
+        self.album_art.hide_if_moved(area, ctx)?;
         self.album_art.set_size(area);
         Ok(())
     }
