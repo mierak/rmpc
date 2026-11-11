@@ -251,7 +251,7 @@ local function should_scrobble(song_start, current_time, song)
     return false
 end
 
-local DEFAULT_SESSION_KEY_PATH = "/tmp/rmpcd-lastfm-session-key"
+local DEFAULT_SESSION_KEY_PATH = os.getenv("HOME") .. "/.local/share/rmpcd/lastfm-session-key"
 
 
 ---@param path string
