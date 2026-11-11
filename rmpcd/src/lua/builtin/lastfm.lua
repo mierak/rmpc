@@ -253,17 +253,6 @@ end
 
 local DEFAULT_SESSION_KEY_PATH = "/tmp/rmpcd-lastfm-session-key"
 
----@param path string
----@return string
-local function expand_home(path)
-    if path == "~" or path:sub(1, 2) == "~/" then
-        local home = os.getenv("HOME")
-        if home ~= nil and home ~= "" then
-            return home .. path:sub(2)
-        end
-    end
-    return path
-end
 
 ---@param path string
 ---@param session_key string
@@ -288,7 +277,7 @@ M.setup = function(self, args)
     self.shared_secret = args.shared_secret
     self.update_now_playing = args.update_now_playing == true
     self.enabled = args.enabled == nil or args.enabled
-    self.session_key_path = expand_home(args.session_key_path or DEFAULT_SESSION_KEY_PATH)
+    self.session_key_path = args.session_key_path or DEFAULT_SESSION_KEY_PATH
 
     local xdg_open = util.which("xdg-open")
     if not xdg_open then
