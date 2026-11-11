@@ -6,7 +6,7 @@
 ---@field shared_secret string For now you are required to create your own LastFM secret because of their insane API design https://www.last.fm/api/account/create
 ---@field update_now_playing? boolean Whether to update the now playing status on song change
 ---@field enabled? boolean Whether to enable scrobbling on startup
----@field session_key_path? string Where to cache the Last.fm session key. Defaults to "/tmp/rmpcd-lastfm-session-key"
+---@field session_key_path? string Where to cache the Last.fm session key. Defaults to "$HOME/.local/share/rmpcd/lastfm-session-key"
 
 ---@class LastFmPlugin: RmpcdPlugin<LastFmArgs>
 ---@field enabled boolean
