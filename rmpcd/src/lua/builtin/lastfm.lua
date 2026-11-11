@@ -251,11 +251,44 @@ local function should_scrobble(song_start, current_time, song)
     return false
 end
 
+local DEFAULT_SESSION_KEY_PATH = "/tmp/rmpcd-lastfm-session-key"
+
+---@param path string
+---@return string
+local function expand_home(path)
+    if path == "~" or path:sub(1, 2) == "~/" then
+        local home = os.getenv("HOME")
+        if home ~= nil and home ~= "" then
+            return home .. path:sub(2)
+        end
+    end
+    return path
+end
+
+---@param path string
+---@param session_key string
+local function write_session_key(path, session_key)
+    local parent = path:match("^(.*)/[^/]*$")
+    if parent ~= nil and parent ~= "" then
+        local _, dir_err = fs.create_dir_all(parent)
+        if dir_err ~= nil then
+            log.error("Failed to create directory for Last.fm session key: " .. dir_err)
+            return
+        end
+    end
+
+    local _, sk_write_err = fs.write_str(path, session_key)
+    if sk_write_err ~= nil then
+        log.error("Failed to write Last.fm session key to file: " .. sk_write_err)
+    end
+end
+
 M.setup = function(self, args)
     self.api_key = args.api_key
     self.shared_secret = args.shared_secret
     self.update_now_playing = args.update_now_playing == true
     self.enabled = args.enabled == nil or args.enabled
+    self.session_key_path = expand_home(args.session_key_path or DEFAULT_SESSION_KEY_PATH)
 
     local xdg_open = util.which("xdg-open")
     if not xdg_open then
@@ -265,13 +298,16 @@ M.setup = function(self, args)
 
     self.scrobble_queue = Deque.new()
 
-    local cached_session_key, err = fs.read_str("/tmp/rmpcd-lastfm-session-key")
+    local cached_session_key, err = fs.read_str(self.session_key_path)
     if cached_session_key ~= nil and err == nil then
-        log.info("Using cached Last.fm session key")
+        cached_session_key = cached_session_key:match("^%s*(.-)%s*$")
+    end
+    if cached_session_key ~= nil and cached_session_key ~= "" and err == nil then
+        log.info("Using cached Last.fm session key from " .. self.session_key_path)
         self.session_key = cached_session_key
         return
     else
-        log.info("No cached Last.fm session key found, starting auth flow")
+        log.info("No cached Last.fm session key found at " .. self.session_key_path .. ", starting auth flow")
     end
 
     local response = http.get("https://ws.audioscrobbler.com/2.0", {
@@ -292,17 +328,16 @@ M.setup = function(self, args)
     process.spawn({ "xdg-open", "https://www.last.fm/api/auth/?api_key=" .. args.api_key .. "&token=" .. token })
 
     local session_key = get_session_key(args.api_key, args.shared_secret, token)
-    if session_key == nil then
+    if session_key ~= nil then
+        write_session_key(self.session_key_path, session_key)
+        self.session_key = session_key
+    else
         sync.set_interval(5000, function(handle)
             session_key = get_session_key(args.api_key, args.shared_secret, token)
 
             if session_key ~= nil then
                 handle.cancel()
-                local _, sk_write_err = fs.write_str("/tmp/rmpcd-lastfm-session-key", session_key)
-                if sk_write_err ~= nil then
-                    log.error("Failed to write Last.fm session key to file: " .. sk_write_err)
-                end
-
+                write_session_key(self.session_key_path, session_key)
                 self.session_key = session_key
             end
         end)

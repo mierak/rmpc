@@ -31,6 +31,8 @@ local config = {
 -- 	api_key = "<your api key>",
 -- 	shared_secret = "<your shared secret key>",
 -- 	update_now_playing = false,
+-- 	-- Where to cache the Last.fm session key (default: /tmp/rmpcd-lastfm-session-key)
+-- 	session_key_path = "~/.cache/rmpcd/lastfm-session-key",
 -- })
 
 -- Install notification on song change builtin
