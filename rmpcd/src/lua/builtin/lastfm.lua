@@ -253,7 +253,6 @@ end
 
 local DEFAULT_SESSION_KEY_PATH = os.getenv("HOME") .. "/.local/share/rmpcd/lastfm-session-key"
 
-
 ---@param path string
 ---@param session_key string
 local function write_session_key(path, session_key)
@@ -314,6 +313,7 @@ M.setup = function(self, args)
 
     local token = response:json().token
 
+    log.info("Opening browser, please authorize the application")
     process.spawn({ "xdg-open", "https://www.last.fm/api/auth/?api_key=" .. args.api_key .. "&token=" .. token })
 
     local session_key = get_session_key(args.api_key, args.shared_secret, token)
