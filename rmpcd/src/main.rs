@@ -270,7 +270,13 @@ async fn run() -> Result<()> {
     }));
 
     let enable_mpris = lua_config.get::<Option<bool>>("mpris")?.unwrap_or(false);
-    let tx = if enable_mpris { Some(mpris::setup(mpd.clone(), ctx.clone()).await?) } else { None };
+    let tx = if enable_mpris {
+        let instance = lua_config.get::<Option<String>>("mpris_instance")?;
+        let identity = lua_config.get::<Option<String>>("mpris_identity")?;
+        Some(mpris::setup(mpd.clone(), ctx.clone(), instance, identity).await?)
+    } else {
+        None
+    };
 
     let inhibit_idle = lua_config.get::<Option<bool>>("inhibit_idle")?.unwrap_or(false);
     let inhibitor = if inhibit_idle {
