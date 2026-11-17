@@ -3,8 +3,8 @@ local M = {
     enabled = true,
 }
 
-M.setup = function(_self, args)
-    _self.enabled = (args.enabled ~= nil) and args.enabled or true
+M.setup = function(self, args)
+    self.enabled = args.enabled == nil or args.enabled
 end
 
 M.subscribed_channels = { "rmpcd.playcount" }
@@ -21,8 +21,8 @@ M.message = function(self, _channel, message)
     end
 end
 
-M.song_change = function(_self, _old_song, new_song)
-    if not _self.enabled then
+M.song_change = function(self, _old_song, new_song)
+    if not self.enabled then
         return
     end
 
@@ -37,8 +37,10 @@ M.song_change = function(_self, _old_song, new_song)
     end
 
     if sticker == nil then
+        log.debug("No playcount sticker found for '" .. new_song.file .. "', initializing to 1")
         mpd.set_song_sticker(new_song.file, "playCount", "1")
     else
+        log.debug("Playcount sticker for '" .. new_song.file .. "' is " .. sticker .. ", incrementing by 1")
         local count = tonumber(sticker) or 0
         mpd.set_song_sticker(new_song.file, "playCount", tostring(count + 1))
     end
