@@ -35,7 +35,6 @@ bitflags = { version = "2.10.0", features = ["serde"] }
 bon = "3.8.2"
 chrono = { version = "0.4.43", features = ["serde"] }
 color_quant = "1.1.0"
-console-subscriber = "0.5"
 crossbeam = "0.8.4"
 crossterm = { version = "0.29.0", features = ["serde", "osc52"] }
 ctrlc = { version = "3.5.2" }
@@ -90,6 +89,7 @@ match_single_binding = "allow"
 missing_errors_doc = "allow"
 module_name_repetitions = "allow"
 must_use_candidate = "allow"
+needless_range_loop = "allow"
 needless_return = "allow"
 redundant_closure_for_method_calls = "allow"
 return_self_not_must_use = "allow"

@@ -184,7 +184,7 @@ mod test {
 
         let result = stack.walk_dir(["nonexistent"].into()).collect_vec();
 
-        assert!(result.is_empty());
+        assert_eq!(result, vec![] as Vec<&DirOrSong>);
     }
 
     #[test]
@@ -220,7 +220,7 @@ mod test {
 
         let result = stack.walk_current().collect_vec();
 
-        assert!(result.is_empty());
+        assert_eq!(result, vec![] as Vec<&DirOrSong>);
     }
 
     #[test]
@@ -233,7 +233,7 @@ mod test {
 
         let result = stack.walk_current().collect_vec();
 
-        assert!(result.is_empty());
+        assert_eq!(result, vec![] as Vec<&DirOrSong>);
     }
 
     #[test]
@@ -250,7 +250,7 @@ mod test {
 
         let result = stack.walk_current().collect_vec();
 
-        assert!(result.is_empty());
+        assert_eq!(result, vec![] as Vec<&DirOrSong>);
     }
 
     #[test]
@@ -309,7 +309,7 @@ mod test {
         let result =
             stack.current().selected().unwrap().walk(&stack, stack.path().to_owned()).collect_vec();
 
-        assert!(result.is_empty());
+        assert_eq!(result, vec![] as Vec<&DirOrSong>);
     }
 
     #[test]
