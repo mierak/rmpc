@@ -6,7 +6,7 @@ body:
     id: description
     attributes:
       label: Description
-      description: Describe the feature you would like to be added to rmpc. 
+      description: Describe the feature you would like to be added to rmpc.
     validations:
       required: true
 

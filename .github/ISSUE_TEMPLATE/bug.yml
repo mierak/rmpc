@@ -81,3 +81,19 @@ body:
     validations:
       required: false
 
+  - type: textarea
+    id: ai-usage
+    attributes:
+      label: AI usage
+      description: >-
+        State if you used any AI while making this report, state which tool
+        and to what extent you used it. See the [contributing
+        guide](https://github.com/mierak/rmpc/blob/master/CONTRIBUTING.md#ai-usage).
+      placeholder: |
+        Examples: (write the text yourself, these are only examples)
+        - I did not use any AI
+        - I used Opus 5.5 to consult and to review my changes
+        - I used Fable 5.2 to generate `<part of the diff>` and reviewed it myself
+        - I used GPT 6 Astra to generate the whole change, I then read the code and validated it myself
+    validations:
+      required: true
