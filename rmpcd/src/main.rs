@@ -72,6 +72,9 @@ enum PkgCommand {
         #[arg(long, short = 'v')]
         verbose: bool,
     },
+    /// Remove remote plugins that are present on disk but no longer specified
+    /// in the config file
+    Clean,
 }
 
 fn init_logging(level: &str, log_to_stderr: bool) -> Result<(WorkerGuard, Option<WorkerGuard>)> {
@@ -127,7 +130,7 @@ async fn main() -> Result<()> {
     let _lock = match &args.command {
         Some(Command::Pkg { command }) => match command {
             PkgCommand::List { .. } => None,
-            PkgCommand::Upgrade => Some(instance_lock::acquire()),
+            PkgCommand::Upgrade | PkgCommand::Clean => Some(instance_lock::acquire()),
         },
         _ => Some(instance_lock::acquire()),
     };

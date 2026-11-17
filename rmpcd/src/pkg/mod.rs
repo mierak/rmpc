@@ -2,11 +2,13 @@ use std::{
     collections::{HashMap, HashSet},
     io::Write,
     path::{Path, PathBuf},
+    sync::Arc,
 };
 
 use anyhow::{Context, Result, bail};
 use bon::Builder;
 use sha2::{Digest, Sha256};
+use tokio::sync::RwLock;
 
 use crate::{
     PkgCommand,
@@ -27,49 +29,50 @@ pub use manifest::Manifest;
 
 pub async fn run_pkg(command: PkgCommand) -> Result<()> {
     let log_to_stderr = match command {
-        PkgCommand::Upgrade => true,
+        PkgCommand::Upgrade | PkgCommand::Clean => true,
         PkgCommand::List { verbose } => verbose,
     };
 
     let _log_guards = init_logging("info", log_to_stderr)?;
     let (_, _, plugins_spec) = eval_config(None).await?;
+    let specs = remote_specs(&plugins_spec).await;
 
     match command {
         PkgCommand::Upgrade => {
             let mut lockfile = Lockfile::read_or_default().await?;
-            let mut specs = HashMap::new();
-
-            for spec in plugins_spec.read().await.iter() {
-                match &*spec.read().await {
-                    LuaPluginSpec::Builtin(_) => {}
-                    LuaPluginSpec::Local(_) => {}
-                    LuaPluginSpec::Remote(spec) => {
-                        specs.insert(normalize_url(&spec.url).to_string(), spec.clone());
-                    }
-                }
-            }
-
-            run_upgrade(specs.into_values().collect(), &mut lockfile).await?;
+            run_upgrade(specs, &mut lockfile).await?;
             lockfile.write().await?;
             Ok(())
         }
-        PkgCommand::List { verbose: _ } => {
-            let mut specs = HashMap::new();
-            let lockfile = Lockfile::read_or_default().await?;
+        PkgCommand::Clean => {
+            let in_spec: HashSet<String> =
+                specs.iter().map(|spec| url_to_dir_name(&spec.url)).collect();
 
-            for spec in plugins_spec.read().await.iter() {
-                match &*spec.read().await {
-                    LuaPluginSpec::Builtin(_) => {}
-                    LuaPluginSpec::Local(_) => {}
-                    LuaPluginSpec::Remote(spec) => {
-                        specs.insert(normalize_url(&spec.url).to_string(), spec.clone());
-                    }
-                }
+            let mut lockfile = Lockfile::read_or_default().await?;
+
+            let plugins_dir = Paths::plugins_dir();
+            let leftovers = remove_leftovers(plugins_dir, &in_spec).await?;
+            if leftovers.removed.is_empty() && leftovers.failed.is_empty() {
+                tracing::info!("No leftover plugins to remove");
             }
 
+            lockfile.retain(|name, _| in_spec.contains(name) || leftovers.failed.contains(name));
+            lockfile.write().await?;
+
+            if !leftovers.failed.is_empty() {
+                bail!("Failed to remove leftover plugins: {}", leftovers.failed.join(", "));
+            }
+
+            Ok(())
+        }
+        PkgCommand::List { verbose: _ } => {
+            let lockfile = Lockfile::read_or_default().await?;
+            let in_spec: HashSet<String> =
+                specs.iter().map(|spec| url_to_dir_name(&spec.url)).collect();
+            let leftovers = find_leftovers(Paths::plugins_dir(), &in_spec).await?;
             let mut result = Vec::new();
 
-            for spec in specs.into_values() {
+            for spec in specs {
                 let plugin_name: String = url_to_dir_name(&spec.url);
 
                 let target_dir = Paths::plugins_dir().join(&plugin_name);
@@ -93,23 +96,8 @@ pub async fn run_pkg(command: PkgCommand) -> Result<()> {
                 );
             }
 
-            let in_spec: HashSet<String> = result.iter().map(|r| r.name.clone()).collect();
-            let mut entries = tokio::fs::read_dir(Paths::plugins_dir())
-                .await
-                .context("Failed to read plugins directory")?;
-
-            while let Some(entry) = entries.next_entry().await? {
-                if !entry.file_type().await?.is_dir() {
-                    continue;
-                }
-
-                let name = entry.file_name().to_string_lossy().into_owned();
-                if in_spec.contains(&name) {
-                    continue;
-                }
-
-                let target_dir = entry.path();
-                let manifest = Manifest::read(&target_dir).await.ok();
+            for LeftoverDir { name, path } in leftovers {
+                let manifest = Manifest::read(&path).await.ok();
 
                 let url = lockfile.get(&name).map_or("", |entry| &entry.url);
                 result.push(
@@ -118,7 +106,7 @@ pub async fn run_pkg(command: PkgCommand) -> Result<()> {
                         .on_disk(true)
                         .in_spec(false)
                         .name(name)
-                        .target_dir(target_dir)
+                        .target_dir(path)
                         .url(url.to_owned())
                         .build(),
                 );
@@ -132,6 +120,100 @@ pub async fn run_pkg(command: PkgCommand) -> Result<()> {
             }
         }
     }
+}
+
+async fn remote_specs(
+    plugins_spec: &RwLock<Vec<Arc<RwLock<LuaPluginSpec>>>>,
+) -> Vec<RemotePluginSpec> {
+    let mut specs = HashMap::new();
+
+    for spec in plugins_spec.read().await.iter() {
+        if let LuaPluginSpec::Remote(spec) = &*spec.read().await {
+            specs.insert(normalize_url(&spec.url).to_string(), spec.clone());
+        }
+    }
+
+    specs.into_values().collect()
+}
+
+#[derive(Debug, Default)]
+struct Leftovers {
+    removed: Vec<String>,
+    failed: Vec<String>,
+}
+
+#[derive(Debug)]
+struct LeftoverDir {
+    name: String,
+    path: PathBuf,
+}
+
+async fn find_leftovers(plugins_dir: &Path, in_spec: &HashSet<String>) -> Result<Vec<LeftoverDir>> {
+    let mut entries =
+        tokio::fs::read_dir(plugins_dir).await.context("Failed to read plugins directory")?;
+    let mut result = Vec::new();
+
+    while let Some(entry) =
+        entries.next_entry().await.context("Failed to read plugins directory")?
+    {
+        let path = entry.path();
+        let file_type = entry
+            .file_type()
+            .await
+            .with_context(|| format!("Failed to get file type of '{}'", path.display()))?;
+        if !file_type.is_dir() {
+            continue;
+        }
+
+        let name = entry.file_name().to_string_lossy().into_owned();
+        if in_spec.contains(&name) {
+            continue;
+        }
+
+        result.push(LeftoverDir { name, path });
+    }
+
+    Ok(result)
+}
+
+async fn remove_leftovers(plugins_dir: &Path, in_spec: &HashSet<String>) -> Result<Leftovers> {
+    let leftovers = find_leftovers(plugins_dir, in_spec).await?;
+    let mut result = Leftovers::default();
+
+    for LeftoverDir { name, path } in leftovers {
+        match remove_plugin_dir(plugins_dir, &path).await {
+            Ok(()) => {
+                tracing::info!(plugin = name, "Removed leftover plugin");
+                result.removed.push(name);
+            }
+            Err(err) => {
+                tracing::error!(plugin = name, "Failed to remove leftover plugin: {err:#}");
+                result.failed.push(name);
+            }
+        }
+    }
+
+    Ok(result)
+}
+
+async fn remove_plugin_dir(plugins_dir: &Path, dir: &Path) -> Result<()> {
+    let plugins_dir = tokio::fs::canonicalize(plugins_dir).await.with_context(|| {
+        format!("Failed to canonicalize plugins directory '{}'", plugins_dir.display())
+    })?;
+    let canonicalized = tokio::fs::canonicalize(dir)
+        .await
+        .with_context(|| format!("Failed to canonicalize plugin directory '{}'", dir.display()))?;
+
+    if canonicalized.parent() != Some(plugins_dir.as_path()) {
+        bail!(
+            "Refusing to remove plugin directory '{}', it is not a subdirectory of the plugins directory",
+            canonicalized.display()
+        );
+    }
+
+    tokio::fs::remove_dir_all(&canonicalized)
+        .await
+        .with_context(|| format!("Failed to remove plugin directory '{}'", canonicalized.display()))
 }
 
 #[rustfmt::skip]
@@ -227,28 +309,11 @@ pub async fn run_inner(
 
     let result = resolve_and_read(&target_dir, &plugin_name, spec, lockfile, resolution).await;
 
-    if result.is_err() && freshly_cloned {
-        match target_dir.canonicalize() {
-            Ok(canonicalized) => {
-                if !canonicalized.starts_with(Paths::plugins_dir()) {
-                    tracing::error!(
-                        "Refusing to remove cloned plugin directory '{}', it is not a subdirectory of the plugins directory",
-                        canonicalized.display()
-                    );
-                } else if let Err(err) = tokio::fs::remove_dir_all(&canonicalized).await {
-                    tracing::error!(
-                        "Failed to remove cloned plugin directory '{}': {err}",
-                        canonicalized.display()
-                    );
-                }
-            }
-            Err(err) => {
-                tracing::error!(
-                    "Failed to canonicalize cloned plugin directory '{}': {err}",
-                    target_dir.display()
-                );
-            }
-        }
+    if result.is_err()
+        && freshly_cloned
+        && let Err(err) = remove_plugin_dir(Paths::plugins_dir(), &target_dir).await
+    {
+        tracing::error!("Failed to clean up freshly cloned plugin: {err:#}");
     }
 
     result
@@ -275,29 +340,9 @@ async fn ensure_cloned(target_dir: &Path, spec: &RemotePluginSpec) -> Result<boo
             target_dir.display()
         );
 
-        match target_dir.canonicalize() {
-            Ok(canonicalized) => {
-                if canonicalized.starts_with(Paths::plugins_dir()) {
-                    tokio::fs::remove_dir_all(canonicalized).await.with_context(|| {
-                        format!(
-                            "Failed to remove stale plugin directory: '{}'",
-                            target_dir.display()
-                        )
-                    })?;
-                } else {
-                    bail!(
-                        "Refusing to remove cloned plugin directory '{}', it is not a subdirectory of the plugins directory",
-                        canonicalized.display()
-                    );
-                }
-            }
-            Err(err) => {
-                bail!(
-                    "Failed to canonicalize cloned plugin directory '{}': {err}",
-                    target_dir.display()
-                );
-            }
-        }
+        remove_plugin_dir(Paths::plugins_dir(), target_dir)
+            .await
+            .context("Failed to remove stale plugin directory")?;
     }
 
     tracing::debug!(url = spec.url, "Cloning plugin");
