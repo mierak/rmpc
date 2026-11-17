@@ -1109,7 +1109,7 @@ mod tests {
 
             pane.process_grouped_list(MpdGroupedList(vec![]), &ctx);
 
-            assert!(pane.stack.current().items.is_empty());
+            assert_eq!(pane.stack.current().items, []);
         }
 
         #[rstest]

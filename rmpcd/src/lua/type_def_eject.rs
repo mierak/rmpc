@@ -303,9 +303,9 @@ mod test {
         let result = eject_inner(&fs, Path::new(DATA_DIR));
 
         assert!(result.is_ok());
-        assert!(calls!(fs, "remove_file").is_empty());
-        assert!(calls!(fs, "write").is_empty());
-        assert!(calls!(fs, "create_dir_all").is_empty());
+        assert_eq!(calls!(fs, "remove_file").as_slice(), &[] as &[&str]);
+        assert_eq!(calls!(fs, "write").as_slice(), &[] as &[&str]);
+        assert_eq!(calls!(fs, "create_dir_all").as_slice(), &[] as &[&str]);
     }
 
     #[test]
@@ -321,9 +321,9 @@ mod test {
         let result = eject_inner(&fs, Path::new(DATA_DIR));
 
         assert!(result.is_ok());
-        assert!(calls!(fs, "remove_file").is_empty());
-        assert!(calls!(fs, "write").is_empty());
-        assert!(calls!(fs, "create_dir_all").is_empty());
+        assert_eq!(calls!(fs, "remove_file").as_slice(), &[] as &[&str]);
+        assert_eq!(calls!(fs, "write").as_slice(), &[] as &[&str]);
+        assert_eq!(calls!(fs, "create_dir_all").as_slice(), &[] as &[&str]);
     }
 
     #[test]
@@ -373,7 +373,7 @@ mod test {
 
         assert!(result.is_ok(), "{result:?}");
         assert_eq!(calls!(fs, "exists"), &vec![format!("{DATA_DIR}/manifest.json")]);
-        assert!(calls!(fs, "read_str").is_empty());
+        assert_eq!(calls!(fs, "read_str").as_slice(), &[] as &[&str]);
         assert_eq!(calls!(fs, "write").len(), 16);
     }
 

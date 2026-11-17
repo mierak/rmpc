@@ -48,10 +48,10 @@ jobs:
           components: rust-src
 
       - name: Build
-        run: cargo build --verbose --target ${{ matrix.target }} --profile ${{ matrix.profile }}
+        run: cargo build --workspace --all-targets --verbose --target ${{ matrix.target }} --profile ${{ matrix.profile }}
 
       - name: Run tests
-        run: cargo test --verbose --target ${{ matrix.target }} --profile ${{ matrix.profile }}
+        run: cargo test --workspace --all-targets --verbose --target ${{ matrix.target }} --profile ${{ matrix.profile }}
 
   lint:
     timeout-minutes: 10
@@ -81,11 +81,11 @@ jobs:
 
       - name: Check code for possible improvements (dev profile)
         if: matrix.profile == 'dev'
-        run: cargo clippy -- -D warnings
+        run: cargo clippy --workspace --all-targets -- -D warnings
 
       - name: Check code for possible improvements (release profile)
         if: matrix.profile == 'release'
-        run: cargo clippy --release -- -D warnings
+        run: cargo clippy --workspace --all-targets --release -- -D warnings
 
       - name: Check for typos
         uses: crate-ci/typos@master

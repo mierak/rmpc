@@ -77,7 +77,7 @@ mod tests {
         channels.increment("a");
 
         assert_eq!(channels.decrement("a"), Some(0));
-        assert!(channels.list().is_empty());
+        assert_eq!(channels.list(), vec![] as Vec<String>);
     }
 
     #[test]
