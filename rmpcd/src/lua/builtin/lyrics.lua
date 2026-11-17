@@ -1,4 +1,5 @@
 local lrclib_url = "https://lrclib.net"
+local request_timeout_ms = 10000
 
 ---@type LyricsPlugin
 local M = {
@@ -8,9 +9,15 @@ local M = {
     checked_uris = {},
 }
 
-local function last_path_segment(s)
-    local before = s:match("^(.*)/[^/]*$")
-    return before or s
+local function parent_dir(path)
+    local parent = path:match("^(.*)/[^/]*$")
+    if parent == nil then
+        return "."
+    end
+    if parent == "" then
+        return "/"
+    end
+    return parent
 end
 
 local function replace_after_last_dot(s, replacement)
@@ -20,8 +27,6 @@ end
 ---@param self LyricsPlugin
 ---@param song Song
 local function download(self, song)
-    log.info("Fetching lyrics for " .. song.artist .. " - " .. song.title .. " at path " .. song.file)
-    fs.create_dir_all(self.lyrics_dir .. "/" .. last_path_segment(song.file))
     local lrc_path = self.lyrics_dir .. "/" .. replace_after_last_dot(song.file, "lrc")
 
     if fs.exists(lrc_path) then
@@ -29,7 +34,7 @@ local function download(self, song)
         return
     end
 
-    if song.artist == nil or song.title == nil or song.album == nil then
+    if song.artist == nil or song.title == nil then
         log.warn("Song metadata missing artist or title, cannot fetch lyrics for " .. song.file)
         process.spawn({
             "rmpc",
@@ -42,14 +47,16 @@ local function download(self, song)
         return
     end
 
+    log.info("Fetching lyrics for " .. song.artist .. " - " .. song.title .. " at path " .. song.file)
     local result = http.get(lrclib_url .. "/api/get", {
+        timeout_ms = request_timeout_ms,
         headers = {
             ["User-Agent"] = "rmpcd v0.1.0 (https://github.com/mierak/rmpc)",
         },
         params = {
             artist_name = song.artist:first(),
             track_name = song.title:first(),
-            album_name = song.album:first(),
+            album_name = song.album and song.album:first() or nil,
             duration = string.format("%.0f", song.duration / 1000),
         },
     })
@@ -67,8 +74,8 @@ local function download(self, song)
         return
     end
 
-    if result.code ~= 200 then
-        log.error("Error fetching lyrics: HTTP " .. result.code)
+    if result.code ~= 200 or result.error ~= nil then
+        log.error("Error fetching lyrics: " .. (result.error or ("HTTP " .. tostring(result.code))))
         process.spawn({ "rmpc", "remote", "status", "--level", "error", "Failed to download lyrics" })
         return
     end
@@ -89,11 +96,23 @@ local function download(self, song)
 
     local lrc = ""
     lrc = lrc .. "[ar:" .. song.artist .. "]\n"
-    lrc = lrc .. "[al:" .. song.album .. "]\n"
+    if song.album ~= nil then
+        lrc = lrc .. "[al:" .. song.album .. "]\n"
+    end
     lrc = lrc .. "[ti:" .. song.title .. "]\n"
     lrc = lrc .. json.syncedLyrics
     log.info("Saving lyrics to " .. lrc_path)
-    fs.write_str(lrc_path, lrc)
+
+    local _, err = fs.create_dir_all(parent_dir(lrc_path))
+    if err == nil then
+        _, err = fs.write_str(lrc_path, lrc)
+    end
+
+    if err ~= nil then
+        log.error("Failed to save lyrics to '" .. lrc_path .. "': " .. tostring(err))
+        process.spawn({ "rmpc", "remote", "status", "--level", "error", "Failed to save lyrics" })
+        return
+    end
 
     process.spawn({ "rmpc", "remote", "indexlrc", "--path", lrc_path })
 end
