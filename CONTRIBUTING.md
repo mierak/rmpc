@@ -64,8 +64,12 @@ Rmpc is a project created by a human in their spare time and for humans to enjoy
 allowed but you, the contributor, are responsible for the submission.
 If you wish to contribute using AI you must follow these few points:
 
-- All AI usage **MUST** be disclosed. State what tool you used and to what extent you used its
-  assistance.
+- All AI usage **MUST** be disclosed. State what tool you used and how you used it. Examples: (write
+  the text yourself, these only serve as an example)
+  - I did not use any AI
+  - I used Opus 5.5 to consult and to review my changes
+  - I used Fable 5.2 to generate `<part of the diff>` and reviewed it myself
+  - I used GPT 6 Astra to generate the whole change, I then read the code and validated it myself
 - You, the human, **MUST** fully understand the code changes you made and how they affect the rest
   of the system.
 - Do not copy paste or otherwise use AI to generate messages and descriptions in issues and PRs.
