@@ -1,0 +1,154 @@
+name: Release rmpcd
+
+on:
+  push:
+    tags:
+    - 'rmpcd-v*.*.*'
+  workflow_dispatch:
+    inputs:
+      release:
+        description: "Create a draft release, otherwise only upload the build to this run"
+        type: boolean
+        default: false
+
+jobs:
+  build-linux:
+    runs-on: ${{ matrix.os }}
+    permissions:
+      contents: write
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest
+            target: x86_64-unknown-linux-gnu
+          - os: ubuntu-latest
+            target: x86_64-unknown-linux-musl
+          - os: ubuntu-latest
+            target: aarch64-unknown-linux-musl
+          - os: ubuntu-latest
+            target: aarch64-unknown-linux-gnu
+          - os: ubuntu-latest
+            target: arm-unknown-linux-gnueabihf
+    steps:
+    - name: Install prerequisites
+      run: |
+        cargo install cross --git https://github.com/cross-rs/cross
+
+    - name: Read release tag
+      run: |
+        if [[ "$GITHUB_REF" == refs/tags/rmpcd-v* ]]; then
+            echo "RELEASE_TAG=${GITHUB_REF#refs/tags/rmpcd-}"  >> "$GITHUB_ENV"
+        elif [[ "$GITHUB_REF" == refs/tags/* ]]; then
+            echo "This workflow only handles rmpcd-v*.*.* tags, got $GITHUB_REF"
+            exit 1
+        elif [ "${{ inputs.release }}" == 'true' ]; then
+            echo "Releasing requires running this workflow from a rmpcd-v*.*.* tag, got $GITHUB_REF"
+            exit 1
+        else
+            echo "RELEASE_TAG=master" >> "$GITHUB_ENV"
+        fi
+
+    - name: Checkout
+      uses: actions/checkout@v4
+
+    - name: Check that the tag matches the rmpcd version
+      if: startsWith(github.ref, 'refs/tags/')
+      run: |
+        CARGO_VERSION="v$(grep -m1 '^version' rmpcd/Cargo.toml | cut -d '"' -f2)"
+        if [ "$CARGO_VERSION" != "$RELEASE_TAG" ]; then
+            echo "Tag $RELEASE_TAG does not match rmpcd/Cargo.toml version $CARGO_VERSION"
+            exit 1
+        fi
+
+    - name: Build release
+      run: |
+        cross build --release --target ${{ matrix.target }} -p rmpcd
+
+    - name: Copy artifacts
+      working-directory: ./target
+      run: |
+        mkdir -p "/tmp/artifacts"
+        tar cvzf "/tmp/artifacts/rmpcd-$RELEASE_TAG-${{ matrix.target }}.tar.gz" -C "./${{ matrix.target }}/release" "rmpcd"
+
+    - name: Upload build artifacts (manual run)
+      if: github.event_name == 'workflow_dispatch' && !inputs.release
+      uses: actions/upload-artifact@v4
+      with:
+        name: rmpcd-${{ matrix.target }}
+        path: /tmp/artifacts/
+
+    - name: Release
+      if: github.event_name == 'push' || inputs.release
+      uses: ncipollo/release-action@v1
+      with:
+        allowUpdates: true
+        draft: true
+        makeLatest: false
+        artifacts: /tmp/artifacts/*
+
+  build-macos:
+    runs-on: ${{ matrix.os }}
+    permissions:
+      contents: write
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: macos-latest
+            target: x86_64-apple-darwin
+          - os: macos-latest
+            target: aarch64-apple-darwin
+    steps:
+    - name: Read release tag
+      run: |
+        if [[ "$GITHUB_REF" == refs/tags/rmpcd-v* ]]; then
+            echo "RELEASE_TAG=${GITHUB_REF#refs/tags/rmpcd-}"  >> "$GITHUB_ENV"
+        elif [[ "$GITHUB_REF" == refs/tags/* ]]; then
+            echo "This workflow only handles rmpcd-v*.*.* tags, got $GITHUB_REF"
+            exit 1
+        elif [ "${{ inputs.release }}" == 'true' ]; then
+            echo "Releasing requires running this workflow from a rmpcd-v*.*.* tag, got $GITHUB_REF"
+            exit 1
+        else
+            echo "RELEASE_TAG=master" >> "$GITHUB_ENV"
+        fi
+
+    - name: Checkout
+      uses: actions/checkout@v4
+
+    - name: Check that the tag matches the rmpcd version
+      if: startsWith(github.ref, 'refs/tags/')
+      run: |
+        CARGO_VERSION="v$(grep -m1 '^version' rmpcd/Cargo.toml | cut -d '"' -f2)"
+        if [ "$CARGO_VERSION" != "$RELEASE_TAG" ]; then
+            echo "Tag $RELEASE_TAG does not match rmpcd/Cargo.toml version $CARGO_VERSION"
+            exit 1
+        fi
+
+    - name: Build release
+      run: |
+        rustup target add ${{ matrix.target }}
+        cargo build --release --target ${{ matrix.target }} -p rmpcd
+
+    - name: Copy artifacts
+      working-directory: ./target
+      run: |
+        mkdir -p "/tmp/artifacts"
+        tar cvzf "/tmp/artifacts/rmpcd-$RELEASE_TAG-${{ matrix.target }}.tar.gz" -C "./${{ matrix.target }}/release" "rmpcd"
+
+    - name: Upload build artifacts (manual run)
+      if: github.event_name == 'workflow_dispatch' && !inputs.release
+      uses: actions/upload-artifact@v4
+      with:
+        name: rmpcd-${{ matrix.target }}
+        path: /tmp/artifacts/
+
+    - name: Release
+      if: github.event_name == 'push' || inputs.release
+      uses: ncipollo/release-action@v1
+      with:
+        allowUpdates: true
+        draft: true
+        makeLatest: false
+        artifacts: /tmp/artifacts/*
