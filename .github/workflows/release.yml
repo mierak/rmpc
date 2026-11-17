@@ -1,9 +1,9 @@
-name: Release
+name: Release rmpc
 
-on: 
+on:
   push:
     tags:
-    - 'v*.*.*'
+      - "v*.*.*"
   workflow_dispatch:
     inputs:
       release:
@@ -30,55 +30,55 @@ jobs:
           - os: ubuntu-latest
             target: arm-unknown-linux-gnueabihf
     steps:
-    - name: Install prerequisites
-      run: |
-        cargo install cross --git https://github.com/cross-rs/cross
+      - name: Install prerequisites
+        run: |
+          cargo install cross --git https://github.com/cross-rs/cross
 
-    - name: Read release tag
-      run: |
-        if [[ "$GITHUB_REF" == refs/tags/v* ]]; then
-            echo "RELEASE_TAG=${GITHUB_REF#refs/tags/}"  >> "$GITHUB_ENV"
-        elif [[ "$GITHUB_REF" == refs/tags/* ]]; then
-            echo "This workflow only handles v*.*.* tags, got $GITHUB_REF"
-            exit 1
-        elif [ "${{ inputs.release }}" == 'true' ]; then
-            echo "Releasing requires running this workflow from a v*.*.* tag, got $GITHUB_REF"
-            exit 1
-        else
-            echo "RELEASE_TAG=master" >> "$GITHUB_ENV"
-        fi
+      - name: Read release tag
+        run: |
+          if [[ "$GITHUB_REF" == refs/tags/v* ]]; then
+              echo "RELEASE_TAG=${GITHUB_REF#refs/tags/}"  >> "$GITHUB_ENV"
+          elif [[ "$GITHUB_REF" == refs/tags/* ]]; then
+              echo "This workflow only handles v*.*.* tags, got $GITHUB_REF"
+              exit 1
+          elif [ "${{ inputs.release }}" == 'true' ]; then
+              echo "Releasing requires running this workflow from a v*.*.* tag, got $GITHUB_REF"
+              exit 1
+          else
+              echo "RELEASE_TAG=master" >> "$GITHUB_ENV"
+          fi
 
-    - name: Checkout
-      uses: actions/checkout@v4
+      - name: Checkout
+        uses: actions/checkout@v4
 
-    - name: Fetch tags
-      run: |
-        git fetch --tags -f
+      - name: Fetch tags
+        run: |
+          git fetch --tags -f
 
-    - name: Build release
-      run: |
-        cross build --release --target ${{ matrix.target }}
+      - name: Build release
+        run: |
+          cross build --release --target ${{ matrix.target }}
 
-    - name: Copy artifacts
-      working-directory: ./target
-      run: |
-        mkdir -p "/tmp/artifacts"
-        tar cvzf "/tmp/artifacts/rmpc-$RELEASE_TAG-${{ matrix.target }}.tar.gz" "man" "completions" -C "./${{ matrix.target }}/release" "rmpc"
+      - name: Copy artifacts
+        working-directory: ./target
+        run: |
+          mkdir -p "/tmp/artifacts"
+          tar cvzf "/tmp/artifacts/rmpc-$RELEASE_TAG-${{ matrix.target }}.tar.gz" "man" "completions" -C "./${{ matrix.target }}/release" "rmpc"
 
-    - name: Upload build artifacts (manual run)
-      if: github.event_name == 'workflow_dispatch' && !inputs.release
-      uses: actions/upload-artifact@v4
-      with:
-        name: rmpc-${{ matrix.target }}
-        path: /tmp/artifacts/
+      - name: Upload build artifacts (manual run)
+        if: github.event_name == 'workflow_dispatch' && !inputs.release
+        uses: actions/upload-artifact@v7
+        with:
+          path: /tmp/artifacts/rmpc-${{ env.RELEASE_TAG }}-${{ matrix.target }}.tar.gz
+          archive: false
 
-    - name: Release
-      if: github.event_name == 'push' || inputs.release
-      uses: ncipollo/release-action@v1
-      with:
-        allowUpdates: true
-        draft: true
-        artifacts: /tmp/artifacts/*
+      - name: Release
+        if: github.event_name == 'push' || inputs.release
+        uses: ncipollo/release-action@v1
+        with:
+          allowUpdates: true
+          draft: true
+          artifacts: /tmp/artifacts/*
 
   build-macos:
     runs-on: ${{ matrix.os }}
@@ -92,53 +92,53 @@ jobs:
           - os: macos-latest
             target: aarch64-apple-darwin
     steps:
-    - name: Install prerequisites
-      run: |
-        cargo install cross --git https://github.com/cross-rs/cross
+      - name: Install prerequisites
+        run: |
+          cargo install cross --git https://github.com/cross-rs/cross
 
-    - name: Read release tag
-      run: |
-        if [[ "$GITHUB_REF" == refs/tags/v* ]]; then
-            echo "RELEASE_TAG=${GITHUB_REF#refs/tags/}"  >> "$GITHUB_ENV"
-        elif [[ "$GITHUB_REF" == refs/tags/* ]]; then
-            echo "This workflow only handles v*.*.* tags, got $GITHUB_REF"
-            exit 1
-        elif [ "${{ inputs.release }}" == 'true' ]; then
-            echo "Releasing requires running this workflow from a v*.*.* tag, got $GITHUB_REF"
-            exit 1
-        else
-            echo "RELEASE_TAG=master" >> "$GITHUB_ENV"
-        fi
+      - name: Read release tag
+        run: |
+          if [[ "$GITHUB_REF" == refs/tags/v* ]]; then
+              echo "RELEASE_TAG=${GITHUB_REF#refs/tags/}"  >> "$GITHUB_ENV"
+          elif [[ "$GITHUB_REF" == refs/tags/* ]]; then
+              echo "This workflow only handles v*.*.* tags, got $GITHUB_REF"
+              exit 1
+          elif [ "${{ inputs.release }}" == 'true' ]; then
+              echo "Releasing requires running this workflow from a v*.*.* tag, got $GITHUB_REF"
+              exit 1
+          else
+              echo "RELEASE_TAG=master" >> "$GITHUB_ENV"
+          fi
 
-    - name: Checkout
-      uses: actions/checkout@v4
+      - name: Checkout
+        uses: actions/checkout@v4
 
-    - name: Fetch tags
-      run: |
-        git fetch --tags -f
+      - name: Fetch tags
+        run: |
+          git fetch --tags -f
 
-    - name: Build release
-      run: |
-        rustup target add ${{ matrix.target }}
-        cargo build --release --target ${{ matrix.target }}
+      - name: Build release
+        run: |
+          rustup target add ${{ matrix.target }}
+          cargo build --release --target ${{ matrix.target }}
 
-    - name: Copy artifacts
-      working-directory: ./target
-      run: |
-        mkdir -p "/tmp/artifacts"
-        tar cvzf "/tmp/artifacts/rmpc-$RELEASE_TAG-${{ matrix.target }}.tar.gz" "man" "completions" -C "./${{ matrix.target }}/release" "rmpc"
+      - name: Copy artifacts
+        working-directory: ./target
+        run: |
+          mkdir -p "/tmp/artifacts"
+          tar cvzf "/tmp/artifacts/rmpc-$RELEASE_TAG-${{ matrix.target }}.tar.gz" "man" "completions" -C "./${{ matrix.target }}/release" "rmpc"
 
-    - name: Upload build artifacts (manual run)
-      if: github.event_name == 'workflow_dispatch' && !inputs.release
-      uses: actions/upload-artifact@v4
-      with:
-        name: rmpc-${{ matrix.target }}
-        path: /tmp/artifacts/
+      - name: Upload build artifacts (manual run)
+        if: github.event_name == 'workflow_dispatch' && !inputs.release
+        uses: actions/upload-artifact@v7
+        with:
+          path: /tmp/artifacts/rmpc-${{ env.RELEASE_TAG }}-${{ matrix.target }}.tar.gz
+          archive: false
 
-    - name: Release
-      if: github.event_name == 'push' || inputs.release
-      uses: ncipollo/release-action@v1
-      with:
-        allowUpdates: true
-        draft: true
-        artifacts: /tmp/artifacts/*
+      - name: Release
+        if: github.event_name == 'push' || inputs.release
+        uses: ncipollo/release-action@v1
+        with:
+          allowUpdates: true
+          draft: true
+          artifacts: /tmp/artifacts/*
