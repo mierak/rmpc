@@ -1,5 +1,4 @@
 use std::{
-    fs::TryLockError,
     path::Path,
     sync::Arc,
     time::{SystemTime, UNIX_EPOCH},
@@ -32,6 +31,7 @@ mod ctx;
 mod event_loop;
 mod ext;
 mod inhibit;
+mod instance_lock;
 mod kv_bridge;
 mod lua;
 mod mpd_ext;
@@ -53,6 +53,7 @@ enum Command {
     /// Sets up a new config directory with example init.lua and .luarc.json
     /// config file for `LuaLS`
     Init,
+    /// Manage plugins
     Pkg {
         #[command(subcommand)]
         command: PkgCommand,
@@ -62,17 +63,30 @@ enum Command {
 #[derive(Subcommand, Clone, Debug, PartialEq)]
 #[clap(rename_all = "lower")]
 enum PkgCommand {
+    /// Update all remote plugins to the latest version
     Upgrade,
+    /// List remote plugins that are either already present on disk or specified
+    /// in the config file
+    List {
+        /// Verbose output
+        #[arg(long, short = 'v')]
+        verbose: bool,
+    },
 }
 
-fn init_logging(level: &str) -> Result<(WorkerGuard, WorkerGuard)> {
+fn init_logging(level: &str, log_to_stderr: bool) -> Result<(WorkerGuard, Option<WorkerGuard>)> {
     let uid = rustix::process::geteuid();
     let file_appender = tracing_appender::rolling::never(
         std::env::temp_dir(),
         format!("rmpcd_{}.log", uid.as_raw()),
     );
     let (non_blocking_file, file_guard) = tracing_appender::non_blocking(file_appender);
-    let (non_blocking_stderr, stderr_guard) = tracing_appender::non_blocking(std::io::stderr());
+    let (stderr_writer, stderr_guard) = if log_to_stderr {
+        let (writer, guard) = tracing_appender::non_blocking(std::io::stderr());
+        (Some(writer), Some(guard))
+    } else {
+        (None, None)
+    };
 
     let env_filter = EnvFilter::builder()
         .with_default_directive(LevelFilter::INFO.into())
@@ -80,14 +94,14 @@ fn init_logging(level: &str) -> Result<(WorkerGuard, WorkerGuard)> {
         .add_directive(format!("rmpcd={level}").parse()?);
 
     let subscriber = Registry::default()
-        .with(
+        .with(stderr_writer.map(|writer| {
             tracing_subscriber::fmt::Layer::new()
                 .with_line_number(true)
                 .with_target(false)
                 .with_file(true)
                 .with_ansi(true)
-                .with_writer(non_blocking_stderr),
-        )
+                .with_writer(writer)
+        }))
         .with(
             tracing_subscriber::fmt::Layer::new()
                 .with_line_number(true)
@@ -110,27 +124,13 @@ async fn main() -> Result<()> {
     let args = Args::parse();
     Paths::init()?;
 
-    let lock_handle = match std::fs::File::options()
-        .write(true)
-        .create(true)
-        .truncate(true)
-        .open(Paths::runtime_dir().join("instance.lock"))
-    {
-        Ok(v) => v,
-        Err(err) => {
-            eprintln!("Failed to open lock file: {err:?}");
-            std::process::exit(1);
-        }
+    let _lock = match &args.command {
+        Some(Command::Pkg { command }) => match command {
+            PkgCommand::List { .. } => None,
+            PkgCommand::Upgrade => Some(instance_lock::acquire()),
+        },
+        _ => Some(instance_lock::acquire()),
     };
-
-    match lock_handle.try_lock() {
-        Ok(()) => {}
-        Err(TryLockError::WouldBlock) => {
-            eprintln!("Another instance of rmpcd is already running, exiting...");
-            std::process::exit(1);
-        }
-        err @ Err(_) => err?,
-    }
 
     match args.command {
         Some(Command::Init) => run_init()?,
@@ -142,7 +142,7 @@ async fn main() -> Result<()> {
 }
 
 fn run_init() -> Result<()> {
-    let _log_guards = init_logging("info")?;
+    let _log_guards = init_logging("info", true)?;
 
     let cfg_dir = Paths::config_dir();
     let init_lua_path = cfg_dir.join("init.lua");
@@ -185,7 +185,7 @@ fn run_init() -> Result<()> {
 
 async fn run() -> Result<()> {
     let start = std::time::Instant::now();
-    let _log_guards = init_logging("debug")?;
+    let _log_guards = init_logging("debug", true)?;
 
     let (shutdown_tx, shutdown_rx) = tokio::sync::broadcast::channel::<()>(1);
     ctrlc::set_handler(move || {

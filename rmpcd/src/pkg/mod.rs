@@ -1,9 +1,11 @@
 use std::{
     collections::{HashMap, HashSet},
+    io::Write,
     path::{Path, PathBuf},
 };
 
 use anyhow::{Context, Result, bail};
+use bon::Builder;
 use sha2::{Digest, Sha256};
 
 use crate::{
@@ -24,7 +26,12 @@ pub use lockfile::Lockfile;
 pub use manifest::Manifest;
 
 pub async fn run_pkg(command: PkgCommand) -> Result<()> {
-    let _log_guards = init_logging("info")?;
+    let log_to_stderr = match command {
+        PkgCommand::Upgrade => true,
+        PkgCommand::List { verbose } => verbose,
+    };
+
+    let _log_guards = init_logging("info", log_to_stderr)?;
     let (_, _, plugins_spec) = eval_config(None).await?;
 
     match command {
@@ -45,6 +52,135 @@ pub async fn run_pkg(command: PkgCommand) -> Result<()> {
             run_upgrade(specs.into_values().collect(), &mut lockfile).await?;
             lockfile.write().await?;
             Ok(())
+        }
+        PkgCommand::List { verbose: _ } => {
+            let mut specs = HashMap::new();
+            let lockfile = Lockfile::read_or_default().await?;
+
+            for spec in plugins_spec.read().await.iter() {
+                match &*spec.read().await {
+                    LuaPluginSpec::Builtin(_) => {}
+                    LuaPluginSpec::Local(_) => {}
+                    LuaPluginSpec::Remote(spec) => {
+                        specs.insert(normalize_url(&spec.url).to_string(), spec.clone());
+                    }
+                }
+            }
+
+            let mut result = Vec::new();
+
+            for spec in specs.into_values() {
+                let plugin_name: String = url_to_dir_name(&spec.url);
+
+                let target_dir = Paths::plugins_dir().join(&plugin_name);
+                let on_disk = tokio::fs::try_exists(&target_dir)
+                    .await
+                    .inspect_err(|err| {
+                        tracing::error!(?err, "Failed to check whether plugin directory exists");
+                    })
+                    .unwrap_or(false);
+                let manifest = if on_disk { Manifest::read(&target_dir).await.ok() } else { None };
+
+                result.push(
+                    ListResult::builder()
+                        .maybe_manifest(manifest)
+                        .on_disk(on_disk)
+                        .in_spec(true)
+                        .name(plugin_name)
+                        .target_dir(target_dir)
+                        .url(spec.url)
+                        .build(),
+                );
+            }
+
+            let in_spec: HashSet<String> = result.iter().map(|r| r.name.clone()).collect();
+            let mut entries = tokio::fs::read_dir(Paths::plugins_dir())
+                .await
+                .context("Failed to read plugins directory")?;
+
+            while let Some(entry) = entries.next_entry().await? {
+                if !entry.file_type().await?.is_dir() {
+                    continue;
+                }
+
+                let name = entry.file_name().to_string_lossy().into_owned();
+                if in_spec.contains(&name) {
+                    continue;
+                }
+
+                let target_dir = entry.path();
+                let manifest = Manifest::read(&target_dir).await.ok();
+
+                let url = lockfile.get(&name).map_or("", |entry| &entry.url);
+                result.push(
+                    ListResult::builder()
+                        .maybe_manifest(manifest)
+                        .on_disk(true)
+                        .in_spec(false)
+                        .name(name)
+                        .target_dir(target_dir)
+                        .url(url.to_owned())
+                        .build(),
+                );
+            }
+
+            result.sort_by(|a, b| a.name.cmp(&b.name));
+
+            match print_list_result(&mut std::io::stdout().lock(), &result) {
+                Err(err) if err.kind() != std::io::ErrorKind::BrokenPipe => Err(err.into()),
+                _ => Ok(()),
+            }
+        }
+    }
+}
+
+#[rustfmt::skip]
+fn print_list_result(out: &mut impl Write, result: &[ListResult]) -> std::io::Result<()> {
+    for (i, plugin) in result.iter().enumerate() {
+        if i > 0 {
+            writeln!(out)?;
+        }
+
+        writeln!(out, "plugin {}", plugin.name)?;
+        writeln!(out, "    name:    {}", plugin.manifest.as_ref().map_or_else(|| "-", |m| &m.name))?;
+        writeln!(out, "    url:     {}", plugin.url)?;
+        writeln!(out, "    author:  {}", plugin.manifest.as_ref().map_or_else(|| "-", |m| &m.author))?;
+        writeln!(out, "    status:  {}", plugin.status().as_ref())?;
+        writeln!(out, "    path:    {}", plugin.target_dir.display())?;
+    }
+
+    Ok(())
+}
+
+#[derive(Builder)]
+struct ListResult {
+    manifest: Option<Manifest>,
+    name: String,
+    target_dir: PathBuf,
+    on_disk: bool,
+    in_spec: bool,
+    url: String,
+}
+
+#[derive(strum::AsRefStr)]
+enum PluginStatus {
+    #[strum(serialize = "installed")]
+    Installed,
+    #[strum(serialize = "not installed")]
+    NotInstalled,
+    #[strum(serialize = "broken")]
+    Broken,
+    #[strum(serialize = "leftover")]
+    Leftover,
+}
+
+impl ListResult {
+    fn status(&self) -> PluginStatus {
+        match (self.in_spec, self.on_disk, self.manifest.is_some()) {
+            (true, false, _) => PluginStatus::NotInstalled,
+            (true, true, true) => PluginStatus::Installed,
+            (true, true, false) => PluginStatus::Broken,
+            (false, ..) => PluginStatus::Leftover,
         }
     }
 }
