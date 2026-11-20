@@ -6,7 +6,7 @@ use strum::Display;
 
 use super::defaults;
 
-#[derive(Debug, Default, Clone)]
+#[derive(Debug, Clone)]
 pub struct Cava {
     pub framerate: u16,
     pub autosens: bool,
@@ -16,6 +16,15 @@ pub struct Cava {
     pub input: CavaInput,
     pub smoothing: CavaSmoothing,
     pub eq: Vec<f64>,
+    pub waveform: bool,
+    pub waveform_sync: bool,
+    pub waveform_duration: u16,
+}
+
+impl Default for Cava {
+    fn default() -> Self {
+        CavaFile::default().into()
+    }
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
@@ -29,6 +38,9 @@ pub struct CavaFile {
     input: CavaInputFile,
     smoothing: CavaSmoothingFile,
     eq: Vec<f64>,
+    waveform: bool,
+    waveform_sync: bool,
+    waveform_duration: u16,
 }
 
 impl Default for CavaFile {
@@ -42,6 +54,9 @@ impl Default for CavaFile {
             input: CavaInputFile::default(),
             smoothing: CavaSmoothingFile::default(),
             eq: vec![],
+            waveform: false,
+            waveform_sync: false,
+            waveform_duration: 50,
         }
     }
 }
@@ -125,6 +140,9 @@ impl From<CavaFile> for Cava {
                 noise_reduction: value.smoothing.noise_reduction,
             },
             eq: value.eq,
+            waveform: value.waveform,
+            waveform_sync: value.waveform_sync,
+            waveform_duration: value.waveform_duration,
         }
     }
 }
@@ -167,6 +185,9 @@ impl Cava {
         writeln!(buf, "data_format = binary")?;
         writeln!(buf, "bit_format = 16bit")?;
         writeln!(buf, "reverse = 0")?;
+        writeln!(buf, "waveform = {}", i8::from(self.waveform))?;
+        writeln!(buf, "waveform_sync = {}", i8::from(self.waveform_sync))?;
+        writeln!(buf, "waveform_duration = {}", self.waveform_duration)?;
 
         writeln!(buf, "[smoothing]")?;
         writeln!(buf, "noise_reduction = {}", self.smoothing.noise_reduction)?;
