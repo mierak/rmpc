@@ -359,7 +359,7 @@ mod tests {
                 "track".to_string(),
                 MetadataTag::Single(track.to_string()),
             )]),
-            last_modified: chrono::Utc::now(),
+            last_modified: jiff::Timestamp::now(),
             added: None,
         })
     }
@@ -369,7 +369,7 @@ mod tests {
             name: full_path.rsplit('/').next().unwrap_or(full_path).to_string(),
             display_name: None,
             full_path: full_path.to_string(),
-            last_modified: chrono::Utc::now(),
+            last_modified: jiff::Timestamp::now(),
             playlist: false,
             metadata: HashMap::new(),
         }
@@ -380,7 +380,7 @@ mod tests {
             name: full_path.to_string(),
             display_name: None,
             full_path: full_path.to_string(),
-            last_modified: chrono::Utc::now(),
+            last_modified: jiff::Timestamp::now(),
             playlist: true,
             metadata: HashMap::new(),
         }

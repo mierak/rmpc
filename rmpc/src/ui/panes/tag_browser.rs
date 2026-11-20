@@ -224,7 +224,7 @@ impl TagBrowserPane {
                 id: 0,
                 file: String::new(),
                 duration: None,
-                last_modified: chrono::Utc::now(),
+                last_modified: jiff::Timestamp::now(),
                 added: None,
                 metadata: record
                     .into_iter()
@@ -524,7 +524,7 @@ mod tests {
                 ("album".to_string(), Into::<String>::into(album).into()),
                 ("date".to_string(), Into::<String>::into(date).into()),
             ]),
-            last_modified: chrono::Utc::now(),
+            last_modified: jiff::Timestamp::now(),
             added: None,
         }
     }
@@ -543,7 +543,7 @@ mod tests {
                 ("date".to_string(), Into::<String>::into(date).into()),
                 ("originaldate".to_string(), Into::<String>::into(original_date).into()),
             ]),
-            last_modified: chrono::Utc::now(),
+            last_modified: jiff::Timestamp::now(),
             added: None,
         }
     }
@@ -564,7 +564,7 @@ mod tests {
                 ("date".to_string(), date.into().into()),
                 ("disc".to_string(), disc.into()),
             ]),
-            last_modified: chrono::Utc::now(),
+            last_modified: jiff::Timestamp::now(),
             added: None,
         }
     }

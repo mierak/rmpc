@@ -239,7 +239,7 @@ impl SongExt for Song {
                 start_of_line_spacer.clone(),
                 Span::styled("Last Modified", key_style),
                 separator.clone(),
-                Span::from(self.last_modified.to_string()),
+                Span::from(format_timestamp(self.last_modified)),
             ])
             .into(),
         );
@@ -250,7 +250,7 @@ impl SongExt for Song {
                     start_of_line_spacer.clone(),
                     Span::styled("Added", key_style),
                     separator.clone(),
-                    Span::from(added.to_string()),
+                    Span::from(format_timestamp(*added)),
                 ])
                 .into(),
             );
@@ -359,8 +359,8 @@ impl SongExt for Song {
             SongProperty::SampleRate() => self.samplerate().map(|v| Cow::Owned(v.to_string())),
             SongProperty::Bits() => self.bits().map(|v| Cow::Owned(v.to_string())),
             SongProperty::Channels() => self.channels().map(|v| Cow::Owned(v.to_string())),
-            SongProperty::Added() => self.added.map(|d| Cow::Owned(d.to_string())),
-            SongProperty::LastModified() => Some(Cow::Owned(self.last_modified.to_string())),
+            SongProperty::Added() => self.added.map(|d| Cow::Owned(format_timestamp(d))),
+            SongProperty::LastModified() => Some(Cow::Owned(format_timestamp(self.last_modified))),
         }
     }
 
@@ -675,6 +675,12 @@ impl SongExt for Song {
     }
 }
 
+/// Formats a timestamp as `YYYY-MM-DD HH:MM:SS UTC`, matching the format used
+/// before the switch from chrono to jiff.
+fn format_timestamp(ts: jiff::Timestamp) -> String {
+    ts.strftime("%Y-%m-%d %H:%M:%S%.f UTC").to_string()
+}
+
 #[cfg(test)]
 mod tests {
     use std::collections::HashMap;
@@ -694,7 +700,7 @@ mod tests {
             file: file.to_string(),
             duration: None,
             metadata,
-            last_modified: chrono::Utc::now(),
+            last_modified: jiff::Timestamp::now(),
             added: None,
         }
     }

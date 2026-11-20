@@ -1,6 +1,6 @@
 use anyhow::{Context, anyhow};
-use chrono::{DateTime, Utc};
 use derive_more::{AsMut, AsRef, Into, IntoIterator};
+use jiff::Timestamp;
 
 use super::Song;
 use crate::{
@@ -34,7 +34,7 @@ pub struct Dir {
     pub name: String,
     /// this is the full path from mpd root
     pub full_path: String,
-    pub last_modified: DateTime<Utc>,
+    pub last_modified: Timestamp,
 }
 
 #[derive(Debug, Default, PartialEq, Eq)]
@@ -43,7 +43,7 @@ pub struct Playlist {
     pub name: String,
     /// this is the full path from mpd root
     pub full_path: String,
-    pub last_modified: DateTime<Utc>,
+    pub last_modified: Timestamp,
 }
 
 impl FromMpd for Dir {

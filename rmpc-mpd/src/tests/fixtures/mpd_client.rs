@@ -62,7 +62,7 @@ pub fn client() -> TestMpdClient {
                     ("title".to_owned(), format!("{}_{}_file_{i}", *artist, *album).into()),
                 ]),
                 duration: Some(Duration::from_secs(i.into())),
-                last_modified: chrono::Utc::now(),
+                last_modified: jiff::Timestamp::now(),
                 added: None,
             })
         })
@@ -540,7 +540,7 @@ impl MpdClient for TestMpdClient {
                         id: *idx as u32,
                         duration: None,
                         metadata: HashMap::default(),
-                        last_modified: chrono::Utc::now(),
+                        last_modified: jiff::Timestamp::now(),
                         added: None,
                     })
                     .collect())

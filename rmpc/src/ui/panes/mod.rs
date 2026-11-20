@@ -1499,7 +1499,7 @@ mod format_tests {
                     ("track".to_string(), "123".into()),
                     ("artist".to_string(), "artist".into()),
                 ]),
-                last_modified: chrono::Utc::now(),
+                last_modified: jiff::Timestamp::now(),
                 added: None,
             };
 
@@ -1538,7 +1538,7 @@ mod format_tests {
                     ("title".to_string(), "title".into()),
                     ("track".to_string(), "123".into()),
                 ]),
-                last_modified: chrono::Utc::now(),
+                last_modified: jiff::Timestamp::now(),
                 added: None,
             };
             ctx.status = Status {
@@ -1804,7 +1804,7 @@ mod format_tests {
                     ("title".to_string(), "Current Song".into()),
                     ("artist".to_string(), "Artist".into()),
                 ]),
-                last_modified: chrono::Utc::now(),
+                last_modified: jiff::Timestamp::now(),
                 added: None,
             };
 
@@ -1815,7 +1815,7 @@ mod format_tests {
                 file: "song1.mp3".to_owned(),
                 duration: Some(Duration::from_secs(123)),
                 metadata: HashMap::from([("title".to_string(), "Song 1".into())]),
-                last_modified: chrono::Utc::now(),
+                last_modified: jiff::Timestamp::now(),
                 added: None,
             });
             queue.push(Song {
@@ -1823,7 +1823,7 @@ mod format_tests {
                 file: "song2.mp3".to_owned(),
                 duration: Some(Duration::from_secs(123)),
                 metadata: HashMap::from([("title".to_string(), "Song 2".into())]),
-                last_modified: chrono::Utc::now(),
+                last_modified: jiff::Timestamp::now(),
                 added: None,
             });
 
@@ -1897,7 +1897,7 @@ mod format_tests {
                 file: "no_duration.mp3".to_owned(),
                 duration: None,
                 metadata: HashMap::from([("title".to_string(), "No Duration".into())]),
-                last_modified: chrono::Utc::now(),
+                last_modified: jiff::Timestamp::now(),
                 added: None,
             };
 
