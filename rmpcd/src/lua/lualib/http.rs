@@ -2,7 +2,7 @@ use std::collections::HashMap;
 
 use mlua::{ExternalResult, Lua, LuaSerdeExt, Table, Value};
 use serde::{Deserialize, Serialize};
-use tracing::{error, trace};
+use tracing::{trace, warn};
 
 pub fn create(lua: &Lua) -> mlua::Result<Table> {
     let tbl = lua.create_table()?;
@@ -35,6 +35,12 @@ pub fn create(lua: &Lua) -> mlua::Result<Table> {
 
 async fn do_call(lua: Lua, url: &str, opts: Option<RequestOpts>) -> mlua::Result<Table> {
     let opts = opts.unwrap_or_default();
+    let host = reqwest::Url::parse(url)
+        .ok()
+        .and_then(|u| u.host_str().map(str::to_owned))
+        .unwrap_or_default();
+    trace!(method = ?opts.method, host = %host, "Sending HTTP request");
+
     let mut client = reqwest::Client::new().request(opts.method.into(), url);
 
     for (k, v) in opts.headers {
@@ -55,25 +61,24 @@ async fn do_call(lua: Lua, url: &str, opts: Option<RequestOpts>) -> mlua::Result
 
     let result = lua.create_table()?;
 
-    trace!(?client, "Sending HTTP request");
-    let response = match client.send().await.and_then(|r| r.error_for_status()) {
+    let response = match client.send().await {
         Ok(resp) => resp,
         Err(e) => {
-            error!("HTTP request failed: {e}");
-            result.set("error", e.to_string())?;
-            result.set("code", e.status().map(|s| s.as_u16()))?;
-
+            set_error(&result, &host, "HTTP request failed", e)?;
             return Ok(result);
         }
     };
 
     result.set("code", response.status().as_u16())?;
 
+    if let Err(e) = response.error_for_status_ref() {
+        set_error(&result, &host, "HTTP request failed", e)?;
+    }
+
     let body = match response.text().await {
         Ok(bytes) => bytes,
         Err(e) => {
-            error!("Failed to read response body: {e}");
-            result.set("error", e.to_string())?;
+            set_error(&result, &host, "Failed to read response body", e)?;
             return Ok(result);
         }
     };
@@ -94,6 +99,16 @@ async fn do_call(lua: Lua, url: &str, opts: Option<RequestOpts>) -> mlua::Result
     result.set("text", text)?;
 
     Ok(result)
+}
+
+fn set_error(result: &Table, host: &str, context: &str, e: reqwest::Error) -> mlua::Result<()> {
+    let e = e.without_url();
+    warn!(host = %host, "{context}: {e}");
+
+    if result.contains_key("error")? {
+        return Ok(());
+    }
+    result.set("error", e.to_string())
 }
 
 #[derive(Default, Debug, Serialize, Deserialize)]
@@ -178,5 +193,80 @@ impl From<PostOpts> for RequestOpts {
             params: value.params,
             timeout_ms: value.timeout_ms,
         }
+    }
+}
+
+#[cfg(test)]
+#[allow(clippy::unwrap_used)]
+mod tests {
+    use mlua::Lua;
+    use tokio::{
+        io::{AsyncReadExt, AsyncWriteExt},
+        net::TcpListener,
+    };
+
+    async fn get_with_secret(url: String) -> (Option<u16>, Option<String>, Option<String>) {
+        let lua = Lua::new();
+        lua.globals().set("http", super::create(&lua).unwrap()).unwrap();
+        lua.globals().set("url", url).unwrap();
+
+        lua.load("local r = http.get(url, { params = { sk = 'secret' } }) return r.code, r.error, r.body")
+            .eval_async()
+            .await
+            .unwrap()
+    }
+
+    async fn serve_once(response: &'static str) -> String {
+        let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let url = format!("http://{}/", listener.local_addr().unwrap());
+        tokio::spawn(async move {
+            let (mut stream, _) = listener.accept().await.unwrap();
+            let _ = stream.read(&mut [0; 4096]).await.unwrap();
+            stream.write_all(response.as_bytes()).await.unwrap();
+        });
+        url
+    }
+
+    #[tokio::test]
+    async fn error_status_keeps_body_and_hides_query() {
+        let url = serve_once(
+            "HTTP/1.1 403 Forbidden\r\nContent-Length: 11\r\nConnection: close\r\n\r\n{\"error\":9}",
+        )
+        .await;
+
+        let (code, error, body) = get_with_secret(url).await;
+
+        assert_eq!(code, Some(403));
+        assert_eq!(body.as_deref(), Some(r#"{"error":9}"#));
+        let error = error.expect("4xx should still set error");
+        assert!(error.contains("403"), "error should describe the status: {error}");
+        assert!(!error.contains("secret"), "error leaks the query string: {error}");
+    }
+
+    #[tokio::test]
+    async fn failed_body_read_keeps_status_error() {
+        let url =
+            serve_once("HTTP/1.1 500 Internal Server Error\r\nContent-Length: 100\r\n\r\nshort")
+                .await;
+
+        let (code, error, body) = get_with_secret(url).await;
+
+        assert_eq!(code, Some(500));
+        assert_eq!(body, None);
+        let error = error.expect("5xx should set error");
+        assert!(error.contains("500"), "status error was overwritten: {error}");
+    }
+
+    #[tokio::test]
+    async fn connection_error_hides_query() {
+        let listener = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
+        let url = format!("http://{}/", listener.local_addr().unwrap());
+        drop(listener);
+
+        let (code, error, _) = get_with_secret(url).await;
+
+        assert_eq!(code, None);
+        let error = error.expect("connection failure should set error");
+        assert!(!error.contains("secret"), "error leaks the query string: {error}");
     }
 }
