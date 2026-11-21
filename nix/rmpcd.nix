@@ -1,4 +1,5 @@
 {
+  cacert,
   craneLib,
   individualCrateArgs,
   lib,
@@ -33,6 +34,9 @@ craneLib.buildPackage (individualCrateArgs "rmpcd"
         (sourcesWithExt "lua")
       ];
     };
+
+    # Set path to find SSL certificates, needed for http lualib
+    SSL_CERT_FILE = "${cacert}/etc/ssl/certs/ca-bundle.crt";
 
     # Run-time binary dependencies. We wrap the program to prepend the PATH with the
     # required binaries.
