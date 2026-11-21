@@ -6,6 +6,8 @@ All notable changes to this project will be documented in this file.
 
 ### Added
 
+- CAVA waveform rendering with `cava.waveform`, `cava.waveform_sync` and
+  `cava.waveform_duration` options.
 - `preserve_order` option to `AddOptions`. Setting it to `false` makes adding of songs much faster
   but ignores the client side browser sorting.
 - `FileExtension` falls back to the underlying file's extension (`RealUri`, MPD 0.25) for
