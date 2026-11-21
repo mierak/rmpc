@@ -1,6 +1,8 @@
 use zbus::interface;
 
-pub struct Root {}
+pub struct Root {
+    pub identity: String,
+}
 
 #[interface(name = "org.mpris.MediaPlayer2")]
 impl Root {
@@ -31,8 +33,8 @@ impl Root {
     }
 
     #[zbus(property)]
-    fn identity(&self) -> &'static str {
-        "Music Player Daemon"
+    fn identity(&self) -> &str {
+        &self.identity
     }
 
     #[zbus(property)]

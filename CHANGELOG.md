@@ -6,6 +6,9 @@ All notable changes to this project will be documented in this file.
 
 ### Added
 
+- `--instance`/`-i` rmpcd flag to register MPRIS as `org.mpris.MediaPlayer2.mpd.<instance>`,
+  allowing multiple instances to expose MPRIS at once
+- `mpris_identity` rmpcd config option to set the player name shown by MPRIS clients
 - `preserve_order` option to `AddOptions`. Setting it to `false` makes adding of songs much faster
   but ignores the client side browser sorting.
 - `FileExtension` falls back to the underlying file's extension (`RealUri`, MPD 0.25) for
