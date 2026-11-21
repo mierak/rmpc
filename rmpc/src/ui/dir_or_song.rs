@@ -21,7 +21,7 @@ pub(crate) enum DirOrSong {
         name: String,
         display_name: Option<String>,
         full_path: String,
-        last_modified: chrono::DateTime<chrono::Utc>,
+        last_modified: jiff::Timestamp,
         playlist: bool,
         metadata: HashMap<String, String>,
     },
@@ -34,7 +34,7 @@ impl DirOrSong {
             name,
             display_name: None,
             full_path: String::new(),
-            last_modified: chrono::Utc::now(),
+            last_modified: jiff::Timestamp::now(),
             playlist: false,
             metadata: HashMap::new(),
         }
@@ -45,7 +45,7 @@ impl DirOrSong {
             name,
             display_name: Some(display_name),
             full_path: String::new(),
-            last_modified: chrono::Utc::now(),
+            last_modified: jiff::Timestamp::now(),
             playlist: false,
             metadata: HashMap::new(),
         }
@@ -60,7 +60,7 @@ impl DirOrSong {
             name,
             display_name: Some(display_name),
             full_path: String::new(),
-            last_modified: chrono::Utc::now(),
+            last_modified: jiff::Timestamp::now(),
             playlist: false,
             metadata,
         }
@@ -71,7 +71,7 @@ impl DirOrSong {
             name,
             display_name: None,
             full_path: String::new(),
-            last_modified: chrono::Utc::now(),
+            last_modified: jiff::Timestamp::now(),
             playlist: true,
             metadata: HashMap::new(),
         }
@@ -88,7 +88,7 @@ impl DirOrSong {
         matches!(self, DirOrSong::Dir { name, playlist: false, .. } if hidden.iter().any(|h| h == name))
     }
 
-    pub fn last_modified(&self) -> chrono::DateTime<chrono::Utc> {
+    pub fn last_modified(&self) -> jiff::Timestamp {
         match self {
             DirOrSong::Dir { last_modified, .. } => *last_modified,
             DirOrSong::Song(song) => song.last_modified,
@@ -481,13 +481,13 @@ mod ordtest {
     };
 
     static LAST_ID: AtomicU32 = AtomicU32::new(1);
-    static NOW: LazyLock<chrono::DateTime<chrono::Utc>> = LazyLock::new(chrono::Utc::now);
+    static NOW: LazyLock<jiff::Timestamp> = LazyLock::new(jiff::Timestamp::now);
     pub fn new_id() -> u32 {
         LAST_ID.fetch_add(1, std::sync::atomic::Ordering::Relaxed)
     }
 
     fn song(name: &str, metadata: &[(&str, &str)]) -> DirOrSong {
-        song_mtime(name, metadata, &NOW.to_rfc3339())
+        song_mtime(name, metadata, &NOW.to_string())
     }
 
     fn song_mtime(name: &str, metadata: &[(&str, &str)], mtime: &str) -> DirOrSong {
@@ -505,7 +505,7 @@ mod ordtest {
     }
 
     fn dir(name: &str) -> DirOrSong {
-        dir_mtime(name, &NOW.to_rfc3339())
+        dir_mtime(name, &NOW.to_string())
     }
 
     fn dir_mtime(name: &str, mtime: &str) -> DirOrSong {
@@ -994,7 +994,7 @@ mod ordtest {
                     "disc".to_string(),
                     MetadataTag::Single(disc.to_string()),
                 )]),
-                last_modified: NOW.to_rfc3339().parse().unwrap(),
+                last_modified: NOW.to_string().parse().unwrap(),
                 added: None,
             }
         }

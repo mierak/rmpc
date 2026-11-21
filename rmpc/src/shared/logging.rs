@@ -187,8 +187,8 @@ pub fn structured_detailed_format(
     }
     write!(
         w,
-        r#"{} {:<5} thread={} {}:{} message="{}" {}"#,
-        now.now_utc_owned().to_rfc3339_opts(chrono::SecondsFormat::Nanos, true),
+        r#"{:.9} {:<5} thread={} {}:{} message="{}" {}"#,
+        now.now_utc_owned().timestamp(),
         record.level().to_string(),
         std::thread::current().name().unwrap_or("<unnamed>"),
         record.file().unwrap_or("<unnamed>"),

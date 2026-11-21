@@ -519,7 +519,7 @@ mod on_idle_event {
 }
 
 static LAST_ID: AtomicU32 = AtomicU32::new(1);
-static NOW: LazyLock<chrono::DateTime<chrono::Utc>> = LazyLock::new(chrono::Utc::now);
+static NOW: LazyLock<jiff::Timestamp> = LazyLock::new(jiff::Timestamp::now);
 
 pub fn new_id() -> u32 {
     LAST_ID.fetch_add(1, Ordering::Relaxed)

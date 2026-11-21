@@ -201,7 +201,6 @@ mod tests {
     };
 
     use bon::builder;
-    use chrono::DateTime;
     use rmpc_mpd::commands::{Song, metadata_tag::MetadataTag};
 
     use super::LrcIndex;
@@ -220,8 +219,8 @@ mod tests {
             file: String::new(),
             duration,
             metadata,
-            last_modified: DateTime::default(),
-            added: Some(DateTime::default()),
+            last_modified: jiff::Timestamp::default(),
+            added: Some(jiff::Timestamp::default()),
         }
     }
 

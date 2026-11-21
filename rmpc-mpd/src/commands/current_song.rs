@@ -1,7 +1,7 @@
 use std::{collections::HashMap, time::Duration};
 
 use anyhow::Context;
-use chrono::{DateTime, Utc};
+use jiff::Timestamp;
 use serde::Serialize;
 
 use super::metadata_tag::MetadataTag;
@@ -16,9 +16,9 @@ pub struct Song {
     pub file: String,
     pub duration: Option<Duration>,
     pub metadata: HashMap<String, MetadataTag>,
-    pub last_modified: DateTime<Utc>,
+    pub last_modified: Timestamp,
     // Option because it is present from mpd 0.24 onwards
-    pub added: Option<DateTime<Utc>>,
+    pub added: Option<Timestamp>,
 }
 
 impl Song {

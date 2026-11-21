@@ -10,7 +10,7 @@ rust-version.workspace = true
 [dependencies]
 rmpc-shared = { path = "../rmpc-shared" }
 anyhow = { workspace = true }
-chrono = { workspace = true }
+jiff = { workspace = true }
 derive_more = { workspace = true }
 enum-map = { workspace = true }
 itertools = { workspace = true }

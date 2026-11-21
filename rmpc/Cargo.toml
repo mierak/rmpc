@@ -20,7 +20,7 @@ anyhow = { workspace = true }
 base64 = { workspace = true }
 bitflags = { workspace = true }
 bon = { workspace = true }
-chrono = { workspace = true }
+jiff = { workspace = true }
 clap = { workspace = true }
 color_quant = { workspace = true }
 crossbeam = { workspace = true }
