@@ -12,11 +12,15 @@ pub fn create(lua: &Lua) -> mlua::Result<Table> {
 
             debug!(program = %program, args = ?args, "Running command");
 
-            let mut child = tokio::process::Command::new(program)
-                .args(args)
-                .kill_on_drop(true)
-                .spawn()
-                .map_err(mlua::Error::external)?;
+            let spawned =
+                tokio::process::Command::new(program).args(args).kill_on_drop(true).spawn();
+            let mut child = match spawned {
+                Ok(child) => child,
+                Err(err) => {
+                    error!(err = ?err, program = %program, "Failed to spawn process");
+                    return Ok((None, Some(err.to_string())));
+                }
+            };
             let pid = child.id();
 
             let program = program.clone();

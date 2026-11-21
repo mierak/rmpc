@@ -1,4 +1,4 @@
-use mlua::{ExternalError, IntoLuaMulti, Lua, Table, Value};
+use mlua::{IntoLuaMulti, Lua, Table, Value};
 use tracing::error;
 
 pub fn create(lua: &Lua) -> mlua::Result<Table> {
@@ -10,7 +10,7 @@ pub fn create(lua: &Lua) -> mlua::Result<Table> {
                 Ok(exists) => exists.into_lua_multi(&lua),
                 Err(err) => {
                     error!(err = ?err, path, "Failed to check if file exists");
-                    (false, err.into_lua_err()).into_lua_multi(&lua)
+                    (false, err.to_string()).into_lua_multi(&lua)
                 }
             }
         })?;
@@ -20,7 +20,7 @@ pub fn create(lua: &Lua) -> mlua::Result<Table> {
             Ok(()) => true.into_lua_multi(&lua),
             Err(err) => {
                 error!(err = ?err, path, "Failed to create directory");
-                (false, err.into_lua_err()).into_lua_multi(&lua)
+                (false, err.to_string()).into_lua_multi(&lua)
             }
         }
     })?;
@@ -30,7 +30,7 @@ pub fn create(lua: &Lua) -> mlua::Result<Table> {
             Ok(()) => true.into_lua_multi(&lua),
             Err(err) => {
                 error!(err = ?err, path, "Failed to create directory");
-                (false, err.into_lua_err()).into_lua_multi(&lua)
+                (false, err.to_string()).into_lua_multi(&lua)
             }
         }
     })?;
@@ -40,7 +40,7 @@ pub fn create(lua: &Lua) -> mlua::Result<Table> {
             Ok(()) => true.into_lua_multi(&lua),
             Err(err) => {
                 error!(err = ?err, path, "Failed to write file");
-                (false, err.into_lua_err()).into_lua_multi(&lua)
+                (false, err.to_string()).into_lua_multi(&lua)
             }
         }
     })?;
@@ -51,7 +51,7 @@ pub fn create(lua: &Lua) -> mlua::Result<Table> {
                 Ok(()) => true.into_lua_multi(&lua),
                 Err(err) => {
                     error!(err = ?err, path, "Failed to write file");
-                    (false, err.into_lua_err()).into_lua_multi(&lua)
+                    (false, err.to_string()).into_lua_multi(&lua)
                 }
             }
         })?;
@@ -62,7 +62,7 @@ pub fn create(lua: &Lua) -> mlua::Result<Table> {
                 Ok(()) => true.into_lua_multi(&lua),
                 Err(err) => {
                     error!(err = ?err, path, "Failed to delete file");
-                    (false, err.into_lua_err()).into_lua_multi(&lua)
+                    (false, err.to_string()).into_lua_multi(&lua)
                 }
             }
         })?;
@@ -72,7 +72,7 @@ pub fn create(lua: &Lua) -> mlua::Result<Table> {
             Ok(()) => true.into_lua_multi(&lua),
             Err(err) => {
                 error!(err = ?err, path, "Failed to delete directory");
-                (false, err.into_lua_err()).into_lua_multi(&lua)
+                (false, err.to_string()).into_lua_multi(&lua)
             }
         }
     })?;
@@ -82,7 +82,7 @@ pub fn create(lua: &Lua) -> mlua::Result<Table> {
             Ok(()) => true.into_lua_multi(&lua),
             Err(err) => {
                 error!(err = ?err, path, "Failed to delete directory");
-                (false, err.into_lua_err()).into_lua_multi(&lua)
+                (false, err.to_string()).into_lua_multi(&lua)
             }
         }
     })?;
@@ -92,7 +92,7 @@ pub fn create(lua: &Lua) -> mlua::Result<Table> {
             Ok(contents) => contents.into_lua_multi(&lua),
             Err(err) => {
                 error!(err = ?err, path, "Failed to read file");
-                (Value::Nil, err.into_lua_err()).into_lua_multi(&lua)
+                (Value::Nil, err.to_string()).into_lua_multi(&lua)
             }
         })?;
 
@@ -101,7 +101,7 @@ pub fn create(lua: &Lua) -> mlua::Result<Table> {
             Ok(contents) => contents.into_lua_multi(&lua),
             Err(err) => {
                 error!(err = ?err, path, "Failed to read file");
-                (Value::Nil, err.into_lua_err()).into_lua_multi(&lua)
+                (Value::Nil, err.to_string()).into_lua_multi(&lua)
             }
         }
     })?;

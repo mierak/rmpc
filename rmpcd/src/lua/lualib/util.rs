@@ -1,6 +1,6 @@
 use std::{collections::HashSet, fmt::Write};
 
-use mlua::{ExternalError, IntoLuaMulti, Lua, LuaSerdeExt, Table, Value};
+use mlua::{IntoLuaMulti, Lua, LuaSerdeExt, Table, Value};
 use tracing::info;
 
 pub fn create(lua: &Lua) -> mlua::Result<Table> {
@@ -21,30 +21,11 @@ pub fn create(lua: &Lua) -> mlua::Result<Table> {
 
     let nil_or_null = lua.create_function(|_, val: Value| Ok(val.is_nil() || val.is_null()))?;
 
-    let deserialize_ron = lua.create_function(|lua, data: Vec<u8>| {
-        let mut val = match ron::de::Deserializer::from_bytes(&data) {
-            Ok(val) => val,
-            Err(err) => {
-                return (Value::Nil, err.into_lua_err()).into_lua_multi(lua);
-            }
-        };
-
-        let result: ron::Value = match serde_path_to_error::deserialize(&mut val) {
-            Ok(val) => val,
-            Err(err) => {
-                return (Value::Nil, err.into_lua_err()).into_lua_multi(lua);
-            }
-        };
-
-        let val = match lua.to_value(&result) {
-            Ok(val) => val,
-            Err(err) => {
-                return (Value::Nil, err.into_lua_err()).into_lua_multi(lua);
-            }
-        };
-
-        (val, Value::Nil).into_lua_multi(lua)
-    })?;
+    let deserialize_ron =
+        lua.create_function(|lua, data: Vec<u8>| match parse_ron(lua, &data) {
+            Ok(val) => (val, Value::Nil).into_lua_multi(lua),
+            Err(err) => (Value::Nil, err).into_lua_multi(lua),
+        })?;
 
     let json_encode = lua.create_function(|lua, val: Value| {
         let json = match lua.from_value::<serde_json::Value>(val) {
@@ -77,6 +58,12 @@ pub fn create(lua: &Lua) -> mlua::Result<Table> {
     tbl.set("deserialize_ron", deserialize_ron)?;
 
     Ok(tbl)
+}
+
+fn parse_ron(lua: &Lua, data: &[u8]) -> Result<Value, String> {
+    let mut de = ron::de::Deserializer::from_bytes(data).map_err(|e| e.to_string())?;
+    let value: ron::Value = serde_path_to_error::deserialize(&mut de).map_err(|e| e.to_string())?;
+    lua.to_value(&value).map_err(|e| e.to_string())
 }
 
 pub fn dump(v: &Value, indent: usize, seen: &mut HashSet<usize>) -> String {
