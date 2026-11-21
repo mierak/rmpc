@@ -327,7 +327,7 @@ macro_rules! tmux_write_bytes {
     ( $w:ident, $data:expr ) => {{
         use crate::{config::album_art::ImageMethod, shared::terminal::TERMINAL};
         let skip_passthrough = if let Some(backend) = TERMINAL.resolved_backend.get() {
-            matches!(backend, ImageMethod::Sixel) && *TERMINAL.sixel
+            matches!(backend, ImageMethod::Sixel) && TERMINAL.sixel()
         } else {
             false
         };

@@ -38,7 +38,7 @@ pub struct Terminal {
     emulator: Emulator,
     kitty_keyboard_protocol: bool,
     kitty_graphics: LazyLock<bool>,
-    pub sixel: LazyLock<bool>,
+    sixel: LazyLock<bool>,
     ueberzug_x11: LazyLock<bool>,
     ueberzug_wayland: LazyLock<bool>,
     pub resolved_backend: OnceLock<ImageMethod>,
@@ -103,6 +103,14 @@ impl Terminal {
         *self.ueberzug_x11
     }
 
+    pub fn sixel(&self) -> bool {
+        *self.sixel
+    }
+
+    pub fn kitty_graphics(&self) -> bool {
+        *self.kitty_graphics
+    }
+
     pub fn ueberzug_wayland(&self) -> bool {
         *self.ueberzug_wayland
     }
@@ -130,8 +138,22 @@ impl Terminal {
                 ImageMethod::Block
             }
             ImageMethodFile::Iterm2 => ImageMethod::Iterm2,
-            ImageMethodFile::Kitty => ImageMethod::Kitty,
-            ImageMethodFile::Sixel => ImageMethod::Sixel,
+            ImageMethodFile::Kitty => {
+                if !self.kitty_graphics() {
+                    log::warn!(
+                        "Kitty requested but not supported, images might not display correctly"
+                    );
+                }
+                ImageMethod::Kitty
+            }
+            ImageMethodFile::Sixel => {
+                if !self.sixel() {
+                    log::warn!(
+                        "Sixel requested but not supported, images might not display correctly"
+                    );
+                }
+                ImageMethod::Sixel
+            }
             ImageMethodFile::Block => ImageMethod::Block,
             ImageMethodFile::None => ImageMethod::None,
             ImageMethodFile::Auto if self.zellij => {
