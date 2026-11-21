@@ -59,7 +59,7 @@ async fn do_call(lua: Lua, url: &str, opts: Option<RequestOpts>) -> mlua::Result
         client = client.timeout(std::time::Duration::from_millis(ms));
     }
 
-    let result = lua.create_table()?;
+    let result = create_result(&lua)?;
 
     let response = match client.send().await {
         Ok(resp) => resp,
@@ -85,15 +85,20 @@ async fn do_call(lua: Lua, url: &str, opts: Option<RequestOpts>) -> mlua::Result
 
     result.raw_set("body", body)?;
 
+    Ok(result)
+}
+
+fn create_result(lua: &Lua) -> mlua::Result<Table> {
+    let result = lua.create_table()?;
+
     let json = lua.create_function(|lua, this: Table| {
-        let body = &this.get::<String>("body")?;
-        let json = serde_json::from_str::<serde_json::Value>(body).into_lua_err()?;
+        let Some(body) = this.get::<Option<String>>("body")? else {
+            return Ok(Value::Nil);
+        };
+        let json = serde_json::from_str::<serde_json::Value>(&body).into_lua_err()?;
         lua.to_value(&json)
     })?;
-    let text = lua.create_function(|_, this: Table| {
-        let body = &this.get::<String>("body")?;
-        Ok(body.clone())
-    })?;
+    let text = lua.create_function(|_, this: Table| this.get::<Option<String>>("body"))?;
 
     result.set("json", json)?;
     result.set("text", text)?;
@@ -205,12 +210,21 @@ mod tests {
         net::TcpListener,
     };
 
-    async fn get_with_secret(url: String) -> (Option<u16>, Option<String>, Option<String>) {
+    fn lua_with_url(url: String) -> Lua {
         let lua = Lua::new();
         lua.globals().set("http", super::create(&lua).unwrap()).unwrap();
         lua.globals().set("url", url).unwrap();
+        lua
+    }
 
-        lua.load("local r = http.get(url, { params = { sk = 'secret' } }) return r.code, r.error, r.body")
+    fn closed_port_url() -> String {
+        let listener = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
+        format!("http://{}/", listener.local_addr().unwrap())
+    }
+
+    async fn get_with_secret(url: String) -> (Option<u16>, Option<String>, Option<String>) {
+        lua_with_url(url)
+            .load("local r = http.get(url, { params = { sk = 'secret' } }) return r.code, r.error, r:text()")
             .eval_async()
             .await
             .unwrap()
@@ -259,14 +273,22 @@ mod tests {
 
     #[tokio::test]
     async fn connection_error_hides_query() {
-        let listener = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
-        let url = format!("http://{}/", listener.local_addr().unwrap());
-        drop(listener);
-
-        let (code, error, _) = get_with_secret(url).await;
+        let (code, error, _) = get_with_secret(closed_port_url()).await;
 
         assert_eq!(code, None);
         let error = error.expect("connection failure should set error");
         assert!(!error.contains("secret"), "error leaks the query string: {error}");
+    }
+
+    #[tokio::test]
+    async fn text_and_json_return_nil_without_body() {
+        let (text_is_nil, json_is_nil): (bool, bool) = lua_with_url(closed_port_url())
+            .load("local r = http.get(url) return r:text() == nil, r:json() == nil")
+            .eval_async()
+            .await
+            .unwrap();
+
+        assert!(text_is_nil);
+        assert!(json_is_nil);
     }
 }

@@ -5,7 +5,7 @@
 
 ---@class Sync
 ---@field set_timeout fun(timeout_ms: integer, callback: fun()): TimeoutHandle
----@field set_interval fun(interval_ms: integer, callback: fun(handle: TimeoutHandle)): TimeoutHandle
+---@field set_interval fun(interval_ms: integer, callback: fun(handle: TimeoutHandle)): (TimeoutHandle) Runs `callback` immediately, then every `interval_ms` milliseconds.
 ---@field sleep fun(ms: integer) Suspends the calling plugin for `ms` milliseconds. Use with caution as it pauses processing of any events by the plugin.
 
 ---@type Sync

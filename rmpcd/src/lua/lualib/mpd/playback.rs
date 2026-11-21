@@ -79,7 +79,7 @@ pub fn init(lua: &Lua, mpd: &Table, client: &Arc<AsyncClient>) -> Result<()> {
         async move {
             let Ok(value): mlua::Result<OnOffOneshot> = lua.from_value(value) else {
                 tracing::error!("Failed to parse value for single");
-                return (false, "Invalid consume value, expected 'on', 'off' or 'oneshot'")
+                return (false, "Invalid single value, expected 'on', 'off' or 'oneshot'")
                     .into_lua_multi(&lua);
             };
 

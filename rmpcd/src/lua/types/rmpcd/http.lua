@@ -25,8 +25,8 @@
 ---@field code integer|nil
 ---@field error string|nil
 ---@field body string|nil
----@field json fun(self: HttpResponse): any
----@field text fun(self: HttpResponse): string
+---@field json fun(self: HttpResponse): (any|nil) Decoded body, nil if the request failed before a body was read. Raises if the body is not valid JSON.
+---@field text fun(self: HttpResponse): (string|nil) The body, nil if the request failed before a body was read.
 
 ---@class RmpcdHttp
 ---@field call fun(url: string, opts?: HttpRequestOpts): HttpResponse
