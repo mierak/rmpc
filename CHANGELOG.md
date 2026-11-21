@@ -6,7 +6,7 @@ All notable changes to this project will be documented in this file.
 
 ### Added
 
-- `mpris_instance` rmpcd config option to register MPRIS as `org.mpris.MediaPlayer2.mpd.<instance>`,
+- `--instance`/`-i` rmpcd flag to register MPRIS as `org.mpris.MediaPlayer2.mpd.<instance>`,
   allowing multiple instances to expose MPRIS at once
 - `mpris_identity` rmpcd config option to set the player name shown by MPRIS clients
 - `preserve_order` option to `AddOptions`. Setting it to `false` makes adding of songs much faster

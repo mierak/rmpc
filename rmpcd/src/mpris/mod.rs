@@ -1,6 +1,6 @@
 use std::sync::Arc;
 
-use anyhow::{Context, Result, anyhow};
+use anyhow::{Context, Result, anyhow, ensure};
 use tokio::sync::{RwLock, mpsc::UnboundedSender};
 use tracing::error;
 use zbus::names::WellKnownName;
@@ -20,18 +20,21 @@ pub use tracklist::Tracklist;
 
 const BUS_NAME: &str = "org.mpris.MediaPlayer2.mpd";
 const DEFAULT_IDENTITY: &str = "Music Player Daemon";
+const INVALID_INSTANCE: &str =
+    "instance name must use ASCII letters, digits, '_' or '-', and not start with a digit";
 
 fn bus_name(instance: Option<&str>) -> Result<WellKnownName<'static>> {
     let Some(instance) = instance else {
         return Ok(WellKnownName::try_from(BUS_NAME)?);
     };
 
-    WellKnownName::try_from(format!("{BUS_NAME}.{instance}")).with_context(|| {
-        format!(
-            "Invalid mpris_instance '{instance}': use ASCII letters, digits, '_' or '-', and do \
-             not start with a digit"
-        )
-    })
+    ensure!(!instance.contains('.'), INVALID_INSTANCE);
+    WellKnownName::try_from(format!("{BUS_NAME}.{instance}")).context(INVALID_INSTANCE)
+}
+
+pub fn parse_instance(instance: &str) -> Result<String> {
+    bus_name(Some(instance))?;
+    Ok(instance.to_owned())
 }
 
 fn default_identity(instance: Option<&str>) -> String {
@@ -63,8 +66,8 @@ pub async fn setup(
         .await
         .map_err(|err| match err {
             zbus::Error::NameTaken => anyhow!(
-                "Failed to start mpris: {name} is already owned by another player. Set \
-                 mpris_instance to run more than one rmpcd with MPRIS"
+                "Failed to start mpris: {name} is already owned by another player. Use \
+                 --instance to run more than one rmpcd with MPRIS"
             ),
             err => anyhow::Error::new(err).context("Failed to start mpris"),
         })?;

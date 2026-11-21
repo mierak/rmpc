@@ -32,7 +32,6 @@ rmpcd = rmpcd
 ---@field address string Point to your mpd server, e.g. "localhost:6600".
 ---@field password string | nil Password for your mpd server, if any.
 ---@field mpris boolean | nil
----@field mpris_instance string | nil Register MPRIS as org.mpris.MediaPlayer2.mpd.<instance> so several rmpcd instances can expose MPRIS at once.
----@field mpris_identity string | nil Player name shown by MPRIS clients. Defaults to "Music Player Daemon", or "Music Player Daemon (<instance>)" when `mpris_instance` is set.
+---@field mpris_identity string | nil Player name shown by MPRIS clients. Defaults to "Music Player Daemon", or "Music Player Daemon (<instance>)" when started with `--instance`.
 ---@field inhibit_idle boolean | nil Prevent the system from going idle while MPD is playing.
 ---@field subscribed_channels string[] | nil

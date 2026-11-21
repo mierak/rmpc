@@ -43,6 +43,9 @@ mod subscribed_channels;
 #[derive(Parser, Debug)]
 #[command(version, about)]
 struct Args {
+    /// Instance name, registers MPRIS as org.mpris.MediaPlayer2.mpd.<INSTANCE>
+    #[arg(short, long, value_parser = mpris::parse_instance)]
+    instance: Option<String>,
     #[command(subcommand)]
     command: Option<Command>,
 }
@@ -135,7 +138,7 @@ async fn main() -> Result<()> {
     match args.command {
         Some(Command::Init) => run_init()?,
         Some(Command::Pkg { command }) => pkg::run_pkg(command).await?,
-        None => run().await?,
+        None => run(args.instance).await?,
     }
 
     Ok(())
@@ -183,7 +186,7 @@ fn run_init() -> Result<()> {
     Ok(())
 }
 
-async fn run() -> Result<()> {
+async fn run(instance: Option<String>) -> Result<()> {
     let start = std::time::Instant::now();
     let _log_guards = init_logging("debug")?;
 
@@ -271,7 +274,6 @@ async fn run() -> Result<()> {
 
     let enable_mpris = lua_config.get::<Option<bool>>("mpris")?.unwrap_or(false);
     let tx = if enable_mpris {
-        let instance = lua_config.get::<Option<String>>("mpris_instance")?;
         let identity = lua_config.get::<Option<String>>("mpris_identity")?;
         Some(mpris::setup(mpd.clone(), ctx.clone(), instance, identity).await?)
     } else {
