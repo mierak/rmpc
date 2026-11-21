@@ -58,8 +58,18 @@ pub async fn eval_config(
     let plugins: Arc<RwLock<Vec<_>>> = Arc::new(RwLock::new(Vec::new()));
     let lua = create(Some(cfg_dir), &mpd, Some(&plugins))?;
 
-    let file = std::fs::read(cfg_dir.join("init.lua"))
-        .context("Failed to read config. Did you initialize your config? Try 'rmpcd init'")?;
+    let config_file = Paths::config_file();
+    let file = std::fs::read(config_file).with_context(|| {
+        let init_cmd = if Paths::get().config_file_overridden {
+            format!("rmpcd --config {} init", config_file.display())
+        } else {
+            "rmpcd init".to_owned()
+        };
+        format!(
+            "Failed to read config at '{}'. Did you initialize your config? Try '{init_cmd}'",
+            config_file.display()
+        )
+    })?;
     let lua_config: Table = lua.load(&file).eval_async().await?;
 
     Ok((lua, lua_config, plugins))
