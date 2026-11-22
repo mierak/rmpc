@@ -11,6 +11,7 @@ static PATHS: OnceLock<Paths> = OnceLock::new();
 #[allow(dead_code)]
 pub struct Paths {
     pub config: PathBuf,
+    pub config_overridden: bool,
     pub cache: PathBuf,
     pub plugins: PathBuf,
     pub type_def: PathBuf,
@@ -20,8 +21,9 @@ pub struct Paths {
 
 #[allow(dead_code)]
 impl Paths {
-    fn new() -> Result<Self> {
-        let Some(config) = rmpcd_config_dir() else {
+    fn new(config_dir: Option<PathBuf>) -> Result<Self> {
+        let config_overridden = config_dir.is_some();
+        let Some(config) = config_dir.or_else(rmpcd_config_dir) else {
             bail!("Could not determine config directory");
         };
 
@@ -49,6 +51,7 @@ impl Paths {
 
         Ok(Self {
             config: config.canonicalize().context("Failed to canonicalize config directory")?,
+            config_overridden,
             cache: cache.canonicalize().context("Failed to canonicalize cache directory")?,
             plugins: plugins.canonicalize().context("Failed to canonicalize plugins directory")?,
             type_def: type_def
@@ -67,8 +70,8 @@ impl Paths {
         PATHS.get().expect("Paths not initialized")
     }
 
-    pub fn init() -> Result<&'static Self> {
-        let paths = Self::new()?;
+    pub fn init(config_dir: Option<PathBuf>) -> Result<&'static Self> {
+        let paths = Self::new(config_dir)?;
         PATHS.set(paths).map_err(|_| anyhow::anyhow!("Paths already initialized"))?;
         Ok(Self::get())
     }

@@ -1,11 +1,11 @@
 use std::{
-    path::Path,
+    path::{Path, PathBuf},
     sync::Arc,
     time::{SystemTime, UNIX_EPOCH},
 };
 
-use anyhow::Result;
-use clap::{Parser, Subcommand};
+use anyhow::{Context, Result};
+use clap::{Parser, Subcommand, ValueHint};
 use rmpc_mpd::{
     commands::{IdleEvent, Status},
     mpd_client::{AlbumArtOrder, MpdClient},
@@ -43,6 +43,9 @@ mod subscribed_channels;
 #[derive(Parser, Debug)]
 #[command(version, about)]
 struct Args {
+    /// Path to the config directory
+    #[arg(short, long, global = true, value_name = "DIR", value_hint = ValueHint::DirPath)]
+    config: Option<PathBuf>,
     /// Instance name, registers MPRIS as org.mpris.MediaPlayer2.mpd.<INSTANCE>
     #[arg(short, long, value_parser = mpris::parse_instance)]
     instance: Option<String>,
@@ -128,7 +131,7 @@ fn init_logging(level: &str, log_to_stderr: bool) -> Result<(WorkerGuard, Option
 #[tokio::main]
 async fn main() -> Result<()> {
     let args = Args::parse();
-    Paths::init()?;
+    Paths::init(args.config)?;
 
     let _lock = match &args.command {
         Some(Command::Pkg { command }) => match command {
@@ -159,7 +162,9 @@ fn run_init() -> Result<()> {
     }
 
     let default_config = include_str!("../../assets/rmpcd/example_init.lua");
-    std::fs::write(&init_lua_path, default_config)?;
+    std::fs::write(&init_lua_path, default_config).with_context(|| {
+        format!("Failed to write default config to '{}'", init_lua_path.display())
+    })?;
 
     info!("Created default config at '{}'", init_lua_path.display());
 
