@@ -31,10 +31,13 @@ impl LuaPluginSpec {
 
             let tbl = lua.create_table()?;
             let setup = lua.create_async_function(
-                move |_lua, (_self, args): (mlua::Value, mlua::Value)| {
+                move |_lua, (_self, args): (mlua::Value, Option<mlua::Table>)| {
                     let entry_clone = entry_clone.clone();
                     async move {
-                        let json = serde_json::to_string(&args).into_lua_err()?;
+                        let json = match args {
+                            Some(args) => serde_json::to_string(&args).into_lua_err()?,
+                            None => String::from("{}"),
+                        };
                         *entry_clone.write().await.args_mut() = json;
                         Ok(())
                     }

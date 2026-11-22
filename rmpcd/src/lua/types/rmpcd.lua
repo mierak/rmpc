@@ -1,16 +1,20 @@
 ---@alias IdleEvent "player" | "mixer" | "options" | "playlist" | "database" | "update" | "stored_playlist" | "sticker" | "subscription" | "shelf"
 
 ---@class RmpcdGlobal
----@field install fun(path: string): RmpcdPlugin
----@field install fun(path: "#builtin.lastfm"): LastFmPlugin
----@field install fun(path: "#builtin.notify"): NotifyPlugin
----@field install fun(path: "#builtin.playcount"): PlaycountPlugin
----@field install fun(path: "#builtin.lyrics"): LyricsPlugin
----@field install fun(spec: RmpcdPluginSpec): RmpcdPlugin
+---@field install fun(path: string): RmpcdPluginHandle<table>
+---@field install fun(path: "#builtin.lastfm"): RmpcdPluginHandle<LastFmArgs>
+---@field install fun(path: "#builtin.notify"): RmpcdPluginHandle<NotifyArgs>
+---@field install fun(path: "#builtin.playcount"): RmpcdPluginHandle<{ enabled?: boolean }>
+---@field install fun(path: "#builtin.lyrics"): RmpcdPluginHandle<LyricsArgs>
+---@field install fun(spec: RmpcdPluginSpec): RmpcdPluginHandle<table>
 
 ---@class RmpcdPluginSpec
 ---@field url string
 ---@field branch string | nil
+
+---@generic Args
+---@class RmpcdPluginHandle<Args>
+---@field setup fun(self, args: Args)
 
 ---@generic Args
 ---@class RmpcdPlugin<Args>
