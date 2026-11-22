@@ -1,96 +1,90 @@
 # rmpcd
 
 > [!WARNING]
-This project is in its very early stages and is not ready for daily use. Expect
-changes to basically everything with no regards to backwards compatibility at
-this point.
-
-> [!WARNING]
-The README is not kept strictly up to date at the moment
+> This project is in its very early stages and is not ready for daily use. Expect
+> changes to basically everything with no regards to backwards compatibility at
+> this point.
 
 A companion MPD client to rmpc intended to run as a daemon.
 
-Features(so far):
-* Fully configurable with Lua
-* MPRIS server implementation
-* Plugin support with custom API
-* Builtin [LastFM plugin](https://github.com/mierak/rmpc/blob/master/rmpcd/src/lua/builtin/lastfm.lua)
-* Builtin [Playcount tracking plugin](https://github.com/mierak/rmpc/blob/master/rmpcd/src/lua/builtin/playcount.lua)
-* Builtin [Notification plugin](https://github.com/mierak/rmpc/blob/master/rmpcd/src/lua/builtin/notify.lua)
-* Builtin [Lyrics download plugin](https://github.com/mierak/rmpc/blob/master/rmpcd/src/lua/builtin/lyrics.lua)
+## Get started
 
-## Usage
+Description, configuration and installation methods can be found on the [rmpcd website](https://rmpc.mierak.dev/rmpcd/)
 
-Clone the repo and run `cargo run --release --package rmpcd` from the repo root.
+## Features
 
-Create a config file at `~/.config/rmpcd/init.lua`.
+- Fully configurable with Lua
+- MPRIS server implementation
+- Idle inhibition when music is playing
+- Full plugin support
+- Built-in plugin manager
+- A few official plugins:
+  - [Last.fm](https://github.com/rmpc-org/rmpcd-lastfm)
+  - [Playcount](https://github.com/rmpc-org/rmpcd-playcount)
+  - [Notify](https://github.com/rmpc-org/rmpcd-notify)
+  - [Lyrics](https://github.com/rmpc-org/rmpcd-lyrics)
+  - [Discord rich presence](https://github.com/rmpc-org/rmpcd-discord-rich-presence)
+  - [Last played](https://github.com/rmpc-org/rmpcd-lastplayed)
 
-Address has the same syntax as [rmpc](https://rmpc.mierak.dev/configuration/#address)
+- A growing list of [community created plugins](https://github.com/rmpc-org/rmpcd-plugins)
 
-Check `rmpcd/src/lua/builtin` for usage examples and type definitions.
+## Installation
 
-Plugins run completely isolated from each other, they have separate global state etc.
+Rmpcd can currently only be built from source code, installed via AUR or using the provided Nix flake.
 
-Each of the builtin plugins are built in a way that they can be disabled at
-runtime by sending a message to MPD channel for the corresponding plugin.
-For example with rmpc's CLI:
-- Disable Lastfm scrobbling: `rmpc sendmessage rmpcd.lastfm disable`
-- Enable Lastfm scrobbling: `rmpc sendmessage rmpcd.lastfm enable`
-- Toggle Lastfm scrobbling: `rmpc sendmessage rmpcd.lastfm toggle`
+### AUR
 
-Custom plugins can be installed by `rmpcd.install`ing them as you would
-`require` normal lua modules. If you have `plugin.lua` next to your `init.lua`
-for example you can install it ith `rmpcd.install("plugin")` or
-`plugins/custom.lua` can be installed by `rmpcd.install("plugins.custom")`.
-
-Example:
-```lua
---@type Config
-local config = {}
-
-config.address = "@mpd"
-config.mpris = false
-
--- Prevent screen lock and idle suspend while MPD is playing
-config.inhibit_idle = true
-
--- If you wish to subscribe to additional MPD channels
-config.subscribe_channels = { "test" }
-
--- Automatically increment play count on song change
-rmpcd.install("#builtin.playcount")
-
--- Install last fm scrobbling builtin
--- For now you have to request an API key yourself due to LastFM's insane API
--- design https://www.last.fm/api/account/create
-rmpcd.install("#builtin.lastfm"):setup({
-	api_key = "<your api key here>",
-	shared_secret = "<your secret here>",
-	update_now_playing = false,
-	-- Where to cache the Last.fm session key (default: /tmp/rmpcd-lastfm-session-key)
-    session_key_path = os.getenv("HOME") .. "/.local/share/rmpcd/lastfm-session-key",
-})
-
--- Install notification on song change builtin
-rmpcd.install("#builtin.notify")
-
--- Install the auto lyrics download builtin
-rmpcd.install("#builtin.lyrics")
-
-return config
+```bash
+yay -S rmpcd-git
 ```
 
-## LuaLS type definitions
+### Building from source
 
-Type definitions are in `rmpcd/src/lua/builtin/types/`. Include them in your
-config by creating a `.luarc.json` in your config root (next to init.lua). In
-the future there will be a more convenient way to eject the type definitions
-from rmpcd directly.
+This assumes you have git and rust installed already.
 
-```json
+```bash
+# Either with cargo directly
+cargo install --git https://github.com/mierak/rmpc.git rmpcd
+
+# Or clone the repo and run
+git clone https://github.com/mierak/rmpc.git
+cd rmpc
+
+cargo run --release --package rmpcd -- init
+cargo run --release --package rmpcd
+```
+
+### NixOS
+
+With the flake added to your flake inputs, add the package to your system configuration:
+
+```nix title="configuration.nix"
+{ inputs, pkgs, ... }:
+
 {
-    "workspace.library": [
-        "<path to repo>/rmpcd/src/lua/builtin/types"
-    ]
+  environment.systemPackages = with pkgs; [
+    inputs.rmpc.packages.${pkgs.stdenv.hostPlatform.system}.rmpcd
+  ];
 }
 ```
+
+## Setup
+
+After installation run:
+
+```bash
+rmpcd init
+# You will see output similar to:
+2026-03-28T23:42:17.918458Z  INFO rmpcd/src/main.rs:109: Created default config at '/home/<user>/.config/rmpcd/init.lua'
+2026-03-28T23:42:17.918924Z  INFO rmpcd/src/main.rs:124: Created Lua API type definitions at '/home/<user>/.local/share/rmpcd/lua'
+```
+
+This will create a default `init.lua` at the path shown in the log. It will also generate a
+`.luarc.json` file pointing to the type definitions, allowing your editor to provide autocompletion
+if you have the [Lua language server](https://github.com/LuaLS/lua-language-server) installed and
+configured.
+
+Installing plugins will also download their type definitions and they should work automatically.
+
+Rmpcd will keep the generated type definitions up to date automatically. Make sure to not edit these
+files directly.
