@@ -4,7 +4,7 @@ use std::{
     time::{SystemTime, UNIX_EPOCH},
 };
 
-use anyhow::Result;
+use anyhow::{Context, Result};
 use clap::{Parser, Subcommand, ValueHint};
 use rmpc_mpd::{
     commands::{IdleEvent, Status},
@@ -43,8 +43,8 @@ mod subscribed_channels;
 #[derive(Parser, Debug)]
 #[command(version, about)]
 struct Args {
-    /// Path to a config file or directory
-    #[arg(short, long, global = true, value_name = "PATH", value_hint = ValueHint::AnyPath)]
+    /// Path to the config directory
+    #[arg(short, long, global = true, value_name = "DIR", value_hint = ValueHint::DirPath)]
     config: Option<PathBuf>,
     /// Instance name, registers MPRIS as org.mpris.MediaPlayer2.mpd.<INSTANCE>
     #[arg(short, long, value_parser = mpris::parse_instance)]
@@ -154,38 +154,35 @@ fn run_init() -> Result<()> {
     let _log_guards = init_logging("info", true)?;
 
     let cfg_dir = Paths::config_dir();
-    let init_lua_path = Paths::config_file();
+    let init_lua_path = cfg_dir.join("init.lua");
 
     if init_lua_path.exists() {
-        warn!("Config already exists at '{}', exiting...", init_lua_path.display());
+        warn!("Config directory already exists at '{}', exiting...", cfg_dir.display());
         std::process::exit(1);
     }
 
     let default_config = include_str!("../../assets/rmpcd/example_init.lua");
-    std::fs::write(init_lua_path, default_config)?;
+    std::fs::write(&init_lua_path, default_config).with_context(|| {
+        format!("Failed to write default config to '{}'", init_lua_path.display())
+    })?;
 
     info!("Created default config at '{}'", init_lua_path.display());
 
     match lua::type_def_eject::eject() {
         Ok(path) => {
-            let luarc_path = cfg_dir.join(".luarc.json");
-            if luarc_path.exists() {
-                info!("'{}' already exists, skipping", luarc_path.display());
-            } else {
-                let value = &json!({
-                    "workspace.library": [
-                        path.display().to_string(),
-                        Paths::plugins_dir().display().to_string(),
-                    ]
-                });
-                let buf = Vec::new();
-                let formatter = serde_json::ser::PrettyFormatter::with_indent(b"    ");
-                let mut ser = serde_json::Serializer::with_formatter(buf, formatter);
-                value.serialize(&mut ser)?;
-                let luarc = String::from_utf8(ser.into_inner())?;
+            let value = &json!({
+                "workspace.library": [
+                    path.display().to_string(),
+                    Paths::plugins_dir().display().to_string(),
+                ]
+            });
+            let buf = Vec::new();
+            let formatter = serde_json::ser::PrettyFormatter::with_indent(b"    ");
+            let mut ser = serde_json::Serializer::with_formatter(buf, formatter);
+            value.serialize(&mut ser)?;
+            let luarc = String::from_utf8(ser.into_inner())?;
 
-                std::fs::write(&luarc_path, luarc)?;
-            }
+            std::fs::write(cfg_dir.join(".luarc.json"), luarc)?;
 
             info!("Created Lua API type definitions at '{}'", path.display());
         }
