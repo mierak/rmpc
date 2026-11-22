@@ -340,28 +340,24 @@ mod test {
 
         assert!(result.is_ok());
         assert_eq!(calls!(fs, "remove_file").len(), 1);
-        assert_eq!(calls!(fs, "write").len(), 16);
+        assert_eq!(calls!(fs, "write").len(), 12);
         for f in [
             "/home/user/.local/share/rmpcd/lua/rmpcd.lua",
             "/home/user/.local/share/rmpcd/lua/rmpcd/log.lua",
-            "/home/user/.local/share/rmpcd/lua/rmpcd/lyrics.lua",
             "/home/user/.local/share/rmpcd/lua/rmpcd/util.lua",
             "/home/user/.local/share/rmpcd/lua/rmpcd/http.lua",
             "/home/user/.local/share/rmpcd/lua/rmpcd/process.lua",
-            "/home/user/.local/share/rmpcd/lua/rmpcd/lastfm.lua",
             "/home/user/.local/share/rmpcd/lua/rmpcd/mpd/song.lua",
             "/home/user/.local/share/rmpcd/lua/rmpcd/mpd/init.lua",
             "/home/user/.local/share/rmpcd/lua/rmpcd/mpd/status.lua",
-            "/home/user/.local/share/rmpcd/lua/rmpcd/playcount.lua",
             "/home/user/.local/share/rmpcd/lua/rmpcd/fs.lua",
-            "/home/user/.local/share/rmpcd/lua/rmpcd/notify.lua",
             "/home/user/.local/share/rmpcd/lua/rmpcd/sync.lua",
             "/home/user/.local/share/rmpcd/lua/rmpcd/socket.lua",
             "/home/user/.local/share/rmpcd/lua/manifest.json",
         ] {
             assert!(calls!(fs, "write").contains(&f.to_string()), "Expected write call for '{f}'");
         }
-        assert_eq!(calls!(fs, "create_dir_all").len(), 15);
+        assert_eq!(calls!(fs, "create_dir_all").len(), 11);
     }
 
     #[test]
@@ -374,7 +370,7 @@ mod test {
         assert!(result.is_ok(), "{result:?}");
         assert_eq!(calls!(fs, "exists"), &vec![format!("{DATA_DIR}/manifest.json")]);
         assert_eq!(calls!(fs, "read_str").as_slice(), &[] as &[&str]);
-        assert_eq!(calls!(fs, "write").len(), 16);
+        assert_eq!(calls!(fs, "write").len(), 12);
     }
 
     #[test]
@@ -386,21 +382,17 @@ mod test {
         let result = eject_inner(&fs, Path::new(DATA_DIR));
 
         assert!(result.is_ok());
-        assert_eq!(calls!(fs, "write").len(), 16);
+        assert_eq!(calls!(fs, "write").len(), 12);
         for f in [
             "/home/user/.local/share/rmpcd/lua/rmpcd.lua",
             "/home/user/.local/share/rmpcd/lua/rmpcd/log.lua",
-            "/home/user/.local/share/rmpcd/lua/rmpcd/lyrics.lua",
             "/home/user/.local/share/rmpcd/lua/rmpcd/util.lua",
             "/home/user/.local/share/rmpcd/lua/rmpcd/http.lua",
             "/home/user/.local/share/rmpcd/lua/rmpcd/process.lua",
-            "/home/user/.local/share/rmpcd/lua/rmpcd/lastfm.lua",
             "/home/user/.local/share/rmpcd/lua/rmpcd/mpd/song.lua",
             "/home/user/.local/share/rmpcd/lua/rmpcd/mpd/init.lua",
             "/home/user/.local/share/rmpcd/lua/rmpcd/mpd/status.lua",
-            "/home/user/.local/share/rmpcd/lua/rmpcd/playcount.lua",
             "/home/user/.local/share/rmpcd/lua/rmpcd/fs.lua",
-            "/home/user/.local/share/rmpcd/lua/rmpcd/notify.lua",
             "/home/user/.local/share/rmpcd/lua/rmpcd/sync.lua",
             "/home/user/.local/share/rmpcd/lua/rmpcd/socket.lua",
             "/home/user/.local/share/rmpcd/lua/manifest.json",
@@ -408,7 +400,7 @@ mod test {
             assert!(calls!(fs, "write").contains(&f.to_string()), "Expected write call for '{f}'");
         }
 
-        assert_eq!(calls!(fs, "create_dir_all").len(), 15);
+        assert_eq!(calls!(fs, "create_dir_all").len(), 11);
     }
 
     #[test]
@@ -431,21 +423,17 @@ mod test {
         .unwrap();
         assert_eq!(m.rmpcd_version, crate_version);
         assert_eq!(m.hash, hash);
-        assert_eq!(m.files.len(), 15);
+        assert_eq!(m.files.len(), 11);
         for f in [
             "rmpcd.lua",
             "rmpcd/log.lua",
-            "rmpcd/lyrics.lua",
             "rmpcd/util.lua",
             "rmpcd/http.lua",
             "rmpcd/process.lua",
-            "rmpcd/lastfm.lua",
             "rmpcd/mpd/song.lua",
             "rmpcd/mpd/init.lua",
             "rmpcd/mpd/status.lua",
-            "rmpcd/playcount.lua",
             "rmpcd/fs.lua",
-            "rmpcd/notify.lua",
             "rmpcd/sync.lua",
             "rmpcd/socket.lua",
         ] {

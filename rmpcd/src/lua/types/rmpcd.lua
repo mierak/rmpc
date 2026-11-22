@@ -2,10 +2,6 @@
 
 ---@class RmpcdGlobal
 ---@field install fun(path: string): RmpcdPluginHandle<table>
----@field install fun(path: "#builtin.lastfm"): RmpcdPluginHandle<LastFmArgs>
----@field install fun(path: "#builtin.notify"): RmpcdPluginHandle<NotifyArgs>
----@field install fun(path: "#builtin.playcount"): RmpcdPluginHandle<{ enabled?: boolean }>
----@field install fun(path: "#builtin.lyrics"): RmpcdPluginHandle<LyricsArgs>
 ---@field install fun(spec: RmpcdPluginSpec): RmpcdPluginHandle<table>
 
 ---@class RmpcdPluginSpec

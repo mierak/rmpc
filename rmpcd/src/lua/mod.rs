@@ -43,7 +43,6 @@ pub fn create(
     lua.globals().raw_set("rmpcd", &rmpcd)?;
 
     install_lib(&lua, client, plugins)?;
-    install_builtins(&lua)?;
 
     Ok(lua)
 }
@@ -89,23 +88,6 @@ pub fn install_lib(
     install_lib!(fs);
     install_lib!(util);
     install_lib!(socket);
-
-    Ok(())
-}
-
-pub fn install_builtins(lua: &Lua) -> mlua::Result<()> {
-    macro_rules! install_builtin {
-        ($name:literal) => {
-            lua.load(include_str!(concat!("./builtin/", $name, ".lua")))
-                .set_name(concat!("#builtin/", $name, ".lua"))
-                .call::<Table>(())?;
-        };
-    }
-
-    install_builtin!("notify");
-    install_builtin!("playcount");
-    install_builtin!("lyrics");
-    install_builtin!("lastfm");
 
     Ok(())
 }

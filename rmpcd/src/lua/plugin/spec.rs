@@ -5,7 +5,6 @@ use tokio::sync::RwLock;
 
 #[derive(Clone, Debug)]
 pub enum LuaPluginSpec {
-    Builtin(BuiltinPluginSpec),
     Local(LocalPluginSpec),
     Remote(RemotePluginSpec),
 }
@@ -13,7 +12,6 @@ pub enum LuaPluginSpec {
 impl LuaPluginSpec {
     pub fn args_mut(&mut self) -> &mut String {
         match self {
-            LuaPluginSpec::Builtin(spec) => &mut spec.args,
             LuaPluginSpec::Local(spec) => &mut spec.args,
             LuaPluginSpec::Remote(spec) => &mut spec.args,
         }
@@ -53,26 +51,31 @@ impl LuaPluginSpec {
             mlua::Value::String(args) => {
                 let str = args.to_str()?;
 
-                let entry = if let Some(name) = str.strip_prefix("#builtin.") {
-                    LuaPluginSpec::Builtin(BuiltinPluginSpec::new(
-                        name.to_string(),
-                        String::from("{}"),
-                    ))
-                } else {
-                    let mut path = PathBuf::new();
-                    if str.is_empty() || str == "." {
-                        return Err(mlua::Error::external("Plugin name cannot be empty"));
+                if let Some(name) = str.strip_prefix("#builtin.") {
+                    match name {
+                        "lastfm" | "notify" | "playcount" | "lyrics" => tracing::error!(
+                            "Builtin plugin '{name}' was removed and will not be loaded. Replace \
+                             rmpcd.install(\"#builtin.{name}\") with rmpcd.install({{ url = \
+                             \"https://github.com/rmpc-org/rmpcd-{name}.git\" }}) in your init.lua"
+                        ),
+                        _ => tracing::error!(
+                            "Unknown builtin plugin '{name}' will not be loaded. Builtin plugins \
+                             were removed in favor of remote plugins."
+                        ),
                     }
+                    let handle = lua.create_table()?;
+                    handle
+                        .raw_set("setup", lua.create_function(|_, _: mlua::MultiValue| Ok(()))?)?;
+                    return Ok(handle);
+                }
 
-                    let split = str.split('.');
+                if str.is_empty() || str == "." {
+                    return Err(mlua::Error::external("Plugin name cannot be empty"));
+                }
 
-                    for segment in split {
-                        path.push(segment);
-                    }
-                    LuaPluginSpec::Local(LocalPluginSpec::new(path, String::from("{}")))
-                };
-
-                record_entry(entry).await?
+                let path: PathBuf = str.split('.').collect();
+                record_entry(LuaPluginSpec::Local(LocalPluginSpec::new(path, String::from("{}"))))
+                    .await?
             }
             mlua::Value::Table(table) => {
                 let git_url = table.get::<String>("url")?;
@@ -111,18 +114,6 @@ pub struct LocalPluginSpec {
 impl LocalPluginSpec {
     pub fn new(path: PathBuf, args: String) -> Self {
         Self { path, args }
-    }
-}
-
-#[derive(Clone, Debug)]
-pub struct BuiltinPluginSpec {
-    pub name: String,
-    pub args: String,
-}
-
-impl BuiltinPluginSpec {
-    pub fn new(name: String, args: String) -> Self {
-        Self { name, args }
     }
 }
 

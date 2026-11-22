@@ -21,17 +21,12 @@ use crate::{
             LuaPlugin,
             LuaPluginSpec,
             RemotePluginSpec,
-            spec::{BuiltinPluginSpec, LocalPluginSpec},
+            spec::LocalPluginSpec,
             triggers::Triggers,
         },
     },
     pkg::{AddResult, Lockfile, run_add},
 };
-
-const LASTFM: &str = include_str!("../builtin/lastfm.lua");
-const NOTIFY: &str = include_str!("../builtin/notify.lua");
-const PLAYCOUNT: &str = include_str!("../builtin/playcount.lua");
-const LYRICS: &str = include_str!("../builtin/lyrics.lua");
 
 pub async fn load(
     cfg_dir: &Path,
@@ -40,23 +35,9 @@ pub async fn load(
     lockfile: &mut Lockfile,
 ) -> Result<LuaPlugin> {
     match &*plugin.read().await {
-        LuaPluginSpec::Builtin(spec) => load_builtin(spec, client).await,
         LuaPluginSpec::Local(spec) => load_local(spec, cfg_dir, client).await,
         LuaPluginSpec::Remote(spec) => load_remote(spec, client, lockfile).await,
     }
-}
-
-async fn load_builtin(spec: &BuiltinPluginSpec, client: &Arc<AsyncClient>) -> Result<LuaPlugin> {
-    let content = match spec.name.as_str() {
-        "lastfm" => LASTFM,
-        "notify" => NOTIFY,
-        "playcount" => PLAYCOUNT,
-        "lyrics" => LYRICS,
-        _ => bail!("Unknown builtin plugin: {}", spec.name),
-    };
-    let name = format!("#builtin/{}", spec.name);
-
-    load_single(content, name, &spec.args, None, client).await
 }
 
 async fn load_remote(
