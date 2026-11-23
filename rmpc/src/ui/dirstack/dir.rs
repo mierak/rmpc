@@ -218,7 +218,7 @@ where
 
     pub fn set_visual_anchor(&mut self) {
         if let Some(sel) = self.state.get_selected() {
-            self.state.set_visual_anchor(sel)
+            self.state.set_visual_anchor(sel);
         }
     }
 

@@ -1156,14 +1156,14 @@ impl Pane for QueuePane {
                     ctx.render()?;
                 }
                 CommonAction::Visual => {
-                    if !self.queue.visual_is_active() {
+                    if self.queue.visual_is_active() {
+                        self.queue.exit_visual();
+                    } else {
                         self.queue.set_visual_anchor();
                         if self.queue.selected().is_some() {
                             self.queue.mark_selected();
                             ctx.render()?;
                         }
-                    } else {
-                        self.queue.exit_visual();
                     }
                 }
                 CommonAction::CopyToClipboard { kind: CopyContentsKind::Content(content) } => {
