@@ -333,18 +333,19 @@ impl<T: ScrollingState> DirState<T> {
     }
 
     fn apply_visual_selection(&mut self) {
-        if let Some(anchor) = self.visual_anchor 
-            && let Some(selected) = self.get_selected() {
-                self.unmark_all();
-                // Sort the values so we don't have to use a seperate loop if the selected is
-                // smaller than the anchor
-                let (start, end) = (anchor.min(selected), anchor.max(selected));
-                for i in start..=end {
-                    self.mark(i);
-                }
-                for i in self.marked_before_visual.clone() {
-                    self.mark(i);
-                }
+        if let Some(anchor) = self.visual_anchor
+            && let Some(selected) = self.get_selected()
+        {
+            self.unmark_all();
+            // Sort the values so we don't have to use a seperate loop if the
+            // selected is smaller than the anchor
+            let (start, end) = (anchor.min(selected), anchor.max(selected));
+            for i in start..=end {
+                self.mark(i);
+            }
+            for i in self.marked_before_visual.clone() {
+                self.mark(i);
+            }
         }
     }
 

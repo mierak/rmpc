@@ -514,7 +514,7 @@ where
                 self.fetch_data_internal(ctx);
                 ctx.render()?;
             }
-            CommonAction::Visual =>  todo!(),
+            CommonAction::Visual => todo!(),
             CommonAction::CopyToClipboard { kind: CopyContentsKind::Content(content) } => {
                 let items = self.items(content.all);
                 let format = match &content.content {

@@ -217,7 +217,9 @@ where
     }
 
     pub fn set_visual_anchor(&mut self) {
-        if let Some(sel) = self.state.get_selected() { self.state.set_visual_anchor(sel) }
+        if let Some(sel) = self.state.get_selected() {
+            self.state.set_visual_anchor(sel)
+        }
     }
 
     pub fn visual_is_active(&mut self) -> bool {
