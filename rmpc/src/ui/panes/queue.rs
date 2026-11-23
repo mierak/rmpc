@@ -1155,6 +1155,17 @@ impl Pane for QueuePane {
 
                     ctx.render()?;
                 }
+                CommonAction::Visual => {
+                    if !self.queue.visual_is_active() {
+                        self.queue.set_visual_anchor();
+                        if self.queue.selected().is_some() {
+                            self.queue.mark_selected();
+                            ctx.render()?;
+                        }
+                    } else {
+                        self.queue.exit_visual();
+                    }
+                }
                 CommonAction::CopyToClipboard { kind: CopyContentsKind::Content(content) } => {
                     let items = self.items(content.all);
                     let (sep, format) = match &content.content {
@@ -1192,6 +1203,7 @@ impl Pane for QueuePane {
                 }
                 CommonAction::Close if !self.queue.marked().is_empty() => {
                     self.queue.marked_mut().clear();
+                    self.queue.exit_visual();
                     ctx.render()?;
                 }
                 CommonAction::AddOptions { kind: AddKind::Action(options) } => {

@@ -11,6 +11,8 @@ pub struct DirState<T: ScrollingState> {
     pub marked: BTreeSet<usize>,
     content_len: Option<usize>,
     viewport_len: Option<usize>,
+    visual_anchor: Option<usize>,
+    marked_before_visual: BTreeSet<usize>,
 }
 
 #[allow(dead_code)]
@@ -327,6 +329,23 @@ impl<T: ScrollingState> DirState<T> {
         self.apply_scrolloff(scrolloff);
 
         self.scrollbar_state = self.scrollbar_state.position(self.offset());
+        self.apply_visual_selection();
+    }
+
+    fn apply_visual_selection(&mut self) {
+        if let Some(anchor) = self.visual_anchor 
+            && let Some(selected) = self.get_selected() {
+                self.unmark_all();
+                // Sort the values so we don't have to use a seperate loop if the selected is
+                // smaller than the anchor
+                let (start, end) = (anchor.min(selected), anchor.max(selected));
+                for i in start..=end {
+                    self.mark(i);
+                }
+                for i in self.marked_before_visual.clone() {
+                    self.mark(i);
+                }
+        }
     }
 
     fn apply_scrolloff(&mut self, scrolloff: usize) {
@@ -400,6 +419,19 @@ impl<T: ScrollingState> DirState<T> {
 
     pub fn toggle_mark(&mut self, idx: usize) -> bool {
         if self.marked.contains(&idx) { self.marked.remove(&idx) } else { self.marked.insert(idx) }
+    }
+
+    pub fn set_visual_anchor(&mut self, idx: usize) {
+        self.visual_anchor = Some(idx);
+        self.marked_before_visual = self.marked.clone();
+    }
+
+    pub fn visual_is_active(&mut self) -> bool {
+        return self.visual_anchor.is_some();
+    }
+
+    pub fn unset_visual_anchor(&mut self) {
+        self.visual_anchor = None;
     }
 
     pub fn invert_marked(&mut self) {
