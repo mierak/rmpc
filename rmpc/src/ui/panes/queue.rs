@@ -783,6 +783,7 @@ impl Pane for QueuePane {
                         });
                     }
                     self.queue.marked_mut().clear();
+                    self.queue.exit_visual();
                     status_info!("Marked songs removed from queue");
                     ctx.render()?;
                 }
@@ -1219,6 +1220,7 @@ impl Pane for QueuePane {
                             None,
                         );
                         self.queue.marked_mut().clear();
+                        self.queue.exit_visual();
                     }
                 }
                 CommonAction::AddOptions { kind: AddKind::Modal(items) } => {
@@ -1233,6 +1235,7 @@ impl Pane for QueuePane {
 
                     modal!(ctx, create_add_modal(opts, ctx));
                     self.queue.marked_mut().clear();
+                    self.queue.exit_visual();
                 }
                 CommonAction::ShowInfo => {
                     if let Some(selected_song) = self.queue.selected() {
