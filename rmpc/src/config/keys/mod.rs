@@ -152,7 +152,7 @@ impl Default for KeyConfigFile {
             (s().char('N'),                       C::PreviousResult),
             (s().char(' '),                       C::Select),
             (s().char(' ').ctrl(),                C::InvertSelection),
-            (s().char('F'),                       C::Visual),
+            (s().char('V'),                       C::ToggleVisual),
             (s().char('Y'),                       C::CopyToClipboard { kind: CopyContentsKindFile::default() }),
             (s().char('y'),                       C::CopyToClipboard { kind: CopyContentsKindFile::Content(CopyContentsFile { all: false, content: CopyContentFile::DisplayedValue })}),
             (s().char('a'),                       C::Add),

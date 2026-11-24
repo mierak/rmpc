@@ -13,6 +13,7 @@ pub enum InputMode {
     #[default]
     Normal,
     Insert(BufferId),
+    Visual,
 }
 
 #[derive(derive_more::Debug, Default)]
@@ -62,6 +63,7 @@ impl InputManager {
         match self.mode.get() {
             InputMode::Insert(active_id) => active_id == id,
             InputMode::Normal => false,
+            InputMode::Visual => false,
         }
     }
 
@@ -95,12 +97,20 @@ impl InputManager {
         matches!(self.mode.get(), InputMode::Normal)
     }
 
+    pub fn is_visual_mode(&self) -> bool {
+        matches!(self.mode.get(), InputMode::Visual)
+    }
+
     pub fn insert_mode(&self, id: BufferId) {
         self.mode.replace(InputMode::Insert(id));
     }
 
     pub fn normal_mode(&self) {
         self.mode.replace(InputMode::Normal);
+    }
+
+    pub fn visual_mode(&self) {
+        self.mode.replace(InputMode::Visual);
     }
 
     pub fn handle_input(&self, ev: Option<InputEvent>) -> Option<InputResultEvent> {

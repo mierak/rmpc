@@ -17,10 +17,12 @@ use crate::{
 pub struct KeyResolver {
     normal_root: KeyTreeNode,
     insert_root: KeyTreeNode,
+    visual_root: KeyTreeNode,
     timeout_id: Id,
     buffer: RefCell<Vec<Key>>,
     normal_timeout: Duration,
     insert_timeout: Duration,
+    visual_timeout: Duration,
 }
 
 #[derive(Debug)]
@@ -36,10 +38,12 @@ impl KeyResolver {
         Self {
             normal_root: KeyTreeNode::build_trie(&cfg.keybinds, InputModeDiscriminants::Normal),
             insert_root: KeyTreeNode::build_trie(&cfg.keybinds, InputModeDiscriminants::Insert),
+            visual_root: KeyTreeNode::build_trie(&cfg.keybinds, InputModeDiscriminants::Visual),
             timeout_id: id::new(),
             buffer: RefCell::new(Vec::new()),
             normal_timeout: Duration::from_millis(cfg.normal_timeout_ms),
             insert_timeout: Duration::from_millis(cfg.insert_timeout_ms),
+            visual_timeout: Duration::from_millis(cfg.visual_timeout_ms),
         }
     }
 
@@ -57,6 +61,7 @@ impl KeyResolver {
         let root = match ctx.input.mode() {
             InputMode::Normal => &self.normal_root,
             InputMode::Insert(_) => &self.insert_root,
+            InputMode::Visual => &self.visual_root,
         };
         match ctx.input.mode() {
             InputMode::Normal => match self.traverse(&buf, root) {
@@ -83,6 +88,17 @@ impl KeyResolver {
                 TraverseResult::Prefix => {
                     self.flush_insert_buffer(None, std::mem::take(&mut buf), ctx);
                 }
+            },
+            InputMode::Visual => match self.traverse(&buf, root) {
+                TraverseResult::Exact(action) => {
+                    self.execute_action(action, ctx);
+                }
+                TraverseResult::Ambiguous(action) => {
+                    self.execute_action(action, ctx);
+                }
+                // Nothing to do here, just clear the buffer
+                TraverseResult::Mismatch => {}
+                TraverseResult::Prefix => {}
             },
         }
 
@@ -125,6 +141,21 @@ impl KeyResolver {
                     self.schedule_timeout(ctx);
                 }
             },
+            InputMode::Visual => match self.traverse(&buf, &self.visual_root) {
+                TraverseResult::Exact(action) => {
+                    self.execute_action(action, ctx);
+                    buf.clear();
+                }
+                TraverseResult::Ambiguous(_action) => {
+                    self.schedule_timeout(ctx);
+                }
+                TraverseResult::Mismatch => {
+                    buf.clear();
+                }
+                TraverseResult::Prefix => {
+                    self.schedule_timeout(ctx);
+                }
+            },
         }
     }
 
@@ -132,6 +163,7 @@ impl KeyResolver {
         let timeout = match ctx.input.mode() {
             InputMode::Normal => self.normal_timeout,
             InputMode::Insert(_) => self.insert_timeout,
+            InputMode::Visual => self.visual_timeout,
         };
         ctx.scheduler.schedule_replace(self.timeout_id, timeout, |(tx, _)| {
             log::trace!("Key sequence timeout reached, sending timeout event");
@@ -376,6 +408,7 @@ mod test {
         assert_eq!(resolver.buffer_to_string(), "ga");
 
         resolver.handle_timeout(&ctx);
+        self.schedule_timeout(ctx);
 
         assert!(
             resolver.buffer.borrow().is_empty(),

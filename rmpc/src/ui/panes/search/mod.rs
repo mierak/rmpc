@@ -424,7 +424,9 @@ impl SearchPane {
                 CommonAction::PreviousResult => {}
                 CommonAction::Select => {}
                 CommonAction::InvertSelection => {}
-                CommonAction::Visual => {}
+                CommonAction::ToggleVisual => {
+                    todo!()
+                }
                 CommonAction::CopyToClipboard { kind: _ } => {}
                 CommonAction::Rename => {}
                 CommonAction::Close => {}
@@ -684,7 +686,7 @@ impl SearchPane {
 
                     ctx.render()?;
                 }
-                CommonAction::Visual => todo!(),
+                CommonAction::ToggleVisual => todo!(),
                 CommonAction::CopyToClipboard { kind: CopyContentsKind::Content(content) } => {
                     let items = self.items(content.all);
                     let format = match &content.content {

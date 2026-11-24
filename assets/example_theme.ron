@@ -271,6 +271,7 @@
                 (kind: Transform(Replace(content: (kind: Property(Status(InputMode()))), replacements: [
                     (match: "Normal", replace: (kind: Text(" NORMAL "), style: (fg: "black", bg: "blue"))),
                     (match: "Insert", replace: (kind: Text(" INSERT "), style: (fg: "black", bg: "green"))),
+                    (match: "Visual", replace: (kind: Text(" VISUAL "), style: (fg: "black", bg: "yellow"))),
                 ])))
             ], align: Center
         )),

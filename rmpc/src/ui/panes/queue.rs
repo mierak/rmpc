@@ -936,6 +936,9 @@ impl Pane for QueuePane {
                         return Ok(());
                     }
 
+                    let was_visual_before = ctx.input.is_visual_mode();
+                    self.queue.exit_visual();
+
                     let ranges = self.queue.marked().ranges().collect_vec();
                     for range in ranges {
                         for idx in range.clone() {
@@ -965,6 +968,9 @@ impl Pane for QueuePane {
                         self.queue.marked().iter().map(|i| i.saturating_sub(1)).collect();
                     std::mem::swap(self.queue.marked_mut(), &mut new_marked);
 
+                    if was_visual_before {
+                        self.queue.set_visual_anchor();
+                    }
                     ctx.render()?;
                     return Ok(());
                 }
@@ -979,6 +985,8 @@ impl Pane for QueuePane {
                         return Ok(());
                     }
 
+                    let was_visual_before = ctx.input.is_visual_mode();
+                    self.queue.exit_visual();
                     let ranges = self.queue.marked().ranges().rev().collect_vec();
                     for range in ranges {
                         for idx in range.clone().rev() {
@@ -1007,6 +1015,10 @@ impl Pane for QueuePane {
                     let mut new_marked =
                         self.queue.marked().iter().map(|i| i.saturating_add(1)).collect();
                     std::mem::swap(self.queue.marked_mut(), &mut new_marked);
+
+                    if was_visual_before {
+                        self.queue.set_visual_anchor();
+                    }
 
                     ctx.render()?;
                     return Ok(());
@@ -1046,6 +1058,7 @@ impl Pane for QueuePane {
                     let Some(idx) = self.queue.selected_idx() else {
                         return Ok(());
                     };
+                    self.queue.exit_visual();
 
                     let new_idx = (idx + 1).min(self.queue.len() - 1);
                     ctx.app_event_sender.send(AppEvent::IgnoreIdleEvent(IdleEvent::Playlist))?;
@@ -1156,11 +1169,13 @@ impl Pane for QueuePane {
 
                     ctx.render()?;
                 }
-                CommonAction::Visual => {
-                    if self.queue.visual_is_active() {
+                CommonAction::ToggleVisual => {
+                    if ctx.input.is_visual_mode() {
                         self.queue.exit_visual();
+                        ctx.input.normal_mode();
                     } else {
                         self.queue.set_visual_anchor();
+                        ctx.input.visual_mode();
                         if self.queue.selected().is_some() {
                             self.queue.mark_selected();
                             ctx.render()?;
@@ -1204,6 +1219,7 @@ impl Pane for QueuePane {
                 }
                 CommonAction::Close if !self.queue.marked().is_empty() => {
                     self.queue.marked_mut().clear();
+                    ctx.input.normal_mode();
                     self.queue.exit_visual();
                     ctx.render()?;
                 }

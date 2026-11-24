@@ -34,7 +34,15 @@ impl KeyTreeNode {
             root.insert(&seq.0.0, Actions::Common(seq.1.clone()));
         }
 
-        if matches!(mode, InputModeDiscriminants::Normal) {
+        for seq in
+            cfg.navigation.iter().filter(|(_, _)| matches!(mode, InputModeDiscriminants::Visual))
+        {
+            root.insert(&seq.0.0, Actions::Common(seq.1.clone()));
+        }
+
+        if matches!(mode, InputModeDiscriminants::Normal)
+            || matches!(mode, InputModeDiscriminants::Visual)
+        {
             for seq in &cfg.queue {
                 root.insert(&seq.0.0, Actions::Queue(seq.1.clone()));
             }

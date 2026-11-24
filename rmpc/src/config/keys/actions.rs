@@ -973,7 +973,7 @@ pub enum CommonActionFile {
     PreviousResult,
     Select,
     InvertSelection,
-    Visual,
+    ToggleVisual,
     CopyToClipboard {
         #[serde(default)]
         kind: CopyContentsKindFile,
@@ -1044,7 +1044,7 @@ pub enum CommonAction {
     PreviousResult,
     Select,
     InvertSelection,
-    Visual,
+    ToggleVisual,
     CopyToClipboard {
         kind: CopyContentsKind,
     },
@@ -1105,7 +1105,7 @@ impl ToDescription for CommonAction {
                 "Mark current item as selected in the browser, useful for example when you want to add multiple songs to a playlist".into()
             }
             CommonAction::InvertSelection => "Inverts the current selected items".into(),
-            CommonAction::Visual => "Enter visual mode".into(),
+            CommonAction::ToggleVisual => "Enter visual mode".into(),
             CommonAction::CopyToClipboard { kind: _ } => "Copy item(s) under cursor to clipboard".into(),
             CommonAction::Delete => {
                 "Delete. For example a playlist, song from a playlist or wipe the current queue".into()
@@ -1301,7 +1301,7 @@ impl TryFrom<CommonActionFile> for CommonAction {
             CommonActionFile::PreviousResult => CommonAction::PreviousResult,
             CommonActionFile::Select => CommonAction::Select,
             CommonActionFile::InvertSelection => CommonAction::InvertSelection,
-            CommonActionFile::Visual => CommonAction::Visual,
+            CommonActionFile::ToggleVisual => CommonAction::ToggleVisual,
             CommonActionFile::CopyToClipboard { kind } => {
                 CommonAction::CopyToClipboard { kind: kind.try_into()? }
             }
