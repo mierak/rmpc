@@ -137,6 +137,7 @@ impl QueuePane {
             ctx.input.visual_mode();
         }
     }
+
     fn exit_visual(&mut self, ctx: &Ctx) {
         if self.queue.visual_is_active() {
             self.queue.exit_visual();
@@ -1194,6 +1195,7 @@ impl Pane for QueuePane {
                 }
                 CommonAction::InvertSelection => {
                     self.queue.invert_marked();
+                    self.exit_visual(ctx);
 
                     ctx.render()?;
                 }
