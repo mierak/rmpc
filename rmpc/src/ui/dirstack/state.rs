@@ -422,16 +422,17 @@ impl<T: ScrollingState> DirState<T> {
         if self.marked.contains(&idx) { self.marked.remove(&idx) } else { self.marked.insert(idx) }
     }
 
-    pub fn set_visual_anchor(&mut self, idx: usize) {
+    pub fn enter_visual(&mut self, idx: usize) {
         self.visual_anchor = Some(idx);
         self.marked_before_visual = self.marked.clone();
+        self.apply_visual_selection();
     }
 
     pub fn visual_is_active(&mut self) -> bool {
         return self.visual_anchor.is_some();
     }
 
-    pub fn unset_visual_anchor(&mut self) {
+    pub fn exit_visual(&mut self) {
         self.visual_anchor = None;
     }
 

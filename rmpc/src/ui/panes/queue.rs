@@ -131,6 +131,19 @@ impl QueuePane {
         s
     }
 
+    fn enter_visual(&mut self, ctx: &Ctx) {
+        if !self.queue.visual_is_active() {
+            self.queue.enter_visual();
+            ctx.input.visual_mode();
+        }
+    }
+    fn exit_visual(&mut self, ctx: &Ctx) {
+        if self.queue.visual_is_active() {
+            self.queue.exit_visual();
+            ctx.input.normal_mode();
+        }
+    }
+
     pub fn init(ctx: &Ctx) -> (Vec<Constraint>, Vec<Property<SongProperty>>) {
         (
             ctx.config
@@ -783,7 +796,7 @@ impl Pane for QueuePane {
                         });
                     }
                     self.queue.marked_mut().clear();
-                    self.queue.exit_visual();
+                    self.exit_visual(ctx);
                     status_info!("Marked songs removed from queue");
                     ctx.render()?;
                 }
@@ -969,7 +982,7 @@ impl Pane for QueuePane {
                     std::mem::swap(self.queue.marked_mut(), &mut new_marked);
 
                     if was_visual_before {
-                        self.queue.set_visual_anchor();
+                        self.queue.enter_visual();
                     }
                     ctx.render()?;
                     return Ok(());
@@ -1017,7 +1030,7 @@ impl Pane for QueuePane {
                     std::mem::swap(self.queue.marked_mut(), &mut new_marked);
 
                     if was_visual_before {
-                        self.queue.set_visual_anchor();
+                        self.queue.enter_visual();
                     }
 
                     ctx.render()?;
@@ -1036,6 +1049,9 @@ impl Pane for QueuePane {
                         return Ok(());
                     }
 
+                    let was_visual_before = ctx.input.is_visual_mode();
+                    self.queue.exit_visual();
+
                     let new_idx = idx.saturating_sub(1);
                     ctx.app_event_sender.send(AppEvent::IgnoreIdleEvent(IdleEvent::Playlist))?;
                     ctx.command(move |tx, client| {
@@ -1048,6 +1064,11 @@ impl Pane for QueuePane {
                     });
                     self.queue.select_idx(new_idx, ctx.config.scrolloff);
                     self.queue.items.swap(idx, new_idx);
+
+                    if was_visual_before {
+                        self.queue.enter_visual();
+                    }
+
                     ctx.render()?;
                 }
                 CommonAction::MoveDown => {
@@ -1058,6 +1079,8 @@ impl Pane for QueuePane {
                     let Some(idx) = self.queue.selected_idx() else {
                         return Ok(());
                     };
+
+                    let was_visual_before = ctx.input.is_visual_mode();
                     self.queue.exit_visual();
 
                     let new_idx = (idx + 1).min(self.queue.len() - 1);
@@ -1072,6 +1095,11 @@ impl Pane for QueuePane {
                     });
                     self.queue.select_idx(new_idx, ctx.config.scrolloff);
                     self.queue.items.swap(idx, new_idx);
+
+                    if was_visual_before {
+                        self.queue.enter_visual();
+                    }
+
                     ctx.render()?;
                 }
                 CommonAction::DownHalf => {
@@ -1171,15 +1199,9 @@ impl Pane for QueuePane {
                 }
                 CommonAction::ToggleVisual => {
                     if ctx.input.is_visual_mode() {
-                        self.queue.exit_visual();
-                        ctx.input.normal_mode();
+                        self.exit_visual(ctx);
                     } else {
-                        self.queue.set_visual_anchor();
-                        ctx.input.visual_mode();
-                        if self.queue.selected().is_some() {
-                            self.queue.mark_selected();
-                            ctx.render()?;
-                        }
+                        self.enter_visual(ctx);
                     }
                 }
                 CommonAction::CopyToClipboard { kind: CopyContentsKind::Content(content) } => {
@@ -1220,7 +1242,7 @@ impl Pane for QueuePane {
                 CommonAction::Close if !self.queue.marked().is_empty() => {
                     self.queue.marked_mut().clear();
                     ctx.input.normal_mode();
-                    self.queue.exit_visual();
+                    self.exit_visual(ctx);
                     ctx.render()?;
                 }
                 CommonAction::AddOptions { kind: AddKind::Action(options) } => {
@@ -1236,7 +1258,7 @@ impl Pane for QueuePane {
                             None,
                         );
                         self.queue.marked_mut().clear();
-                        self.queue.exit_visual();
+                        self.exit_visual(ctx);
                     }
                 }
                 CommonAction::AddOptions { kind: AddKind::Modal(items) } => {
@@ -1251,7 +1273,7 @@ impl Pane for QueuePane {
 
                     modal!(ctx, create_add_modal(opts, ctx));
                     self.queue.marked_mut().clear();
-                    self.queue.exit_visual();
+                    self.exit_visual(ctx);
                 }
                 CommonAction::ShowInfo => {
                     if let Some(selected_song) = self.queue.selected() {

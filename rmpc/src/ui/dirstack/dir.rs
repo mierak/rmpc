@@ -216,9 +216,9 @@ where
         self.state.invert_marked();
     }
 
-    pub fn set_visual_anchor(&mut self) {
+    pub fn enter_visual(&mut self) {
         if let Some(sel) = self.state.get_selected() {
-            self.state.set_visual_anchor(sel);
+            self.state.enter_visual(sel);
         }
     }
 
@@ -227,7 +227,7 @@ where
     }
 
     pub fn exit_visual(&mut self) {
-        self.state.unset_visual_anchor();
+        self.state.exit_visual();
     }
 
     pub fn toggle_mark_selected(&mut self) -> bool {
