@@ -3,7 +3,7 @@ use std::{collections::HashMap, sync::Arc};
 use itertools::Itertools;
 
 use crate::{
-    config::keys::{CommonAction, Key, KeyConfig},
+    config::keys::{CommonAction, GlobalAction, Key, KeyConfig},
     shared::keys::actions::Actions,
     ui::input::InputModeDiscriminants,
 };
@@ -18,6 +18,10 @@ fn is_insert_mode_action(action: &CommonAction) -> bool {
     matches!(action, CommonAction::Close | CommonAction::Confirm)
 }
 
+fn is_visual_mode_action(action: &GlobalAction) -> bool {
+    matches!(action, GlobalAction::Quit | GlobalAction::ExternalCommand { .. })
+}
+
 impl KeyTreeNode {
     pub fn build_trie(cfg: &KeyConfig, mode: InputModeDiscriminants) -> Self {
         let mut root = KeyTreeNode::default();
@@ -28,15 +32,17 @@ impl KeyTreeNode {
             }
         }
 
-        for seq in cfg.navigation.iter().filter(|(_, act)| {
-            matches!(mode, InputModeDiscriminants::Normal) || is_insert_mode_action(act)
-        }) {
-            root.insert(&seq.0.0, Actions::Common(seq.1.clone()));
+        if matches!(mode, InputModeDiscriminants::Visual) {
+            for seq in cfg.global.iter().filter(|(_, act)| is_visual_mode_action(act)) {
+                root.insert(&seq.0.0, Actions::Global(seq.1.clone()));
+            }
         }
 
-        for seq in
-            cfg.navigation.iter().filter(|(_, _)| matches!(mode, InputModeDiscriminants::Visual))
-        {
+        for seq in cfg.navigation.iter().filter(|(_, act)| {
+            matches!(mode, InputModeDiscriminants::Normal)
+                || is_insert_mode_action(act)
+                || matches!(mode, InputModeDiscriminants::Visual)
+        }) {
             root.insert(&seq.0.0, Actions::Common(seq.1.clone()));
         }
 

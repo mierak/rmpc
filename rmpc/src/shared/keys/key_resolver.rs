@@ -271,10 +271,12 @@ mod test {
         KeyResolver {
             normal_root: KeyTreeNode::build_trie(&cfg, InputModeDiscriminants::Normal),
             insert_root: KeyTreeNode::build_trie(&insert_cfg, InputModeDiscriminants::Insert),
+            visual_root: KeyTreeNode::build_trie(&cfg, InputModeDiscriminants::Visual),
             timeout_id: id::new(),
             buffer: RefCell::new(Vec::new()),
             normal_timeout: Duration::from_millis(1000),
             insert_timeout: Duration::from_millis(1000),
+            visual_timeout: Duration::from_millis(1000),
         }
     }
 
@@ -408,7 +410,6 @@ mod test {
         assert_eq!(resolver.buffer_to_string(), "ga");
 
         resolver.handle_timeout(&ctx);
-        self.schedule_timeout(ctx);
 
         assert!(
             resolver.buffer.borrow().is_empty(),
