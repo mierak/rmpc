@@ -109,6 +109,7 @@
             "zb":         ScrollFocusedToBottom,
             "<Space>":    Select,
             "<C-Space>":  InvertSelection,
+            "V":          ToggleVisual,
             "/":          EnterSearch,
             "n":          NextResult,
             "N":          PreviousResult,

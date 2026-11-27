@@ -216,6 +216,20 @@ where
         self.state.invert_marked();
     }
 
+    pub fn enter_visual(&mut self) {
+        if let Some(sel) = self.state.get_selected() {
+            self.state.enter_visual(sel);
+        }
+    }
+
+    pub fn visual_is_active(&mut self) -> bool {
+        return self.state.visual_is_active();
+    }
+
+    pub fn exit_visual(&mut self) {
+        self.state.exit_visual();
+    }
+
     pub fn toggle_mark_selected(&mut self) -> bool {
         if let Some(sel) = self.state.get_selected() { self.state.toggle_mark(sel) } else { false }
     }

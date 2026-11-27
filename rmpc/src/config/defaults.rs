@@ -393,6 +393,18 @@ pub fn components() -> HashMap<String, PaneOrSplitFile> {
                                     default: None,
                                 },
                             },
+                            ReplacementFile {
+                                r#match: "Visual".to_string(),
+                                replace: PropertyFile {
+                                    kind: PropertyKindFileOrText::Text(" VISUAL ".to_string()),
+                                    style: Some(StyleFile {
+                                        fg: Some("black".to_string()),
+                                        bg: Some("yellow".to_string()),
+                                        modifiers: None,
+                                    }),
+                                    default: None,
+                                },
+                            },
                         ],
                     }),
                     style: None,
