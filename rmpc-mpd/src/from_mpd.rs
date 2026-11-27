@@ -24,7 +24,10 @@ pub fn split_line(mut line: String) -> Result<(String, String), MpdError> {
         None => return Err(MpdError::ValueExpected(line)),
     };
     let mut value = line.split_off(delim_idx);
-    value.drain(..':'.len_utf8() + ' '.len_utf8());
+    value.remove(0);
+    if value.starts_with(' ') {
+        value.remove(0);
+    }
 
     Ok((line, value))
 }
