@@ -205,10 +205,10 @@ impl<T: SocketClient> ProtoClient for T {
                                 result.bytes_read = value.parse()?;
                                 break;
                             }
-                            key => {
-                                return Err(MpdError::Generic(format!(
-                                    "Unexpected key when parsing binary response: '{key}'"
-                                )));
+                            _ => {
+                                // Ignore unknown keys in attempt to be more
+                                // forward compatible with MPD, see https://github.com/mierak/rmpc/issues/1141
+                                log::warn!("Unexpected key when parsing binary response: '{key}'");
                             }
                         }
                     }
@@ -552,20 +552,6 @@ mod tests {
             let result = TestClient::new(buf).read_bin_inner(&mut Vec::new());
 
             assert_eq!(result, Err(MpdError::Mpd(err)));
-        }
-
-        #[test]
-        fn returns_error_when_unknown_receiving_value() {
-            let buf: &[u8] = b"idc: value\nOK\n";
-
-            let result = TestClient::new(buf).read_bin_inner(&mut Vec::new());
-
-            assert_eq!(
-                result,
-                Err(MpdError::Generic(String::from(
-                    "Unexpected key when parsing binary response: 'idc'"
-                )))
-            );
         }
 
         #[test]

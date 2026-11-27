@@ -117,6 +117,7 @@ keybinds
 - Improve rendering performance of the Queue pane
 - Remove dependency on flake-utils in Nix flake and use channels tarball
 - `Volume` pane not letting users use only partially default symbols
+- Reading of album art from the directory to be compatible with MPD 25
 
 ## [0.11.0] - 2026-02-01
 
